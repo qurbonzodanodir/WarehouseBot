@@ -7,12 +7,12 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 SELLER_MENU = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="📦 Заказать товар"),
-            KeyboardButton(text="💼 Мои остатки"),
+            KeyboardButton(text="🖼 Витрина"),
+            KeyboardButton(text="🛒 Заказ"),
         ],
         [
-            KeyboardButton(text="💰 Оформить продажу"),
-            KeyboardButton(text="📊 Отчет за день"),
+            KeyboardButton(text="📜 Продажи"),
+            KeyboardButton(text="📊 Отчет"),
         ],
     ],
     resize_keyboard=True,
@@ -23,35 +23,30 @@ SELLER_MENU = ReplyKeyboardMarkup(
 WAREHOUSE_MENU = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="🔔 Активные запросы"),
-            KeyboardButton(text="📦 Остатки склада"),
+            KeyboardButton(text="📥 Приход"),
+            KeyboardButton(text="📋 Образцы"),
         ],
         [
-            KeyboardButton(text="🚚 История отгрузок"),
+            KeyboardButton(text="🔔 Запросы"),
+            KeyboardButton(text="📦 Остатки"),
+        ],
+        [
+            KeyboardButton(text="🚚 Отгрузки"),
         ],
     ],
     resize_keyboard=True,
     input_field_placeholder="Выберите действие",
 )
 
-# ─── Owner ────────────────────────────────────────────────────────────
 OWNER_MENU = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="📈 Дашборд за сегодня"),
-            KeyboardButton(text="🏪 Рейтинг магазинов"),
+            KeyboardButton(text="📊 Дашборд"),
+            KeyboardButton(text="💰 Инкассация"),
         ],
         [
-            KeyboardButton(text="💸 Начать сбор кассы"),
-            KeyboardButton(text="📝 Список должников"),
-        ],
-        [
-            KeyboardButton(text="🆕 Добавить товар"),
-            KeyboardButton(text="📥 Пополнить склад"),
-        ],
-        [
-            KeyboardButton(text="📦 Популярные товары"),
-            KeyboardButton(text="⚙️ Настройки"),
+            KeyboardButton(text="📦 Каталог"),
+            KeyboardButton(text="⚙️ Управление"),
         ],
     ],
     resize_keyboard=True,

@@ -4,6 +4,7 @@ from app.models.product import Product
 from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.transaction import Transaction
+from app.models.invite_code import InviteCode
 
 __all__ = [
     "User",
@@ -12,4 +13,5 @@ __all__ = [
     "Inventory",
     "Order",
     "Transaction",
+    "InviteCode",
 ]

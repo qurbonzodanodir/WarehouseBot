@@ -19,3 +19,5 @@ class TransactionType(str, enum.Enum):
     SALE = "sale"
     RETURN = "return"
     CASH_COLLECTION = "cash_collection"
+    DISPLAY_TRANSFER = "display_transfer"
+    STOCK_RECEIVE = "stock_receive"

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     debug: bool = False
 
+    owner_telegram_id: int = 0  
     @property
     def webhook_url(self) -> str:
         return f"{self.webhook_host}{self.webhook_path}"

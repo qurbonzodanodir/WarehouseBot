@@ -21,7 +21,6 @@ class ReturnFlow(StatesGroup):
 
 
 class CashCollectionFlow(StatesGroup):
-    """Admin collecting cash from stores."""
     select_store = State()     # picking which store
     enter_amount = State()     # entering custom amount
 
@@ -37,3 +36,29 @@ class AddStockFlow(StatesGroup):
     select_product = State()
     enter_quantity = State()
 
+
+class RegistrationFlow(StatesGroup):
+    enter_code = State()
+
+
+class AddStoreFlow(StatesGroup):
+    enter_name = State()
+    enter_address = State()
+
+
+class InviteFlow(StatesGroup):
+    select_store = State()
+    select_role = State()
+
+
+class ReceiveStockFlow(StatesGroup):
+    """Warehouse worker receiving new stock."""
+    select_product = State()
+    enter_quantity = State()
+
+
+class DisplayTransferFlow(StatesGroup):
+    """Warehouse worker sending display samples to a store."""
+    select_store = State()
+    select_product = State()
+    enter_quantity = State()
