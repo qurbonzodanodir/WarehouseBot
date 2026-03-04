@@ -12,11 +12,25 @@ SELLER_MENU = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text="📜 Продажи"),
-            KeyboardButton(text="📊 Отчет"),
+            KeyboardButton(text="Ещё 🔽"),
         ],
     ],
     resize_keyboard=True,
     input_field_placeholder="Выберите действие",
+)
+
+SELLER_MORE_MENU = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="📊 Отчет"),
+            KeyboardButton(text="↩️ Сделать возврат"),
+        ],
+        [
+            KeyboardButton(text="🔙 Назад"),
+        ],
+    ],
+    resize_keyboard=True,
+    input_field_placeholder="Дополнительные опции",
 )
 
 # ─── Warehouse ────────────────────────────────────────────────────────
@@ -31,11 +45,25 @@ WAREHOUSE_MENU = ReplyKeyboardMarkup(
             KeyboardButton(text="📦 Остатки"),
         ],
         [
-            KeyboardButton(text="🚚 Отгрузки"),
+            KeyboardButton(text="Ещё 🔽"),
         ],
     ],
     resize_keyboard=True,
     input_field_placeholder="Выберите действие",
+)
+
+WAREHOUSE_MORE_MENU = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="🚚 Отгрузки"),
+            KeyboardButton(text="➕ Добавить товар"),
+        ],
+        [
+            KeyboardButton(text="🔙 Назад"),
+        ],
+    ],
+    resize_keyboard=True,
+    input_field_placeholder="Дополнительные опции",
 )
 
 OWNER_MENU = ReplyKeyboardMarkup(

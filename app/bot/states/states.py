@@ -55,6 +55,10 @@ class ReceiveStockFlow(StatesGroup):
     """Warehouse worker receiving new stock."""
     select_product = State()
     enter_quantity = State()
+    # Inline product creation
+    new_product_sku = State()
+    new_product_name = State()
+    new_product_price = State()
 
 
 class DisplayTransferFlow(StatesGroup):

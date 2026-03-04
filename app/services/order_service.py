@@ -18,16 +18,19 @@ async def get_available_products(session: AsyncSession) -> list[Product]:
 
 
 async def get_store_inventory(
-    session: AsyncSession, store_id: int
+    session: AsyncSession, store_id: int, include_empty: bool = False
 ) -> list[Inventory]:
     from sqlalchemy.orm import joinedload
 
     stmt = (
         select(Inventory)
         .options(joinedload(Inventory.product))
-        .where(Inventory.store_id == store_id, Inventory.quantity > 0)
-        .order_by(Inventory.product_id)
+        .where(Inventory.store_id == store_id)
     )
+    if not include_empty:
+        stmt = stmt.where(Inventory.quantity > 0)
+    
+    stmt = stmt.order_by(Inventory.product_id)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 

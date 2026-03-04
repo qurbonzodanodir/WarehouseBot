@@ -97,6 +97,37 @@ def delivery_accepted_kb(order_id: int) -> InlineKeyboardMarkup:
     )
     return builder.as_markup()
 
+def warehouse_return_kb(order_id: int) -> InlineKeyboardMarkup:
+    """Keyboard for warehouse to approve or reject a return from a store."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="✅ Принять возврат",
+            callback_data=f"order:approve_return:{order_id}",
+        ),
+        InlineKeyboardButton(
+            text="❌ Отклонить",
+            callback_data=f"order:reject_return:{order_id}",
+        ),
+    )
+    return builder.as_markup()
+
+
+def display_receive_kb(order_id: int) -> InlineKeyboardMarkup:
+    """Keyboard for seller to confirm receiving display samples."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="✅ Получил",
+            callback_data=f"display:receive:{order_id}",
+        ),
+        InlineKeyboardButton(
+            text="❌ Не получил",
+            callback_data=f"display:reject:{order_id}",
+        ),
+    )
+    return builder.as_markup()
+
 
 
 def product_select_kb(
@@ -169,6 +200,7 @@ def catalog_kb(
     page: int = 0,
     limit: int = 10,
     callback_prefix: str = "order:page",
+    item_callback_prefix: str = "order:select",
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     
@@ -179,7 +211,7 @@ def catalog_kb(
         builder.row(
             InlineKeyboardButton(
                 text=f"{p.sku} — {p.name} ({p.price} сом)",
-                callback_data=f"order:select:{p.id}",
+                callback_data=f"{item_callback_prefix}:{p.id}",
             )
         )
         

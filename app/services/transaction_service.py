@@ -17,6 +17,7 @@ async def record_sale(
     product_id: int,
     quantity: int,
     price_per_unit: Decimal,
+    order_id: int = None,
 ) -> Transaction:
 
     # Check inventory
@@ -26,6 +27,15 @@ async def record_sale(
         raise ValueError(
             f"Insufficient stock: have {available}, need {quantity}."
         )
+
+    if order_id is not None:
+        from app.models.order import Order
+        from app.models.enums import OrderStatus
+        order = await session.get(Order, order_id)
+        if order:
+            if order.status != OrderStatus.DELIVERED:
+                raise ValueError("Заявка уже обработана (продана или возвращена).")
+            order.status = OrderStatus.SOLD
 
     amount = price_per_unit * quantity
 
@@ -51,43 +61,106 @@ async def record_sale(
     return txn
 
 
-async def record_return(
+async def initiate_return(
     session: AsyncSession,
     store_id: int,
     user_id: int,
     product_id: int,
     quantity: int,
-    price_per_unit: Decimal,
-    reason: str,
+    order_id: int,
+) -> None:
+    """
+    Step 1: Seller initiates a return.
+    - Locks/deducts quantity from the store inventory.
+    - Sets order status to RETURN_PENDING.
+    - Does NOT decrease debt yet.
+    """
+    inv = await _get_inventory(session, store_id, product_id)
+    if inv is None or inv.quantity < quantity:
+        available = inv.quantity if inv else 0
+        raise ValueError(f"Insufficient stock to return: have {available}, need {quantity}.")
+
+    inv.quantity -= quantity
+
+    from app.models.order import Order
+    from app.models.enums import OrderStatus
+    order = await session.get(Order, order_id)
+    if order:
+        if order.status not in (OrderStatus.DELIVERED, OrderStatus.RETURN_PENDING):
+            raise ValueError(f"Заявка #{order_id} имеет статус {order.status}, возврат невозможен.")
+        order.status = OrderStatus.RETURN_PENDING
+
+    await session.flush()
+
+
+async def approve_return(
+    session: AsyncSession,
+    warehouse_store_id: int,
+    warehouse_user_id: int,
+    order_id: int,
 ) -> Transaction:
     """
-    Record a product return.
-    - Credit quantity back to store inventory.
-    - Create RETURN transaction (negative amount in terms of debt).
+    Step 2 (Approve): Warehouse approves the return.
+    - Credit quantity back to main warehouse inventory.
+    - Create RETURN transaction (negative amount).
     - Decrease store current_debt.
+    - Set order status to RETURNED.
     """
-    amount = price_per_unit * quantity
+    from app.models.order import Order
+    from app.models.enums import OrderStatus
+    from app.models.product import Product
+    order = await session.get(Order, order_id)
+    if order is None or order.status != OrderStatus.RETURN_PENDING:
+        raise ValueError("Invalid order status for return approval.")
 
-    # Credit inventory back
-    inv = await _get_or_create_inventory(session, store_id, product_id)
-    inv.quantity += quantity
+    product = await session.get(Product, order.product_id)
+    amount = product.price * order.quantity
+
+    # Credit inventory back to the Warehouse's store
+    inv = await _get_or_create_inventory(session, warehouse_store_id, order.product_id)
+    inv.quantity += order.quantity
+
+    order.status = OrderStatus.RETURNED
 
     txn = Transaction(
-        store_id=store_id,
-        user_id=user_id,
+        store_id=order.store_id, # Link transaction to the shop that originated it
+        user_id=warehouse_user_id,
         type=TransactionType.RETURN,
         amount=amount,
-        product_id=product_id,
-        quantity=quantity,
+        product_id=order.product_id,
+        quantity=order.quantity,
     )
     session.add(txn)
 
-    # Decrease debt
-    store = await session.get(Store, store_id)
+    # Decrease debt for the Store (not warehouse)
+    store = await session.get(Store, order.store_id)
     store.current_debt -= amount
 
     await session.flush()
     return txn
+
+
+async def reject_return(
+    session: AsyncSession,
+    order_id: int,
+) -> None:
+    """
+    Step 2 (Reject): Warehouse rejects the return.
+    - Put stock back into the Store's inventory.
+    - Set order status back to DELIVERED.
+    """
+    from app.models.order import Order
+    from app.models.enums import OrderStatus
+    order = await session.get(Order, order_id)
+    if order is None or order.status != OrderStatus.RETURN_PENDING:
+        raise ValueError("Invalid order status for return rejection.")
+
+    # Put inventory back into the store
+    inv = await _get_or_create_inventory(session, order.store_id, order.product_id)
+    inv.quantity += order.quantity
+
+    order.status = OrderStatus.DELIVERED
+    await session.flush()
 
 
 async def record_cash_collection(

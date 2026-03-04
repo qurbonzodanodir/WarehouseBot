@@ -5,6 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy.orm import selectinload
 from app.bot.states.states import DisplayTransferFlow
 from app.models.inventory import Inventory
 from app.models.product import Product
@@ -55,6 +56,7 @@ async def display_select_store(
     # Show warehouse inventory
     result = await session.execute(
         select(Inventory)
+        .options(selectinload(Inventory.product))
         .join(Product)
         .where(
             Inventory.store_id == user.store_id,
@@ -93,6 +95,7 @@ async def display_page_nav(
     
     result = await session.execute(
         select(Inventory)
+        .options(selectinload(Inventory.product))
         .join(Product)
         .where(
             Inventory.store_id == user.store_id,
@@ -165,35 +168,50 @@ async def display_enter_quantity(
         )
         return
 
-    # Deduct from warehouse
+    # 1. Deduct from warehouse immediately (reserve)
     wh_inv.quantity -= quantity
 
-    # Add to store
-    store_result = await session.execute(
-        select(Inventory).where(
-            Inventory.store_id == target_store_id,
-            Inventory.product_id == product_id,
-        )
+    # 2. Create a special "Order" for tracking display transfer
+    from app.models.order import Order
+    from app.models.enums import OrderStatus
+    
+    display_order = Order(
+        store_id=target_store_id,
+        product_id=product_id,
+        quantity=quantity,
+        status=OrderStatus.DISPLAY_DISPATCHED
     )
-    store_inv = store_result.scalar_one_or_none()
-    if store_inv:
-        store_inv.quantity += quantity
-    else:
-        store_inv = Inventory(
-            store_id=target_store_id, product_id=product_id, quantity=quantity
-        )
-        session.add(store_inv)
-
-    # NOTE: no debt increase — this is a display transfer, not a sale!
+    session.add(display_order)
+    await session.flush()  # Get display_order.id
+    
     await session.commit()
 
+    # 3. Notify the seller of the target store
+    from app.services import notification_service
+    from app.bot.keyboards.inline import display_receive_kb
+    from app.bot.bot import bot
+    
+    # Notify target store sellers
+    await notification_service.notify_sellers(
+        bot=bot,
+        session=session,
+        store_id=target_store_id,
+        text=(
+            f"🚚 <b>Склад отправил образцы для витрины!</b>\n\n"
+            f"📦 <b>{product_sku}</b> — {product_name}\n"
+            f"🔢 Количество: <b>{quantity} шт</b>\n\n"
+            f"📍 Пожалуйста, подтвердите получение, когда товар будет у вас."
+        ),
+        reply_markup=display_receive_kb(display_order.id)
+    )
+
     await message.answer(
-        f"✅ Образцы отправлены!\n\n"
+        f"✅ Запрос на отправку образцов создан!\n\n"
         f"🏪 {target_store_name}\n"
         f"📦 {product_name} (<code>{product_sku}</code>)\n"
         f"📋 Отправлено: {quantity} шт (витрина)\n"
         f"📊 Остаток на складе: {wh_inv.quantity} шт\n\n"
-        f"💡 Долг магазина <b>не увеличен</b> — это образцы.",
+        f"⏳ Продавец получит уведомление и должен подтвердить приёмку.",
         parse_mode="HTML",
     )
     await state.clear()

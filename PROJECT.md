@@ -19,15 +19,27 @@ app/
 │   ├── filters.py          # RoleFilter — фильтр по ролям
 │   ├── middlewares/auth.py  # AuthMiddleware — lookup user по telegram_id
 │   ├── keyboards/
-│   │   ├── reply.py        # Reply-клавиатуры (3 меню: seller, warehouse, owner)
-│   │   └── inline.py       # Inline-кнопки (заказы, продажи, инкассация, каталог, управление)
+│   │   ├── reply.py        # Reply-клавиатуры:
+│   │   │                   #   SELLER_MENU (Витрина, Заказ, Продажи, Ещё)
+│   │   │                   #   SELLER_MORE_MENU (Отчет, Сделать возврат, Назад)
+│   │   │                   #   WAREHOUSE_MENU (Приход, Образцы, Запросы, Остатки, Отгрузки)
+│   │   │                   #   OWNER_MENU (Дашборд, Инкассация, Каталог, Управление)
+│   │   └── inline.py       # Inline-кнопки (catalog_kb, product_select_kb, warehouse_return_kb и т.д.)
+│   │                       #   catalog_kb принимает callback_prefix и item_callback_prefix
 │   ├── states/states.py    # FSM: OrderFlow, SaleFlow, ReturnFlow, CashCollectionFlow,
 │   │                       #   AddProductFlow, AddStockFlow, RegistrationFlow,
-│   │                       #   AddStoreFlow, InviteFlow
+│   │                       #   AddStoreFlow, InviteFlow, ReceiveStockFlow, DisplayTransferFlow
 │   └── routers/
 │       ├── common.py       # /start (авто-регистрация owner + инвайт-код), /switch_role, /my_role
-│       ├── seller.py       # Заказ товара, остатки, продажа, приемка, отчет
-│       ├── warehouse.py    # Активные запросы, отгрузка, отказ, остатки склада, история
+│       ├── seller.py       # Заказ товара, витрина, продажи, приемка, возврат, отчет
+│       │                   #   ВАЖНО: содержит MENU_TEXTS set для защиты от конфликтов FSM
+│       │                   #   Все menu-хендлеры вызывают state.clear()
+│       └── warehouse/      # Пакет складщика (разбит по фичам)
+│           ├── __init__.py     # Главный роутер, включает суб-роутеры
+│           ├── orders.py       # 🔔 Запросы — отгрузка, отказ, ОДОБРЕНИЕ/ОТКЛОНЕНИЕ возврата
+│           ├── receive.py      # 📥 Приход — FSM приёмки товара на склад
+│           ├── display.py      # 📋 Образцы — отправка витринных рулонов в магазин
+│           └── stock.py        # 📦 Остатки — просмотр остатков склада
 │       └── owner/          # Пакет владельца (разбит по фичам)
 │           ├── __init__.py     # Главный роутер, включает суб-роутеры
 │           ├── dashboard.py    # 📊 Дашборд — статистика за день
@@ -39,32 +51,72 @@ app/
 │   ├── config.py           # Pydantic Settings (BOT_TOKEN, DATABASE_URL, DEBUG, OWNER_TELEGRAM_ID)
 │   └── database.py         # Async engine, session factory, Base
 ├── models/
-│   ├── enums.py            # UserRole(SELLER,WAREHOUSE,ADMIN,OWNER), OrderStatus, TransactionType
+│   ├── enums.py            # UserRole, OrderStatus, TransactionType (см. раздел Enums)
 │   ├── user.py             # telegram_id (BigInt unique), role, store_id FK
 │   ├── store.py            # name, address, current_debt
 │   ├── product.py          # sku (unique), name, price
 │   ├── inventory.py        # store_id + product_id (unique constraint), quantity
-│   ├── order.py            # status lifecycle: PENDING→DISPATCHED→DELIVERED/REJECTED
+│   ├── order.py            # status lifecycle (см. ниже)
 │   ├── transaction.py      # type: SALE/RETURN/CASH_COLLECTION, amount, product_id nullable
 │   └── invite_code.py      # code (unique 6-char), role, store_id, expires_at, is_used
 ├── services/
-│   ├── user_service.py     # get_user_by_telegram_id, list_users
-│   ├── order_service.py    # create_order, dispatch_order, deliver_order, reject_order, inventory
-│   ├── transaction_service.py  # record_sale, record_return, record_cash_collection
-│   ├── invite_service.py   # create_invite, get_invite_by_code, use_invite
-│   └── store_service.py    # list_active_stores, create_store
+│   ├── user_service.py         # get_user_by_telegram_id, list_users
+│   ├── order_service.py        # create_order, dispatch_order, deliver_order, reject_order
+│   │                           # get_store_inventory(session, store_id, include_empty=False)
+│   ├── transaction_service.py  # record_sale, initiate_return, approve_return, reject_return
+│   │                           # record_cash_collection
+│   ├── notification_service.py # notify_warehouse, notify_sellers
+│   ├── invite_service.py       # create_invite, get_invite_by_code, use_invite
+│   └── store_service.py        # list_active_stores, create_store
 └── (no schemas/ — removed)
+```
+
+## Enums (КРИТИЧЕСКИ ВАЖНО)
+
+### OrderStatus
+```python
+class OrderStatus(str, enum.Enum):
+    PENDING = "pending"        # Заказ создан продавцом
+    DISPATCHED = "dispatched"  # Курьер отправлен складщиком
+    DELIVERED = "delivered"    # Продавец принял товар
+    REJECTED = "rejected"     # Складщик отклонил заказ
+    SOLD = "sold"              # Продавец продал товар
+    RETURNED = "returned"     # Возврат одобрен складом
+    RETURN_PENDING = "return_pending"  # Возврат ожидает решения склада
+```
+
+### ⚠️ PostgreSQL Enum Case Sensitivity
+**КРИТИЧЕСКАЯ ПРОБЛЕМА**: В PostgreSQL enum `order_status` исторически содержит значения
+в РАЗНОМ регистре. Старые значения (`PENDING`, `DISPATCHED`) в UPPERCASE, а Python enum
+использует lowercase (`"pending"`, `"sold"`). При добавлении НОВЫХ значений через Alembic
+миграции нужно добавлять **ОБА** варианта регистра:
+
+```python
+# ПРАВИЛЬНО — всегда добавлять оба варианта:
+op.execute("ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'return_pending'")
+op.execute("ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'RETURN_PENDING'")
+```
+
+**Текущие значения в БД**: `PENDING`, `DISPATCHED`, `DELIVERED`, `REJECTED`,
+`sold`, `returned`, `return_pending`, `RETURN_PENDING`, `SOLD`, `RETURNED`
+
+### TransactionType
+```python
+class TransactionType(str, enum.Enum):
+    SALE = "sale"
+    RETURN = "return"
+    CASH_COLLECTION = "cash_collection"
+    DISPLAY_TRANSFER = "display_transfer"
+    STOCK_RECEIVE = "stock_receive"
 ```
 
 ## Роли (3 шт)
 
 | Роль | Enum | Меню |
 |---|---|---|
-| Продавец | `seller` | Заказ, остатки, продажа, отчет |
-| Складчик | `warehouse` | Заявки, отгрузка, остатки склада, история |
-| Владелец | `owner` | Дашборд, инкассация, каталог, управление системой |
-
-> **Примечание**: В enum `UserRole` ещё есть `ADMIN` (для совместимости с БД), но в боте он не используется.
+| Продавец | `seller` | Витрина, Заказ, Продажи, Ещё (Отчет, Возврат) |
+| Складчик | `warehouse` | Приход, Образцы, Запросы, Остатки, Отгрузки |
+| Владелец | `owner` | Дашборд, Инкассация, Каталог, Управление |
 
 ## Регистрация (закрытая система)
 
@@ -73,16 +125,38 @@ app/
    - Владелец: ⚙️ Управление → 👥 Сотрудники → ➕ Пригласить → выбор магазина → роль → бот генерирует 6-значный код
    - Сотрудник: `/start` → вводит код → автоматическая регистрация с ролью и магазином
 3. **Незнакомые пользователи** видят только: "🔒 Введите код приглашения"
-4. Команды `/register_owner` и `/add_user` **удалены**
-5. `/switch_role` работает **только в DEBUG режиме**
 
 ## Бизнес-логика
 
-### Сценарий: Заказ → Продажа
-1. Продавец создает заказ → `Order(PENDING)`
+### Сценарий: Заказ → Доставка → Продажа
+1. Продавец создает заказ (поиск по витрине) → `Order(PENDING)`
 2. Складчик подтверждает → списание со склада → `Order(DISPATCHED)` → уведомление продавцу
-3. Продавец принимает → зачисление в магазин → `Order(DELIVERED)`
-4. Продавец продает → списание из магазина → `Transaction(SALE)` → увеличение `current_debt`
+3. Продавец принимает → зачисление в магазин → `Order(DELIVERED)` → кнопки "Продал" / "Брак/Возврат"
+4. Продавец нажимает "Продал" → списание из магазина → `Transaction(SALE)` → увеличение `current_debt` → `Order(SOLD)`
+
+### Сценарий: Возврат (2-шаговый)
+**Важно**: Продавец может вернуть товар ДВУМЯ способами:
+- Через кнопку "Ещё 🔽" → "↩️ Сделать возврат" (самостоятельный поиск по витрине)
+- Через кнопку "↩️ Брак/Возврат" после приемки доставки (legacy, теперь перенаправляет)
+
+**Шаг 1 — Инициация (продавец):**
+1. Продавец ищет товар на витрине → выбирает → вводит количество
+2. Создается `Order(RETURN_PENDING)` → товар списывается с витрины
+3. Долг **НЕ** уменьшается
+4. Складщик получает уведомление с кнопками "✅ Принять" / "❌ Отклонить"
+
+**Шаг 2A — Одобрение (складщик):**
+- Товар зачисляется на склад → `Transaction(RETURN)` → `current_debt` уменьшается → `Order(RETURNED)`
+- Продавец получает уведомление: "Долг списан"
+
+**Шаг 2B — Отказ (складщик):**
+- Товар возвращается на витрину продавца → `Order(DELIVERED)` → долг не меняется
+- Продавец получает уведомление: "Возврат отклонен"
+
+### Сценарий: Образцы (display transfer)
+1. Складщик: "📋 Образцы" → выбирает магазин → выбирает товар → количество
+2. Товар списывается со склада, зачисляется в магазин
+3. Долг **НЕ** увеличивается (это образцы, не продажа)
 
 ### Сценарий: Инкассация
 1. Владелец нажимает «💰 Инкассация» → выбирает магазин с долгом
@@ -90,37 +164,19 @@ app/
 3. `Transaction(CASH_COLLECTION)` → уменьшение `current_debt`
 
 ## Ключевые правила
-- Нельзя продать товар, которого нет (проверка `quantity`)
+
+### Бизнес
+- Нельзя продать/вернуть товар, которого нет (проверка `quantity`)
 - Мягкое удаление (`is_active = False`)
 - Каталог (SKU, цены) управляется только владельцем
+
+### Технические
 - `server_default=func.now()` для `created_at`
 - Транзакции автоматически открываются в `AuthMiddleware`. В роутерах используется `await session.commit()` (**нельзя** использовать `async with session.begin():`)
-
-## Интерфейс владельца
-
-### Reply-кнопки (внизу):
-```
-📊 Дашборд       | 💰 Инкассация
-📦 Каталог       | 📥 Пополнить склад
-         ⚙️ Управление
-```
-
-### ⚙️ Управление (inline-меню):
-```
-🏢 Магазины     | 👥 Сотрудники
-📋 Должники     | 🏆 Рейтинг
-```
-
-## Команды бота
-| Команда / Кнопка | Кто | Описание |
-|---|---|---|
-| `/start` | Все | Меню или ввод инвайт-кода |
-| `/switch_role` | DEBUG | Сменить роль (только DEBUG) |
-| `/my_role` | Все | Показать текущую роль |
-| `/add_product` | Owner | Добавить товар (FSM) |
-| `[📦 Каталог]` | Owner | Список товаров |
-| `[📥 Пополнить склад]` | Owner | FSM по пополнению остатков |
-| `[⚙️ Управление]` | Owner | Inline-меню управления |
+- **Eager loading обязательно**: при обращении к relationships в async-контексте всегда использовать `selectinload()` или `joinedload()`, иначе получите `MissingGreenlet`
+- **FSM и меню-кнопки**: все handler'ы кнопок меню (Витрина, Продажи и т.д.) ДОЛЖНЫ вызывать `state.clear()` и фильтровать свой текст через `MENU_TEXTS` set, чтобы не конфликтовать с активным FSM search state
+- **catalog_kb / product_select_kb**: при использовании для разных потоков (заказ, возврат) передавать `item_callback_prefix` чтобы callback_data кнопок совпадали с ожидаемым хендлером
+- **PostgreSQL enums**: при добавлении новых значений через Alembic, добавлять ОБА регистра (см. раздел Enums)
 
 ## Переменные окружения (.env)
 ```
@@ -133,12 +189,11 @@ OWNER_TELEGRAM_ID=6018112126
 ## БД
 - PostgreSQL (localhost:5432, db: `warehouse_bot`)
 - User: `nodir` (без пароля)
-- Миграции: `21a7a3b36c8e_initial_tables`, `b9aacd02643f_add_invite_codes`
+- Миграции: см. `alembic/versions/`
 
 ## Текущие данные
-- База данных чистая (без тестовых товаров)
 - Владелец: telegram_id `6018112126` (Nodir)
-- Магазины: Главный склад (5), Магазин №1 (6)
+- Магазины: Главный склад (id=5), Магазин №1 (id=6)
 
 ## Запуск
 ```bash

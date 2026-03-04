@@ -13,6 +13,13 @@ class OrderStatus(str, enum.Enum):
     DISPATCHED = "dispatched"
     DELIVERED = "delivered"
     REJECTED = "rejected"
+    SOLD = "sold"
+    RETURNED = "returned"
+    RETURN_PENDING = "return_pending"
+    # Display transfers
+    DISPLAY_DISPATCHED = "display_dispatched"
+    DISPLAY_DELIVERED = "display_delivered"
+    DISPLAY_REJECTED = "display_rejected"
 
 
 class TransactionType(str, enum.Enum):
