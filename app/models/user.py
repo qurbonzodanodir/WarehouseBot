@@ -13,14 +13,18 @@ class User(Base):
         BigInteger, unique=True, index=True
     )
     name: Mapped[str] = mapped_column(String(255))
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"))
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", native_enum=False)
+    )
+
     store_id: Mapped[int | None] = mapped_column(
         ForeignKey("stores.id"), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(default=True)
+    language_code: Mapped[str] = mapped_column(String(5), default="ru")
 
     store: Mapped["Store | None"] = relationship(back_populates="users")  # noqa: F821
-    transactions: Mapped[list["Transaction"]] = relationship(  # noqa: F821
+    financial_transactions: Mapped[list["FinancialTransaction"]] = relationship(  # noqa: F821
         back_populates="user"
     )
 

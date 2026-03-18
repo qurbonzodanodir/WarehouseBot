@@ -1,3 +1,5 @@
+from typing import Any
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -9,24 +11,25 @@ from app.bot.routers.warehouse.orders import router as orders_router
 from app.bot.routers.warehouse.receive import router as receive_router
 from app.bot.routers.warehouse.display import router as display_router
 from app.bot.routers.warehouse.stock import router as stock_router
+from app.bot.routers.warehouse.product import router as product_router
 
 router = Router(name="warehouse")
 router.message.filter(RoleFilter(UserRole.WAREHOUSE))
 router.callback_query.filter(RoleFilter(UserRole.WAREHOUSE))
 
-from app.bot.keyboards.reply import WAREHOUSE_MENU, WAREHOUSE_MORE_MENU
+from app.bot.keyboards import reply
 
 
-@router.message(F.text == "Ещё 🔽")
-async def wh_show_more_menu(message: Message, state: FSMContext) -> None:
+@router.message(F.text.in_({"Ещё 🔽", "Боз 🔽"}))
+async def wh_show_more_menu(message: Message, state: FSMContext, _: Any) -> None:
     await state.clear()
-    await message.answer("Дополнительные опции:", reply_markup=WAREHOUSE_MORE_MENU)
+    await message.answer(_("more_options"), reply_markup=reply.get_warehouse_more_menu(_))
 
 
-@router.message(F.text == "🔙 Назад")
-async def wh_back_to_main_menu(message: Message, state: FSMContext) -> None:
+@router.message(F.text.in_({"🔙 Назад", "🔙 Ба қафо"}))
+async def wh_back_to_main_menu(message: Message, state: FSMContext, _: Any) -> None:
     await state.clear()
-    await message.answer("Главное меню:", reply_markup=WAREHOUSE_MENU)
+    await message.answer(_("main_menu_label"), reply_markup=reply.get_warehouse_menu(_))
 
 
 router.include_routers(
@@ -34,4 +37,5 @@ router.include_routers(
     receive_router,
     display_router,
     stock_router,
+    product_router,
 )

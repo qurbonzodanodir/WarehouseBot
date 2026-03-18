@@ -11,21 +11,28 @@ from app.models.inventory import Inventory
 from app.models.product import Product
 from app.models.store import Store
 from app.models.user import User
+from typing import Any
 
 router = Router(name="warehouse.display")
 
 
-@router.message(F.text == "📋 Образцы")
+@router.message(F.text.in_({"📋 Образцы", "📋 Намунаҳо"}))
 async def btn_display_transfer(
-    message: Message, state: FSMContext, session: AsyncSession
+    message: Message, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
+    from app.services import StoreService
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+
     result = await session.execute(
-        select(Store).where(Store.is_active.is_(True)).order_by(Store.id)
+        select(Store)
+        .where(Store.is_active.is_(True), Store.id != warehouse_id)
+        .order_by(Store.id)
     )
     stores = result.scalars().all()
 
     if not stores:
-        await message.answer("Нет магазинов.")
+        await message.answer(_("stores_not_found"))
         return
 
     builder = InlineKeyboardBuilder()
@@ -36,7 +43,7 @@ async def btn_display_transfer(
             )
         )
     await message.answer(
-        "📋 <b>Отправить образцы</b>\n\nВыберите магазин:",
+        _("display_transfer_title"),
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -47,11 +54,19 @@ async def btn_display_transfer(
     DisplayTransferFlow.select_store, F.data.startswith("display:store:")
 )
 async def display_select_store(
-    callback: CallbackQuery, state: FSMContext, user: User, session: AsyncSession
+    callback: CallbackQuery, state: FSMContext, user: User, session: AsyncSession, _: Any
 ) -> None:
     store_id = int(callback.data.split(":")[-1])
     store = await session.get(Store, store_id)
     await state.update_data(target_store_id=store_id, target_store_name=store.name)
+
+    from app.services import StoreService
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        await callback.message.edit_text(_("warehouse_not_found"))
+        await state.clear()
+        return
 
     # Show warehouse inventory
     result = await session.execute(
@@ -59,7 +74,7 @@ async def display_select_store(
         .options(selectinload(Inventory.product))
         .join(Product)
         .where(
-            Inventory.store_id == user.store_id,
+            Inventory.store_id == warehouse_id,
             Inventory.quantity > 0,
             Product.is_active.is_(True),
         )
@@ -68,7 +83,7 @@ async def display_select_store(
     items = result.scalars().all()
 
     if not items:
-        await callback.message.edit_text("Склад пуст — нечего отправлять.")
+        await callback.message.edit_text(_("stock_empty"))
         await state.clear()
         await callback.answer()
         return
@@ -76,10 +91,10 @@ async def display_select_store(
     from app.bot.keyboards.inline import product_select_kb
 
     await callback.message.edit_text(
-        f"🏪 <b>{store.name}</b>\n\nВыберите товар для витрины:",
+        _("display_select_product_title", store=store.name),
         parse_mode="HTML",
         reply_markup=product_select_kb(
-            items, page=0, callback_prefix="display:page", item_callback_prefix="display:product"
+            items, page=0, callback_prefix="display:page", item_callback_prefix="display:product", _=_
         ),
     )
     await state.set_state(DisplayTransferFlow.select_product)
@@ -89,16 +104,22 @@ async def display_select_store(
     DisplayTransferFlow.select_product, F.data.startswith("display:page:")
 )
 async def display_page_nav(
-    callback: CallbackQuery, state: FSMContext, user: User, session: AsyncSession
+    callback: CallbackQuery, state: FSMContext, user: User, session: AsyncSession, _: Any
 ) -> None:
     page = int(callback.data.split(":")[-1])
     
+    from app.services import StoreService
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        return
+
     result = await session.execute(
         select(Inventory)
         .options(selectinload(Inventory.product))
         .join(Product)
         .where(
-            Inventory.store_id == user.store_id,
+            Inventory.store_id == warehouse_id,
             Inventory.quantity > 0,
             Product.is_active.is_(True),
         )
@@ -107,13 +128,13 @@ async def display_page_nav(
     items = result.scalars().all()
     
     data = await state.get_data()
-    store_name = data.get("target_store_name", "Магазин")
+    store_name = data.get("target_store_name", _("store_label"))
     
     from app.bot.keyboards.inline import product_select_kb
     
     await callback.message.edit_reply_markup(
         reply_markup=product_select_kb(
-            items, page=page, callback_prefix="display:page", item_callback_prefix="display:product"
+            items, page=page, callback_prefix="display:page", item_callback_prefix="display:product", _=_
         ),
     )
     await callback.answer()
@@ -123,14 +144,13 @@ async def display_page_nav(
     DisplayTransferFlow.select_product, F.data.startswith("display:product:")
 )
 async def display_select_product(
-    callback: CallbackQuery, state: FSMContext, session: AsyncSession
+    callback: CallbackQuery, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
     product_id = int(callback.data.split(":")[-1])
     product = await session.get(Product, product_id)
-    await state.update_data(product_id=product_id, product_name=product.name, product_sku=product.sku)
+    await state.update_data(product_id=product_id, product_sku=product.sku)
     await callback.message.edit_text(
-        f"📦 <b>{product.sku}</b> — {product.name}\n\n"
-        f"Сколько рулонов отправить для витрины? (обычно 1–2):",
+        _("display_enter_qty_title", sku=product.sku),
         parse_mode="HTML",
     )
     await state.set_state(DisplayTransferFlow.enter_quantity)
@@ -139,24 +159,30 @@ async def display_select_product(
 
 @router.message(DisplayTransferFlow.enter_quantity)
 async def display_enter_quantity(
-    message: Message, state: FSMContext, user: User, session: AsyncSession
+    message: Message, state: FSMContext, user: User, session: AsyncSession, _: Any
 ) -> None:
     if not message.text.strip().isdigit() or int(message.text.strip()) <= 0:
-        await message.answer("❌ Введите положительное целое число.")
+        await message.answer(_("sale_invalid_qty"))
         return
 
     quantity = int(message.text.strip())
     data = await state.get_data()
     product_id = data["product_id"]
-    product_name = data["product_name"]
     product_sku = data["product_sku"]
     target_store_id = data["target_store_id"]
     target_store_name = data["target_store_name"]
 
+    from app.services import StoreService
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        await message.answer(_("warehouse_not_found"))
+        return
+
     # Check warehouse stock
     wh_result = await session.execute(
         select(Inventory).where(
-            Inventory.store_id == user.store_id,
+            Inventory.store_id == warehouse_id,
             Inventory.product_id == product_id,
         )
     )
@@ -164,7 +190,7 @@ async def display_enter_quantity(
     if wh_inv is None or wh_inv.quantity < quantity:
         available = wh_inv.quantity if wh_inv else 0
         await message.answer(
-            f"❌ Недостаточно на складе: есть {available}, нужно {quantity}."
+            _("display_not_enough_stock", available=available, qty=quantity)
         )
         return
 
@@ -184,34 +210,32 @@ async def display_enter_quantity(
     session.add(display_order)
     await session.flush()  # Get display_order.id
     
+    from app.services import TransactionService
+    from app.models.enums import StockMovementType
+    txn_svc = TransactionService(session)
+    await txn_svc.record_stock_movement(
+        product_id=product_id, quantity=quantity,
+        movement_type=StockMovementType.DISPLAY_DISPATCH,
+        from_store_id=warehouse_id, to_store_id=target_store_id, user_id=user.id
+    )
+
     await session.commit()
 
     # 3. Notify the seller of the target store
-    from app.services import notification_service
+    from app.services import NotificationService
     from app.bot.keyboards.inline import display_receive_kb
-    from app.bot.bot import bot
+
     
     # Notify target store sellers
-    await notification_service.notify_sellers(
-        bot=bot,
-        session=session,
+    notif_svc = NotificationService(message.bot, session)
+    await notif_svc.notify_sellers(
         store_id=target_store_id,
-        text=(
-            f"🚚 <b>Склад отправил образцы для витрины!</b>\n\n"
-            f"📦 <b>{product_sku}</b> — {product_name}\n"
-            f"🔢 Количество: <b>{quantity} шт</b>\n\n"
-            f"📍 Пожалуйста, подтвердите получение, когда товар будет у вас."
-        ),
-        reply_markup=display_receive_kb(display_order.id)
+        text=lambda _t: _t("display_dispatched_seller_notif", sku=product_sku, qty=quantity),
+        reply_markup=lambda _t: display_receive_kb(display_order.id, _=_t),
     )
 
     await message.answer(
-        f"✅ Запрос на отправку образцов создан!\n\n"
-        f"🏪 {target_store_name}\n"
-        f"📦 {product_name} (<code>{product_sku}</code>)\n"
-        f"📋 Отправлено: {quantity} шт (витрина)\n"
-        f"📊 Остаток на складе: {wh_inv.quantity} шт\n\n"
-        f"⏳ Продавец получит уведомление и должен подтвердить приёмку.",
+        _("display_dispatch_success_wh", store=target_store_name, sku=product_sku, qty=quantity, total=wh_inv.quantity),
         parse_mode="HTML",
     )
     await state.clear()

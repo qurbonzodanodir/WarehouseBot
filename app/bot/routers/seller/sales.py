@@ -1,0 +1,256 @@
+from datetime import date, datetime, time
+
+from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message
+import sqlalchemy as sa
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.bot.keyboards.inline import catalog_kb
+from app.bot.states.states import SaleFlow
+from app.models.enums import StockMovementType
+from app.models.stock_movement import StockMovement
+from app.models.user import User
+from app.services import OrderService, ProductService, TransactionService
+from app.bot.routers.seller.common import MENU_TEXTS
+from typing import Any
+
+router = Router(name="seller.sales")
+
+
+@router.message(F.text.in_({"💳 Продажа", "💳 Фурӯш"}))
+async def start_sale(
+    message: Message, user: User, state: FSMContext, session: AsyncSession, _: Any
+) -> None:
+    await state.clear()
+    order_svc = OrderService(session)
+    items = await order_svc.get_store_inventory(user.store_id, include_empty=False)
+    if not items:
+        await message.answer(_("sale_no_products"))
+        return
+        
+    products = [inv.product for inv in items if inv.quantity > 0]
+    if not products:
+        await message.answer(_("sale_no_available"))
+        return
+
+    await message.answer(
+        _("sale_title"),
+        parse_mode="HTML",
+        reply_markup=catalog_kb(
+            products, 
+            page=0, 
+            callback_prefix="sale:page", 
+            item_callback_prefix="sale:select",
+            _=_
+        )
+    )
+    await state.set_state(SaleFlow.select_product)
+
+
+@router.message(SaleFlow.select_product, F.text)
+async def sale_search_product(
+    message: Message, user: User, state: FSMContext, session: AsyncSession, _: Any
+) -> None:
+    if message.text.strip() in MENU_TEXTS:
+        await state.clear()
+        return
+
+    prod_svc = ProductService(session)
+    product, matches, inv = await prod_svc.search_store_inventory(
+        message.text, user.store_id, require_stock=True
+    )
+
+    if product:
+        await state.update_data(product_id=product.id)
+        await message.answer(
+            _("sale_selected", sku=product.sku, qty=inv.quantity),
+            parse_mode="HTML"
+        )
+        await state.set_state(SaleFlow.enter_quantity)
+        return
+    elif matches:
+        await message.answer(
+            _("sale_search_found"),
+            reply_markup=catalog_kb(
+                matches,
+                page=0,
+                callback_prefix="sale:page",
+                item_callback_prefix="sale:select",
+                _=_
+            )
+        )
+        return
+    else:
+        await message.answer(_("sale_not_found"))
+        return
+
+
+@router.callback_query(SaleFlow.select_product, F.data.startswith("sale:page:"))
+async def sale_page_nav(
+    callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any
+) -> None:
+    page = int(callback.data.split(":")[-1])
+    
+    from app.models.inventory import Inventory
+    result = await session.execute(
+        select(Inventory)
+        .options(selectinload(Inventory.product))
+        .where(
+            Inventory.store_id == user.store_id,
+            Inventory.quantity > 0
+        )
+    )
+    items = result.scalars().all()
+    products = [inv.product for inv in items] if items else []
+    
+    await callback.message.edit_reply_markup(
+        reply_markup=catalog_kb(
+            products, 
+            page=page, 
+            callback_prefix="sale:page",
+            item_callback_prefix="sale:select",
+            _=_
+        )
+    )
+    await callback.answer()
+
+
+@router.callback_query(SaleFlow.select_product, F.data.startswith("sale:select:"))
+async def sale_select_product(
+    callback: CallbackQuery, state: FSMContext, session: AsyncSession, user: User, _: Any
+) -> None:
+    product_id = int(callback.data.split(":")[-1])
+    
+    from app.models.inventory import Inventory
+    result = await session.execute(
+        select(Inventory).where(Inventory.store_id == user.store_id, Inventory.product_id == product_id)
+    )
+    inv = result.scalar_one_or_none()
+    qty = inv.quantity if inv else 0
+    
+    await state.update_data(product_id=product_id)
+    await callback.message.edit_text(_("sale_enter_qty", qty=qty))
+    await state.set_state(SaleFlow.enter_quantity)
+    await callback.answer()
+
+
+@router.message(SaleFlow.enter_quantity)
+async def enter_sale_quantity(
+    message: Message, state: FSMContext, user: User, session: AsyncSession, _: Any
+) -> None:
+    if not message.text.isdigit() or int(message.text) <= 0:
+        await message.answer(_("sale_invalid_qty"))
+        return
+
+    quantity = int(message.text)
+    data = await state.get_data()
+    product_id = data.get("product_id")
+    
+    if not product_id:
+        await message.answer(_("sale_select_first"))
+        await state.clear()
+        return
+
+    try:
+        from app.models.product import Product
+        product = await session.get(Product, product_id)
+        
+        txn_svc = TransactionService(session)
+        await txn_svc.record_sale(
+            store_id=user.store_id,
+            user_id=user.id,
+            product_id=product_id,
+            quantity=quantity,
+            price_per_unit=product.price,
+        )
+        await session.commit()
+        await message.answer(
+            _("sale_success", sku=product.sku, qty=quantity)
+        )
+    except ValueError as e:
+        await message.answer(_("sale_error", error=str(e)))
+    except Exception as e:
+        await message.answer(_("sale_system_error"))
+        print(f"Error in enter_sale_quantity: {e}")
+    finally:
+        await state.clear()
+
+
+@router.message(F.text.in_({"📜 Продажи", "📜 Фурӯшҳо"}))
+async def sales_history(
+    message: Message, user: User, session: AsyncSession, state: FSMContext, _: Any
+) -> None:
+    await state.clear()
+    from app.models.debt_ledger import DebtLedger
+    from app.models.enums import DebtLedgerReason
+
+    stmt = (
+        select(StockMovement, DebtLedger)
+        .options(selectinload(StockMovement.product))
+        .join(DebtLedger, sa.and_(
+            DebtLedger.store_id == StockMovement.from_store_id,
+            DebtLedger.reason == DebtLedgerReason.SALE_COMPLETED,
+            # Match approximate time (within 1 minute)
+            func.abs(func.extract('epoch', StockMovement.created_at) - func.extract('epoch', DebtLedger.created_at)) < 60
+        ))
+        .where(
+            StockMovement.from_store_id == user.store_id,
+            StockMovement.movement_type == StockMovementType.SALE,
+        )
+        .order_by(StockMovement.created_at.desc())
+        .limit(10)
+    )
+    result = await session.execute(stmt)
+    rows = result.all()
+
+    if not rows:
+        await message.answer(_("sales_history_empty"))
+        return
+
+    lines = [_("sales_history_title") + "\n"]
+    for mov, ledger in rows:
+        dt_str = mov.created_at.strftime("%d.%m %H:%M")
+        amount = ledger.amount_change
+        lines.append(
+            _("sales_history_item", date=dt_str, sku=mov.product.sku, qty=mov.quantity, amount=amount)
+        )
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("order:sold:"))
+async def quick_sold_order(
+    callback: CallbackQuery, user: User, session: AsyncSession, _: Any
+) -> None:
+    order_id = int(callback.data.split(":")[-1])
+    try:
+        from app.models.order import Order
+        from sqlalchemy.orm import selectinload
+        order = await session.get(Order, order_id, options=[selectinload(Order.product)])
+        if not order:
+            await callback.answer(_("order_not_found"), show_alert=True)
+            return
+
+        txn_svc = TransactionService(session)
+        await txn_svc.record_sale(
+            store_id=user.store_id,
+            user_id=user.id,
+            product_id=order.product_id,
+            quantity=order.quantity,
+            price_per_unit=order.product.price,
+            order_id=order_id,
+        )
+        await session.commit()
+        await callback.message.edit_text(
+            _("sale_quick_success", sku=order.product.sku, qty=order.quantity, total=order.product.price * order.quantity),
+            parse_mode="HTML"
+        )
+    except ValueError as e:
+        await callback.message.edit_text(_("sale_error", error=str(e)))
+    except Exception as e:
+        await callback.message.edit_text(_("sale_system_error"))
+        print(f"Error in quick_sold_order: {e}")
+    finally:
+        await callback.answer()

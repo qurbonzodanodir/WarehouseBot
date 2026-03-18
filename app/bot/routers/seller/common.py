@@ -1,0 +1,27 @@
+from typing import Any
+
+from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
+
+from app.bot.keyboards import reply
+from app.bot.states.states import OrderFlow, ReturnFlow
+
+router = Router(name="seller.common")
+
+MENU_TEXTS = {
+    "🖼 Витрина", "🛒 Заказ", "📜 Продажи", "📊 Отчет",
+    "Ещё 🔽", "Боз 🔽", "🔙 Назад", "🔙 Ба қафо", "↩️ Сделать возврат", "↩️ Бозгашти мол",
+}
+
+
+@router.message(F.text.in_({"Ещё 🔽", "Боз 🔽"}))
+async def show_more_menu(message: Message, state: FSMContext, _: Any) -> None:
+    await state.clear()
+    await message.answer(_("menu_seller_more"), reply_markup=reply.get_seller_more_menu(_))
+
+
+@router.message(F.text.in_({"🔙 Назад", "🔙 Ба қафо"}))
+async def back_to_main_menu(message: Message, state: FSMContext, _: Any) -> None:
+    await state.clear()
+    await message.answer(_("menu_main"), reply_markup=reply.get_seller_menu(_))

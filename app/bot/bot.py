@@ -4,8 +4,9 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.bot.middlewares.auth import AuthMiddleware
+from app.bot.middlewares.i18n import I18nMiddleware
 from app.bot.routers.common import router as common_router
-from app.bot.routers.seller import router as seller_router
+from app.bot.routers.seller import seller_router
 from app.bot.routers.warehouse import router as warehouse_router
 from app.bot.routers.owner import router as owner_router
 from app.core.config import settings
@@ -18,6 +19,7 @@ bot = Bot(
 dp = Dispatcher(storage=MemoryStorage())
 
 dp.update.outer_middleware(AuthMiddleware())
+dp.update.outer_middleware(I18nMiddleware())
 
 dp.include_routers(
     common_router,

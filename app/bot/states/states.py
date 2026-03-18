@@ -5,6 +5,7 @@ class OrderFlow(StatesGroup):
     """Seller ordering a product from warehouse."""
     select_product = State()   # choosing product from catalog
     enter_quantity = State()   # entering how many to order
+    cart_action = State()      # reviewing cart and choosing next action
 
 
 class SaleFlow(StatesGroup):
@@ -17,7 +18,6 @@ class ReturnFlow(StatesGroup):
     """Seller recording a return."""
     select_product = State()
     enter_quantity = State()
-    enter_reason = State()     # mandatory reason
 
 
 class CashCollectionFlow(StatesGroup):
@@ -27,7 +27,6 @@ class CashCollectionFlow(StatesGroup):
 
 class AddProductFlow(StatesGroup):
     enter_sku = State()
-    enter_name = State()
     enter_price = State()
 
 
@@ -57,7 +56,6 @@ class ReceiveStockFlow(StatesGroup):
     enter_quantity = State()
     # Inline product creation
     new_product_sku = State()
-    new_product_name = State()
     new_product_price = State()
 
 
@@ -66,3 +64,14 @@ class DisplayTransferFlow(StatesGroup):
     select_store = State()
     select_product = State()
     enter_quantity = State()
+
+
+class EditStoreFlow(StatesGroup):
+    enter_name = State()
+    enter_address = State()
+
+
+class EditEmployeeFlow(StatesGroup):
+    select_store = State()
+    select_role = State()
+

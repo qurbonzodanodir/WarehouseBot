@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -16,16 +17,17 @@ router = Router(name="owner.catalog")
 async def _send_catalog_page(
     message_or_callback: Message | CallbackQuery, 
     products: list[Product], 
-    page: int
+    page: int,
+    _: Any
 ) -> None:
     from app.bot.keyboards.inline import get_page_slice, add_pagination_buttons
     limit = 20
     
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="➕ Добавить товар", callback_data="catalog:add"))
+    builder.row(InlineKeyboardButton(text=_("cat_add_btn"), callback_data="catalog:add"))
 
     if not products:
-        text = "📦 Каталог пуст.\n\nНажмите кнопку ниже, чтобы добавить первый товар."
+        text = _("cat_empty")
         if isinstance(message_or_callback, Message):
             await message_or_callback.answer(text, reply_markup=builder.as_markup())
         else:
@@ -35,11 +37,11 @@ async def _send_catalog_page(
     start, end = get_page_slice(len(products), page, limit)
     page_items = products[start:end]
 
-    lines = [f"📦 <b>Каталог товаров (стр {page + 1}):</b>\n"]
+    lines = [_("cat_title", page=page + 1)]
     for p in page_items:
-        lines.append(f"• <code>{p.sku}</code> — {p.name} | {p.price} сом")
+        lines.append(_("catalog_item_detail", sku=p.sku, price=p.price))
         
-    add_pagination_buttons(builder, len(products), page, limit, "catalog:page")
+    add_pagination_buttons(builder, len(products), page, limit, "catalog:page", _=_)
     
     text = "\n".join(lines)
     if isinstance(message_or_callback, Message):
@@ -48,53 +50,42 @@ async def _send_catalog_page(
         await message_or_callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
 
-@router.message(F.text == "📦 Каталог")
-async def catalog_view(message: Message, session: AsyncSession) -> None:
+@router.message(F.text.in_({"📦 Каталог"}))
+async def catalog_view(message: Message, session: AsyncSession, _: Any) -> None:
     result = await session.execute(
         select(Product).where(Product.is_active.is_(True)).order_by(Product.sku)
     )
     products = result.scalars().all()
-    await _send_catalog_page(message, products, page=0)
+    await _send_catalog_page(message, products, page=0, _=_)
 
 
 @router.callback_query(F.data.startswith("catalog:page:"))
-async def catalog_page_nav(callback: CallbackQuery, session: AsyncSession) -> None:
+async def catalog_page_nav(callback: CallbackQuery, session: AsyncSession, _: Any) -> None:
     page = int(callback.data.split(":")[-1])
     result = await session.execute(
         select(Product).where(Product.is_active.is_(True)).order_by(Product.sku)
     )
     products = result.scalars().all()
-    await _send_catalog_page(callback, products, page)
+    await _send_catalog_page(callback, products, page, _=_)
     await callback.answer()
 
 
 
 @router.callback_query(F.data == "catalog:add")
-async def catalog_add_product(callback: CallbackQuery, state: FSMContext) -> None:
+async def catalog_add_product(callback: CallbackQuery, state: FSMContext, _: Any) -> None:
     await callback.message.edit_text(
-        "Введите <b>артикул (SKU)</b> нового товара:", parse_mode="HTML"
+        _("cat_enter_sku"), parse_mode="HTML"
     )
     await state.set_state(AddProductFlow.enter_sku)
     await callback.answer()
 
 
 @router.message(AddProductFlow.enter_sku)
-async def add_product_sku(message: Message, state: FSMContext) -> None:
+async def add_product_sku(message: Message, state: FSMContext, _: Any) -> None:
     sku = message.text.strip().upper()
     await state.update_data(sku=sku)
     await message.answer(
-        f"SKU: <code>{sku}</code>\n\nТеперь введите <b>название</b> товара:",
-        parse_mode="HTML",
-    )
-    await state.set_state(AddProductFlow.enter_name)
-
-
-@router.message(AddProductFlow.enter_name)
-async def add_product_name(message: Message, state: FSMContext) -> None:
-    name = message.text.strip()
-    await state.update_data(name=name)
-    await message.answer(
-        f"Название: {name}\n\nТеперь введите <b>цену</b> (сом):",
+        _("cat_enter_price", sku=sku),
         parse_mode="HTML",
     )
     await state.set_state(AddProductFlow.enter_price)
@@ -102,36 +93,33 @@ async def add_product_name(message: Message, state: FSMContext) -> None:
 
 @router.message(AddProductFlow.enter_price)
 async def add_product_price(
-    message: Message, state: FSMContext, session: AsyncSession
+    message: Message, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
     try:
         price = Decimal(message.text.strip())
         if price <= 0:
             raise ValueError
     except (InvalidOperation, ValueError):
-        await message.answer("❌ Введите корректную положительную цену.")
+        await message.answer(_("cat_invalid_price"))
         return
 
     data = await state.get_data()
     sku = data["sku"]
-    name = data["name"]
 
     existing = await session.execute(select(Product).where(Product.sku == sku))
     if existing.scalar_one_or_none():
-        await message.answer(f"⚠️ Товар с SKU {sku} уже существует.")
+        await message.answer(_("cat_exists", sku=sku))
         await state.clear()
         return
 
-    product = Product(sku=sku, name=name, price=price, is_active=True)
+    product = Product(sku=sku, price=price, is_active=True)
     session.add(product)
     await session.commit()
 
     await message.answer(
-        f"✅ Товар добавлен!\n\n"
-        f"SKU: <code>{sku}</code>\n"
-        f"Название: {name}\n"
-        f"Цена: {price} сом\n\n"
-        f"Чтобы добавить на склад, нажмите 📥 Пополнить склад",
+        _("cat_success", sku=sku, amount=price),
         parse_mode="HTML",
     )
     await state.clear()
+
+ 

@@ -1,6 +1,6 @@
 import secrets
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +21,9 @@ class InviteCode(Base):
     code: Mapped[str] = mapped_column(
         String(10), unique=True, index=True, default=_generate_code
     )
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"))
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", native_enum=False)
+    )
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -37,14 +39,14 @@ class InviteCode(Base):
 
     def __init__(self, **kwargs):
         if "expires_at" not in kwargs:
-            kwargs["expires_at"] = datetime.utcnow() + timedelta(hours=24)
+            kwargs["expires_at"] = datetime.now(timezone.utc) + timedelta(hours=24)
         if "code" not in kwargs:
             kwargs["code"] = _generate_code()
         super().__init__(**kwargs)
 
     @property
     def is_expired(self) -> bool:
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def is_valid(self) -> bool:

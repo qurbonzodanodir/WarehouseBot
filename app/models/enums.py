@@ -1,14 +1,28 @@
 import enum
 
+class CaseInsensitiveEnum(str, enum.Enum):
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            for member in cls:
+                if member.value.lower() == value.lower():
+                    return member
+        return super()._missing_(value)
+    
+    def __str__(self):
+        return self.value.lower()
 
-class UserRole(str, enum.Enum):
+class StoreType(CaseInsensitiveEnum):
+    WAREHOUSE = "warehouse"
+    STORE = "store"
+
+class UserRole(CaseInsensitiveEnum):
     SELLER = "seller"
     WAREHOUSE = "warehouse"
     ADMIN = "admin"
     OWNER = "owner"
 
-
-class OrderStatus(str, enum.Enum):
+class OrderStatus(CaseInsensitiveEnum):
     PENDING = "pending"
     DISPATCHED = "dispatched"
     DELIVERED = "delivered"
@@ -16,15 +30,27 @@ class OrderStatus(str, enum.Enum):
     SOLD = "sold"
     RETURNED = "returned"
     RETURN_PENDING = "return_pending"
-    # Display transfers
     DISPLAY_DISPATCHED = "display_dispatched"
     DISPLAY_DELIVERED = "display_delivered"
     DISPLAY_REJECTED = "display_rejected"
+    DISPLAY_RETURN_PENDING = "display_return_pending"
+    DISPLAY_RETURNED = "display_returned"
+    PARTIAL_APPROVAL_PENDING = "partial_approval_pending"
 
-
-class TransactionType(str, enum.Enum):
+class StockMovementType(CaseInsensitiveEnum):
+    RECEIVE_FROM_SUPPLIER = "receive_from_supplier"
+    DISPATCH_TO_STORE = "dispatch_to_store"
+    RETURN_TO_WAREHOUSE = "return_to_warehouse"
     SALE = "sale"
-    RETURN = "return"
+    DISPLAY_DISPATCH = "display_dispatch"
+    DISPLAY_RECEIVE = "display_receive"
+    DISPLAY_RETURN = "display_return"
+
+class FinancialTransactionType(CaseInsensitiveEnum):
+    PAYMENT = "payment"
+    COLLECTION = "collection"
+
+class DebtLedgerReason(CaseInsensitiveEnum):
+    SALE_COMPLETED = "sale_completed"
     CASH_COLLECTION = "cash_collection"
-    DISPLAY_TRANSFER = "display_transfer"
-    STOCK_RECEIVE = "stock_receive"
+    RETURN_APPROVED = "return_approved"

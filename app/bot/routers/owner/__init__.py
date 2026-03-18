@@ -7,13 +7,16 @@ from app.bot.routers.owner.dashboard import router as dashboard_router
 from app.bot.routers.owner.collection import router as collection_router
 from app.bot.routers.owner.catalog import router as catalog_router
 from app.bot.routers.owner.management import router as management_router
+from app.bot.routers.owner.stock import router as stock_router
 
 router = Router(name="owner")
 router.message.filter(RoleFilter(UserRole.OWNER))
+router.callback_query.filter(RoleFilter(UserRole.OWNER))
 
 router.include_routers(
     dashboard_router,
     collection_router,
     catalog_router,
     management_router,
+    stock_router,
 )

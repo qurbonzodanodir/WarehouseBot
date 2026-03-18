@@ -6,8 +6,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update
 
 from app.core.database import async_session_factory
-from app.services.user_service import get_user_by_telegram_id
-
+from app.services import UserService
 
 class AuthMiddleware(BaseMiddleware):
     """
@@ -32,7 +31,8 @@ class AuthMiddleware(BaseMiddleware):
             return  # Cannot identify user — skip
 
         async with async_session_factory() as session:
-            user = await get_user_by_telegram_id(session, telegram_id)
+            svc = UserService(session)
+            user = await svc.get_user_by_telegram_id(telegram_id)
 
             data["user"] = user  # May be None for unregistered users
             data["session"] = session
