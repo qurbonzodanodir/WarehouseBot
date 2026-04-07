@@ -19,13 +19,16 @@ async def list_products(
     session: SessionDep,
     current_user: CurrentUser,
     include_inactive: bool = Query(False),
+    only_inactive: bool = Query(False),
     search: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> ProductPaginationOut:
     stmt = select(Product).order_by(Product.sku)
 
-    if not include_inactive:
+    if only_inactive:
+        stmt = stmt.where(Product.is_active.is_(False))
+    elif not include_inactive:
         stmt = stmt.where(Product.is_active.is_(True))
 
     if search:

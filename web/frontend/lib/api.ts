@@ -70,10 +70,11 @@ export const api = {
     }),
 
   // Products
-  getProducts: (params?: { search?: string; include_inactive?: boolean; page?: number; page_size?: number }) => {
+  getProducts: (params?: { search?: string; include_inactive?: boolean; only_inactive?: boolean; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams();
     if (params?.search) qs.set("search", params.search);
     if (params?.include_inactive) qs.set("include_inactive", "true");
+    if (params?.only_inactive) qs.set("only_inactive", "true");
     if (params?.page) qs.set("page", String(params.page));
     if (params?.page_size) qs.set("page_size", String(params.page_size));
     const q = qs.toString();

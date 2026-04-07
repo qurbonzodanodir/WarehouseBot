@@ -6,8 +6,9 @@ import { api, Product, ProductInventoryOut, Store } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, PackageOpen, FileUp, X, CheckCircle2, ShoppingCart } from "lucide-react";
+import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, PackageOpen, FileUp, X, CheckCircle2, ShoppingCart, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { createPortal } from "react-dom";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
@@ -34,6 +35,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -41,6 +43,10 @@ export default function ProductsPage() {
 
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ sku: "", price: "" });
+  const [pendingToggleProduct, setPendingToggleProduct] = useState<Product | null>(null);
+  const [toggling, setToggling] = useState(false);
+  const [pendingDeleteProduct, setPendingDeleteProduct] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [inventoryLoaders, setInventoryLoaders] = useState<Record<number, boolean>>({});
@@ -64,6 +70,7 @@ export default function ProductsPage() {
   const [importData, setImportData] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const [importParsing, setImportParsing] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const isWarehouse = user?.role === "owner" || user?.role === "warehouse" || user?.role === "admin";
   const isSeller = user?.role === "seller";
@@ -71,7 +78,12 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await api.getProducts({ search, page, page_size: PAGE_SIZE });
+      const data = await api.getProducts({
+        search,
+        page,
+        page_size: PAGE_SIZE,
+        only_inactive: showInactive,
+      });
       setProducts(data.items);
       setTotal(data.total);
       setTotalPages(data.total_pages);
@@ -80,7 +92,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, page, showToast]);
+  }, [search, page, showInactive, showToast]);
 
   useEffect(() => {
     const usr = getStoredUser();
@@ -94,13 +106,34 @@ export default function ProductsPage() {
     setPage(1);
   }, [search]);
 
-  async function handleToggleActive(p: Product, e: React.MouseEvent) {
-    e.stopPropagation();
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  async function handleToggleActive(p: Product) {
     try {
+      setToggling(true);
       await api.updateProduct(p.id, { is_active: !p.is_active });
+      setPendingToggleProduct(null);
       await fetchProducts();
     } catch (err: any) {
       showToast(err.message, "error");
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  async function handleHardDelete(p: Product) {
+    try {
+      setDeleting(true);
+      await api.deleteProduct(p.id);
+      setPendingDeleteProduct(null);
+      await fetchProducts();
+      showToast(t("products.hard_delete_success"), "success");
+    } catch (err: any) {
+      showToast(err.message || t("products.hard_delete_failed"), "error");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -319,6 +352,19 @@ export default function ProductsPage() {
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
           <input className="input" style={{ paddingLeft: 36, width: "100%" }} placeholder={t("products.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--text-secondary)", fontSize: 13, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => {
+                setShowInactive(e.target.checked);
+                setPage(1);
+              }}
+            />
+            {t("products.show_only_inactive")}
+          </label>
+        </div>
 
         <div className="card" style={{ padding: 0 }}>
           {loading ? (
@@ -363,9 +409,33 @@ export default function ProductsPage() {
                                   <PackageOpen size={14} />
                                 </button>
                               )}
-                              <button onClick={(e) => handleToggleActive(p, e)} className={p.is_active ? "btn btn-danger" : "btn btn-success"} style={{ padding: "4px 12px", fontSize: 12 }}>
-                                {p.is_active ? "X" : "OK"}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingToggleProduct(p);
+                                }}
+                                className={p.is_active ? "btn btn-danger" : "btn btn-primary"}
+                                style={{
+                                  padding: "4px 12px",
+                                  fontSize: 12,
+                                  ...(p.is_active ? {} : { background: "var(--green)", color: "#fff" }),
+                                }}
+                              >
+                                {p.is_active ? "X" : t("products.btn_restore")}
                               </button>
+                              {!p.is_active && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPendingDeleteProduct(p);
+                                  }}
+                                  className="btn btn-danger"
+                                  style={{ padding: "4px 10px", fontSize: 12 }}
+                                  title={t("products.btn_hard_delete")}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         )}
@@ -427,7 +497,7 @@ export default function ProductsPage() {
         )}
       </main>
 
-      {receivingProduct && (
+      {mounted && receivingProduct && createPortal((
         <div className="modal-overlay">
           <div className="modal-card" style={{ maxWidth: 400 }}>
             <h3 style={{ marginBottom: 8 }}>{t("products.receive_title")}</h3>
@@ -441,9 +511,9 @@ export default function ProductsPage() {
             </form>
           </div>
         </div>
-      )}
+      ), document.body)}
 
-      {isOrderModalOpen && (
+      {mounted && isOrderModalOpen && createPortal((
         <div className="modal-overlay">
           <div className="modal-card" style={{ maxWidth: 400 }}>
             <h3 style={{ marginBottom: 8, color: "var(--green)", display: "flex", alignItems: "center", gap: 10 }}>
@@ -457,9 +527,9 @@ export default function ProductsPage() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
-      {isDispatchModalOpen && (
+      {mounted && isDispatchModalOpen && createPortal((
         <div className="modal-overlay">
           <div className="modal-card" style={{ maxWidth: 400 }}>
             <h3 style={{ marginBottom: 8 }}>{t("inventory.dispatch_modal_title")}</h3>
@@ -477,9 +547,9 @@ export default function ProductsPage() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
-      {importModalOpen && (
+      {mounted && importModalOpen && createPortal((
         <div className="modal-overlay">
           <div className="modal-card" style={{ maxWidth: 850, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
@@ -524,7 +594,68 @@ export default function ProductsPage() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
+
+      {mounted && pendingToggleProduct && createPortal((
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: 420 }}>
+            <h3 style={{ marginBottom: 8 }}>
+              {pendingToggleProduct.is_active
+                ? t("products.toggle_deactivate_title")
+                : t("products.toggle_activate_title")}
+            </h3>
+            <p style={{ marginBottom: 20, fontSize: 14, color: "var(--text-secondary)" }}>
+              {pendingToggleProduct.is_active
+                ? t("products.toggle_deactivate_confirm", { sku: pendingToggleProduct.sku })
+                : t("products.toggle_activate_confirm", { sku: pendingToggleProduct.sku })}
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setPendingToggleProduct(null)}
+                disabled={toggling}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                className={pendingToggleProduct.is_active ? "btn btn-danger" : "btn btn-success"}
+                onClick={() => handleToggleActive(pendingToggleProduct)}
+                disabled={toggling}
+                style={!pendingToggleProduct.is_active ? { background: "var(--green)", color: "#fff" } : undefined}
+              >
+                {toggling ? "..." : t("common.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
+
+      {mounted && pendingDeleteProduct && createPortal((
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: 460 }}>
+            <h3 style={{ marginBottom: 8 }}>{t("products.hard_delete_title")}</h3>
+            <p style={{ marginBottom: 20, fontSize: 14, color: "var(--text-secondary)" }}>
+              {t("products.hard_delete_confirm", { sku: pendingDeleteProduct.sku })}
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setPendingDeleteProduct(null)}
+                disabled={deleting}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => handleHardDelete(pendingDeleteProduct)}
+                disabled={deleting}
+              >
+                {deleting ? "..." : t("products.btn_hard_delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
     </div>
   );
 }

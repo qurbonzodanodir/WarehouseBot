@@ -78,6 +78,29 @@ h3 { font-size: 1rem; font-weight: 600; }
   padding: 20px;
 }
 
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow-y: auto;
+  z-index: 90;
+}
+
+.modal-card {
+  width: min(100%, 560px);
+  margin: auto;
+  max-height: calc(100dvh - 40px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
 /* ── Button ──────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
