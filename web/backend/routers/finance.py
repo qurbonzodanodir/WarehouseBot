@@ -6,7 +6,7 @@ from app.models.enums import FinancialTransactionType
 from app.models.financial_transaction import FinancialTransaction
 from app.models.store import Store
 from app.services.transaction_service import TransactionService
-from web.backend.dependencies import AdminUser, CurrentUser, SessionDep
+from web.backend.dependencies import AdminUser, SessionDep
 from web.backend.schemas.finance import (
     CashCollectionHistoryItem,
     CashCollectionRequest,
@@ -88,7 +88,7 @@ async def get_collection_history(
 async def collect_cash(
     request: CashCollectionRequest,
     session: SessionDep,
-    current_user: CurrentUser,
+    current_user: AdminUser,
 ) -> CashCollectionHistoryItem:
     txn_service = TransactionService(session)
 
@@ -115,8 +115,9 @@ async def collect_cash(
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
+    except Exception:
         await session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
         )

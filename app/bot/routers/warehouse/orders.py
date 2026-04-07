@@ -327,6 +327,7 @@ async def reject_batch_order(
         if not rejected_orders:
             await callback.message.edit_text(_("batch_empty_or_processed"))
             return
+        await session.commit()
             
         store_id = rejected_orders[0].store_id
         items_text = "\n".join([f"• {o.product.sku} — {o.quantity} шт" for o in rejected_orders])

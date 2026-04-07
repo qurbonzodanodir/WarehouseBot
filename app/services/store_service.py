@@ -59,6 +59,6 @@ class StoreService:
             select(Store.id).where(
                 Store.is_active.is_(True),
                 Store.store_type == StoreType.WAREHOUSE,
-            ).limit(1)
+            ).order_by(Store.id).limit(1)
         )
         return result.scalar_one_or_none()

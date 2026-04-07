@@ -25,6 +25,7 @@ class InviteService:
                 InviteCode.code == code,
                 InviteCode.is_used.is_(False),
             )
+            .with_for_update()
         )
         invite = result.scalar_one_or_none()
         if invite is None or not invite.is_valid:
@@ -33,5 +34,7 @@ class InviteService:
 
     async def use_invite(self, invite: InviteCode, user_id: int) -> None:
         """Mark an invite code as used."""
+        if invite.is_used:
+            raise ValueError("Invite code already used")
         invite.is_used = True
         invite.used_by_id = user_id

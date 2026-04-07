@@ -14,6 +14,24 @@ from app.bot.keyboards.inline import delivery_confirm_kb
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
+
+def _ensure_order_access(current_user, order: Order) -> None:
+    from app.models.enums import UserRole
+
+    if current_user.role == UserRole.SELLER and current_user.store_id != order.store_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied for this order",
+        )
+
+
+def _ensure_roles(current_user, allowed_roles: set) -> None:
+    if current_user.role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
 @router.get(
     "",
     response_model=list[OrderOut],
@@ -81,6 +99,7 @@ async def get_order(
     order = result.scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    _ensure_order_access(current_user, order)
     return order
 
 
@@ -111,7 +130,11 @@ async def create_order(
         await session.commit()
         await session.refresh(order)
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     result = await session.execute(
         select(Order)
@@ -131,7 +154,9 @@ async def dispatch_order(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> OrderOut:
+    from app.models.enums import UserRole
     from app.services.store_service import StoreService
+    _ensure_roles(current_user, {UserRole.WAREHOUSE, UserRole.OWNER, UserRole.ADMIN})
     store_svc = StoreService(session)
     warehouse_id = await store_svc.get_main_warehouse_id()
     if not warehouse_id:
@@ -151,7 +176,11 @@ async def dispatch_order(
             reply_markup=lambda _t: delivery_confirm_kb(order.id, order.quantity, _=_t),
         )
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     result = await session.execute(
         select(Order)
@@ -171,12 +200,23 @@ async def deliver_order(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> OrderOut:
+    from app.models.enums import UserRole
+    _ensure_roles(current_user, {UserRole.SELLER, UserRole.OWNER, UserRole.ADMIN})
+    order_check = await session.get(Order, order_id)
+    if order_check is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    _ensure_order_access(current_user, order_check)
+
     order_svc = OrderService(session)
     try:
         await order_svc.deliver_order(order_id)
         await session.commit()
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     result = await session.execute(
         select(Order)
@@ -196,6 +236,8 @@ async def reject_order(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> OrderOut:
+    from app.models.enums import UserRole
+    _ensure_roles(current_user, {UserRole.WAREHOUSE, UserRole.OWNER, UserRole.ADMIN})
     order_svc = OrderService(session)
     try:
         order = await order_svc.reject_order(order_id)
@@ -228,6 +270,9 @@ async def approve_return(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> OrderOut:
+    from app.models.enums import UserRole
+    _ensure_roles(current_user, {UserRole.WAREHOUSE, UserRole.OWNER, UserRole.ADMIN})
+
     from app.services.store_service import StoreService
     from app.services.transaction_service import TransactionService
     
@@ -258,8 +303,12 @@ async def approve_return(
             store_id=order.store_id,
             text=lambda _t: _t("return_approved_seller_notif", type=(_t("return_type_samples_label") if is_display else _t("return_type_goods_label")), id=order_id),
         )
-    except Exception as e:
+    except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     result = await session.execute(
         select(Order)
@@ -279,6 +328,9 @@ async def reject_return(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> OrderOut:
+    from app.models.enums import UserRole
+    _ensure_roles(current_user, {UserRole.WAREHOUSE, UserRole.OWNER, UserRole.ADMIN})
+
     from app.services.transaction_service import TransactionService
     txn_svc = TransactionService(session)
     try:
@@ -297,8 +349,12 @@ async def reject_return(
             store_id=order.store_id,
             text=lambda _t: _t("return_rejected_seller_notif", id=order_id),
         )
-    except Exception as e:
+    except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     result = await session.execute(
         select(Order)

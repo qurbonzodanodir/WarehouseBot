@@ -5,6 +5,7 @@ from sqlalchemy.orm import joinedload
 
 from app.models.display_inventory import DisplayInventory
 from app.models.inventory import Inventory
+from app.models.enums import UserRole
 from app.models.store import Store
 from web.backend.dependencies import CurrentUser, SessionDep
 from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, BulkReceiveInput, DispatchDisplayInput
@@ -31,6 +32,9 @@ async def get_store_inventory(
     current_user: CurrentUser,
     include_empty: bool = Query(False),
 ) -> list[InventoryItemOut]:
+    if current_user.role == UserRole.SELLER and current_user.store_id != store_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     # 1. Fetch regular inventory
     stmt_reg = (
         select(Inventory)
@@ -86,7 +90,6 @@ async def get_all_inventory(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> dict:
-    from app.models.enums import UserRole
     if current_user.role not in (UserRole.OWNER, UserRole.WAREHOUSE):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -149,7 +152,6 @@ async def receive_inventory(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> dict:
-    from app.models.enums import UserRole
     if current_user.role not in (UserRole.OWNER, UserRole.WAREHOUSE):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -171,7 +173,11 @@ async def receive_inventory(
         )
         await session.commit()
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
         
     return {
         "success": True, 
@@ -191,7 +197,6 @@ async def bulk_receive_inventory(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> dict:
-    from app.models.enums import UserRole
     if current_user.role not in (UserRole.OWNER, UserRole.WAREHOUSE):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -240,9 +245,9 @@ async def bulk_receive_inventory(
             updated_count += 1
             
         await session.commit()
-    except Exception as e:
+    except Exception:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
     
     return {
         "success": True,
@@ -262,7 +267,6 @@ async def dispatch_display(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> dict:
-    from app.models.enums import UserRole
     if current_user.role not in (UserRole.OWNER, UserRole.WAREHOUSE):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -285,7 +289,11 @@ async def dispatch_display(
         )
         await session.commit()
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
     
     # Send notification to sellers
     try:

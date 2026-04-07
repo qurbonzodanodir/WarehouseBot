@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 
 from app.models.product import Product
@@ -150,9 +151,12 @@ async def create_product(
         await session.commit()
         await session.refresh(product)
         return product
-    except Exception as e:
+    except IntegrityError:
         await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Product with this SKU already exists")
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.patch(
@@ -200,7 +204,6 @@ async def delete_product(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     try:
-        from sqlalchemy.exc import IntegrityError
         await session.delete(product)
         await session.commit()
     except IntegrityError:

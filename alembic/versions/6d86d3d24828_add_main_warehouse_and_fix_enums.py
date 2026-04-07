@@ -31,18 +31,25 @@ def upgrade() -> None:
         sa.column("is_active", sa.Boolean),
         sa.column("current_debt", sa.Numeric),
     )
-    op.bulk_insert(
-        stores_table,
-        [
-            {
-                "name": "Главный Склад",
-                "address": "Центральный офис",
-                "store_type": "warehouse",
-                "is_active": True,
-                "current_debt": 0,
-            }
-        ],
-    )
+    bind = op.get_bind()
+    exists = bind.execute(
+        sa.text(
+            "SELECT id FROM stores WHERE lower(store_type) = 'warehouse' ORDER BY id LIMIT 1"
+        )
+    ).scalar()
+    if not exists:
+        op.bulk_insert(
+            stores_table,
+            [
+                {
+                    "name": "Главный Склад",
+                    "address": "Центральный офис",
+                    "store_type": "warehouse",
+                    "is_active": True,
+                    "current_debt": 0,
+                }
+            ],
+        )
     # ### end Alembic commands ###
 
 

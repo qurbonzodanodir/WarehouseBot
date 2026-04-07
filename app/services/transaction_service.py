@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -432,11 +433,15 @@ class TransactionService:
     ) -> Inventory:
         inv = await self._get_inventory(store_id, product_id, lock=lock)
         if inv is None:
-            inv = Inventory(
-                store_id=store_id, product_id=product_id, quantity=0
-            )
-            self.session.add(inv)
-            await self.session.flush()
+            try:
+                async with self.session.begin_nested():
+                    inv = Inventory(
+                        store_id=store_id, product_id=product_id, quantity=0
+                    )
+                    self.session.add(inv)
+                    await self.session.flush()
+            except IntegrityError:
+                inv = await self._get_inventory(store_id, product_id, lock=lock)
             # If we just created it and need a lock, we might need a refresh, 
             # but in Postgres flush is usually enough for the session.
         return inv
@@ -446,11 +451,15 @@ class TransactionService:
     ) -> DisplayInventory:
         inv = await self._get_display_inventory(store_id, product_id, lock=lock)
         if inv is None:
-            inv = DisplayInventory(
-                store_id=store_id, product_id=product_id, quantity=0
-            )
-            self.session.add(inv)
-            await self.session.flush()
+            try:
+                async with self.session.begin_nested():
+                    inv = DisplayInventory(
+                        store_id=store_id, product_id=product_id, quantity=0
+                    )
+                    self.session.add(inv)
+                    await self.session.flush()
+            except IntegrityError:
+                inv = await self._get_display_inventory(store_id, product_id, lock=lock)
         return inv
 
     # (rest of the methods: get_store_financial_transactions, etc.)

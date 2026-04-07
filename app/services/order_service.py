@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.display_inventory import DisplayInventory
 from app.models.enums import OrderStatus
@@ -300,7 +301,7 @@ class OrderService:
         for order in orders:
             if order.status == OrderStatus.PENDING:
                 inv = await self._get_or_create_inventory(
-                    warehouse_store_id, order.product_id
+                    warehouse_store_id, order.product_id, lock=True
                 )
                 
                 if inv.quantity < order.quantity:
@@ -491,6 +492,11 @@ class OrderService:
         order = await self.session.get(Order, order_id, options=[joinedload(Order.product)])
         if order is None:
             raise ValueError(f"Order #{order_id} not found.")
+        allowed_statuses = {OrderStatus.PENDING, OrderStatus.PARTIAL_APPROVAL_PENDING}
+        if order.status not in allowed_statuses:
+            raise ValueError(
+                f"Order #{order_id} cannot be rejected from status {order.status}."
+            )
         order.status = OrderStatus.REJECTED
         await self.session.flush()
         return order
@@ -546,9 +552,14 @@ class OrderService:
         result = await self.session.execute(stmt)
         inv = result.scalar_one_or_none()
         if inv is None:
-            inv = Inventory(
-                store_id=store_id, product_id=product_id, quantity=0
-            )
-            self.session.add(inv)
-            await self.session.flush()
+            try:
+                async with self.session.begin_nested():
+                    inv = Inventory(
+                        store_id=store_id, product_id=product_id, quantity=0
+                    )
+                    self.session.add(inv)
+                    await self.session.flush()
+            except IntegrityError:
+                result = await self.session.execute(stmt)
+                inv = result.scalar_one()
         return inv

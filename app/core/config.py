@@ -24,6 +24,11 @@ class Settings(BaseSettings):
 
     @property
     def SECRET_KEY(self) -> str:
+        if (
+            not self.debug
+            and self.secret_key == "change-me-in-production-use-long-random-string"
+        ):
+            raise RuntimeError("SECRET_KEY must be set in non-debug environments")
         return self.secret_key
 
     @property

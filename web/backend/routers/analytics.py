@@ -1,10 +1,11 @@
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func, select
 
 from app.models.enums import OrderStatus
+from app.models.enums import UserRole
 from app.models.order import Order
 from app.models.sale import Sale
 from app.models.store import Store
@@ -41,6 +42,9 @@ async def get_dashboard(
     current_user: CurrentUser,
     period: str = Query("today", pattern="^(today|yesterday|week|month)$"),
 ) -> DashboardResponse:
+    if current_user.role not in (UserRole.OWNER, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Access denied")
+
     start_date, end_date = _get_period_dates(period)
 
     # ── 1. Продажи за период ──────────────────────────────────────────────────

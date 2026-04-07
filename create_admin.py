@@ -12,8 +12,10 @@ from app.models.enums import UserRole
 from app.core.security import get_password_hash
 
 async def main():
-    email = "admin@warehouse.com"
-    password = "admin123"
+    email = os.getenv("ADMIN_EMAIL")
+    password = os.getenv("ADMIN_PASSWORD")
+    if not email or not password:
+        raise RuntimeError("Set ADMIN_EMAIL and ADMIN_PASSWORD environment variables")
     
     async with async_session_factory() as session:
         # Check if user already exists
@@ -45,7 +47,7 @@ async def main():
                 session.add(new_admin)
         
         await session.commit()
-        print(f"Done! Admin created/updated: {email} / {password}")
+        print(f"Done! Admin created/updated: {email}")
 
 if __name__ == "__main__":
     asyncio.run(main())

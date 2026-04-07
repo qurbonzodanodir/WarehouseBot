@@ -184,10 +184,13 @@ async def cmd_language(message: Message, _: Any) -> None:
 
 
 @router.callback_query(F.data.startswith("lang:"))
-async def set_language(callback: Any, user: User, session: AsyncSession, _: Any) -> None:
+async def set_language(callback: Any, user: User | None, session: AsyncSession, _: Any) -> None:
     """Update user language."""
     from app.core.i18n import Translator
     lang = callback.data.split(":")[1]
+    if user is None:
+        await callback.answer(_("auth_enter_code"), show_alert=True)
+        return
     user.language_code = lang
     _ = Translator(lang)
     session.add(user)

@@ -31,6 +31,19 @@ def _clean_search_query(text: str) -> str:
     return text.strip().lower().replace(" ", "").replace("-", "")
 
 
+async def _ensure_seller_order_access(
+    session: AsyncSession,
+    user: User,
+    order_id: int,
+) -> Order | None:
+    order = await session.get(Order, order_id)
+    if order is None:
+        return None
+    if order.store_id != user.store_id:
+        return None
+    return order
+
+
 @router.message(F.text.in_({"🛒 Заказ", "🛒 Дархост"}))
 async def start_order(
     message: Message, user: User, state: FSMContext, session: AsyncSession, _: Any
@@ -187,6 +200,7 @@ async def cart_add_more(callback: CallbackQuery, user: User, state: FSMContext, 
         ),
     )
     await state.set_state(OrderFlow.select_product)
+    await callback.answer()
 
 
 @router.callback_query(OrderFlow.cart_action, F.data == "cart:clear")
@@ -194,6 +208,7 @@ async def cart_clear(callback: CallbackQuery, state: FSMContext, _: Any) -> None
     await state.update_data(cart=[])
     await callback.message.edit_text(_("cart_cleared"))
     await state.clear()
+    await callback.answer()
 
 
 @router.callback_query(OrderFlow.cart_action, F.data == "cart:send")
@@ -239,14 +254,19 @@ async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, sess
         logger.error(f"Error in cart_send: {e}", exc_info=True)
 
     await state.clear()
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("order:accept:"))
 async def accept_delivery(
-    callback: CallbackQuery, session: AsyncSession, _: Any
+    callback: CallbackQuery, user: User, session: AsyncSession, _: Any
 ) -> None:
     order_id = int(callback.data.split(":")[-1])
     try:
+        order_check = await _ensure_seller_order_access(session, user, order_id)
+        if order_check is None:
+            await callback.message.edit_text(_("order_not_found"))
+            return
         order_svc = OrderService(session)
         order = await order_svc.deliver_order(order_id)
         
@@ -268,12 +288,16 @@ async def accept_delivery(
 
 @router.callback_query(F.data.startswith("order:batch_accept:"))
 async def batch_accept_delivery(
-    callback: CallbackQuery, session: AsyncSession, _: Any
+    callback: CallbackQuery, user: User, session: AsyncSession, _: Any
 ) -> None:
     batch_id = callback.data.split(":")[-1]
     try:
         order_svc = OrderService(session)
         orders = await order_svc.get_batch_orders(batch_id)
+        if not orders or any(o.store_id != user.store_id for o in orders):
+            await callback.message.edit_text(_("batch_empty_or_processed"))
+            await callback.answer()
+            return
         
         from app.models.enums import OrderStatus
         delivered_info = []
@@ -452,7 +476,7 @@ async def return_entire_batch(
 
 @router.callback_query(F.data.startswith("order:partial_accept:"))
 async def partial_accept(
-    callback: CallbackQuery, session: AsyncSession, _: Any
+    callback: CallbackQuery, user: User, session: AsyncSession, _: Any
 ) -> None:
     order_id = int(callback.data.split(":")[-1])
     try:
@@ -465,6 +489,10 @@ async def partial_accept(
             return
 
         order_svc = OrderService(session)
+        order_check = await _ensure_seller_order_access(session, user, order_id)
+        if order_check is None:
+            await callback.message.edit_text(_("order_not_found"))
+            return
         order = await order_svc.accept_partial_dispatch(
             order_id, warehouse_store_id=warehouse_store_id
         )
@@ -503,6 +531,10 @@ async def partial_reject(
 ) -> None:
     order_id = int(callback.data.split(":")[-1])
     try:
+        order_check = await _ensure_seller_order_access(session, user, order_id)
+        if order_check is None:
+            await callback.message.edit_text(_("order_not_found"))
+            return
         from app.services import StoreService
         store_svc = StoreService(session)
         warehouse_id = await store_svc.get_main_warehouse_id()
@@ -557,6 +589,10 @@ async def partial_accept_batch(
         # 1. Fetch available again to ensure nothing changed
         avail = await order_svc.check_batch_availability(batch_id, warehouse_id)
         if not avail["orders"]:
+            await callback.message.edit_text(_("batch_empty_or_processed"))
+            await callback.answer()
+            return
+        if any(o.store_id != user.store_id for o in avail["orders"]):
             await callback.message.edit_text(_("batch_empty_or_processed"))
             await callback.answer()
             return
@@ -629,6 +665,10 @@ async def partial_reject_batch(
     try:
         order_svc = OrderService(session)
         orders = await order_svc.get_batch_orders(batch_id)
+        if not orders or any(o.store_id != user.store_id for o in orders):
+            await callback.message.edit_text(_("batch_empty_or_processed"))
+            await callback.answer()
+            return
         
         from app.models.enums import OrderStatus
         valid = False
