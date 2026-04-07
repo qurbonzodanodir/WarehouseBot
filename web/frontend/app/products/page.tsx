@@ -13,6 +13,18 @@ function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
 }
 
+function normalizeSku(raw: unknown): string {
+  return String(raw ?? "").trim().toUpperCase();
+}
+
+function parseLocalizedNumber(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  const text = String(value ?? "").trim().replace(",", ".");
+  if (!text) return NaN;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
 export default function ProductsPage() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -191,24 +203,50 @@ export default function ProductsPage() {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-        const parsedItems: any[] = [];
+        const grouped = new Map<string, { sku: string; total: number; priceSum: number; priceCount: number }>();
+        const errors: string[] = [];
         for (let i = 0; i < data.length; i++) {
           const row = data[i];
           if (!row || row.length < 6) continue;
-          const sku = String(row[2] || "").trim();
-          const unitsPerBox = parseFloat(row[3]);
-          const boxes = parseFloat(row[4]);
-          const total = parseFloat(row[5]);
-          const price = parseFloat(row[6]);
-          if (sku && (total > 0 || (boxes > 0 && unitsPerBox > 0))) {
-            parsedItems.push({
-              sku,
-              boxes: isNaN(boxes) ? 0 : boxes,
-              units_per_box: isNaN(unitsPerBox) ? 0 : unitsPerBox,
-              total: isNaN(total) ? (boxes * unitsPerBox) : total,
-              price: isNaN(price) ? 0 : price
-            });
+          const sku = normalizeSku(row[2]);
+          const unitsPerBox = parseLocalizedNumber(row[3]);
+          const boxes = parseLocalizedNumber(row[4]);
+          const total = parseLocalizedNumber(row[5]);
+          const price = parseLocalizedNumber(row[6]);
+          const derivedTotal = !Number.isNaN(total) ? total : boxes * unitsPerBox;
+
+          if (!sku) continue;
+          if (!Number.isFinite(derivedTotal) || derivedTotal <= 0) {
+            errors.push(`row ${i + 1}: invalid quantity for SKU ${sku}`);
+            continue;
           }
+          if (!Number.isNaN(price) && price < 0) {
+            errors.push(`row ${i + 1}: negative price for SKU ${sku}`);
+            continue;
+          }
+
+          const current = grouped.get(sku) ?? {
+            sku,
+            total: 0,
+            priceSum: 0,
+            priceCount: 0,
+          };
+          current.total += derivedTotal;
+          if (!Number.isNaN(price) && price > 0) {
+            current.priceSum += price;
+            current.priceCount += 1;
+          }
+          grouped.set(sku, current);
+        }
+
+        const parsedItems = Array.from(grouped.values()).map((item) => ({
+          sku: item.sku,
+          total: Math.round(item.total),
+          price: item.priceCount > 0 ? item.priceSum / item.priceCount : 0,
+        }));
+
+        if (errors.length) {
+          showToast(`Import warnings: ${errors.slice(0, 3).join("; ")}`, "error");
         }
         setImportData(parsedItems);
       } catch (err) { showToast(t("products.import_error"), "error"); }

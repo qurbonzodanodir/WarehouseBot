@@ -218,22 +218,33 @@ async def bulk_receive_inventory(
     
     try:
         for item in body.items:
+            sku = item.sku.strip().upper()
+            if not sku:
+                raise HTTPException(status_code=400, detail="SKU cannot be empty")
+            if item.quantity <= 0:
+                raise HTTPException(status_code=400, detail=f"Invalid quantity for SKU {sku}")
+
             # Find product by SKU
-            stmt = select(Product).where(Product.sku == item.sku)
+            stmt = select(Product).where(Product.sku == sku)
             res = await session.execute(stmt)
             product = res.scalar_one_or_none()
             
             if not product:
                 # Create new product
                 price_val = Decimal(str(item.price)) if item.price is not None else Decimal(0)
+                if price_val < 0:
+                    raise HTTPException(status_code=400, detail=f"Invalid price for SKU {sku}")
                 product = await product_svc.create_product(
-                    sku=item.sku,
+                    sku=sku,
                     price=price_val,
                 )
                 created_count += 1
             elif item.price is not None:
                 # Update existing product price
-                product.price = Decimal(str(item.price))
+                new_price = Decimal(str(item.price))
+                if new_price < 0:
+                    raise HTTPException(status_code=400, detail=f"Invalid price for SKU {sku}")
+                product.price = new_price
                 
             # Receive stock
             await txn_svc.receive_stock(
