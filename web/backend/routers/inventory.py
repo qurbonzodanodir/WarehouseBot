@@ -93,51 +93,42 @@ async def get_all_inventory(
     if current_user.role not in (UserRole.OWNER, UserRole.WAREHOUSE):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    stores_result = await session.execute(
-        select(Store).where(Store.is_active.is_(True))
-    )
+    stores_result = await session.execute(select(Store).where(Store.is_active.is_(True)))
     stores = stores_result.scalars().all()
+    store_map = {store.id: store.name for store in stores}
+    result = {store.id: {"store_name": store.name, "items": []} for store in stores}
 
-    result = {}
-    for store in stores:
-        # Regular
-        stmt_reg = (
-            select(Inventory)
-            .options(joinedload(Inventory.product))
-            .where(Inventory.store_id == store.id, Inventory.quantity > 0)
-        )
-        res_reg = await session.execute(stmt_reg)
-        items_reg = res_reg.scalars().all()
-
-        # Display
-        stmt_disp = (
-            select(DisplayInventory)
-            .options(joinedload(DisplayInventory.product))
-            .where(DisplayInventory.store_id == store.id, DisplayInventory.quantity > 0)
-        )
-        res_disp = await session.execute(stmt_disp)
-        items_disp = res_disp.scalars().all()
-
-        store_items = []
-        for inv in items_reg:
-            store_items.append({
+    # Regular inventory for all stores in one query.
+    reg_result = await session.execute(
+        select(Inventory)
+        .options(joinedload(Inventory.product))
+        .where(Inventory.quantity > 0, Inventory.store_id.in_(store_map.keys()))
+    )
+    for inv in reg_result.scalars().all():
+        result[inv.store_id]["items"].append(
+            {
                 "product_id": inv.product_id,
                 "sku": inv.product.sku,
                 "quantity": inv.quantity,
-                "is_display": False
-            })
-        for inv in items_disp:
-            store_items.append({
+                "is_display": False,
+            }
+        )
+
+    # Display inventory for all stores in one query.
+    disp_result = await session.execute(
+        select(DisplayInventory)
+        .options(joinedload(DisplayInventory.product))
+        .where(DisplayInventory.quantity > 0, DisplayInventory.store_id.in_(store_map.keys()))
+    )
+    for inv in disp_result.scalars().all():
+        result[inv.store_id]["items"].append(
+            {
                 "product_id": inv.product_id,
                 "sku": inv.product.sku,
                 "quantity": inv.quantity,
-                "is_display": True
-            })
-
-        result[store.id] = {
-            "store_name": store.name,
-            "items": store_items,
-        }
+                "is_display": True,
+            }
+        )
 
     return result
 

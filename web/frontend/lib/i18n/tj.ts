@@ -185,7 +185,9 @@ export const tj = {
     sample_quantity: "Миқдори намунаҳо (дона)",
     dispatch_confirm: "Ба витрина фиристодан",
     dispatch_success: "Намуна бомуваффақият фиристода шуд!",
-    is_display: "Намуна"
+    is_display: "Намуна",
+    goods_label: "Молҳо",
+    assets_label: "Дороӣ"
   },
 
   management: {

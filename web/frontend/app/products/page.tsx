@@ -561,7 +561,7 @@ export default function ProductsPage() {
                 <div style={{ border: "2px dashed var(--border)", padding: 40, textAlign: "center" }}>
                   <FileUp size={48} color="var(--text-muted)" style={{ marginBottom: 16 }} />
                   <label className="btn btn-primary" style={{ cursor: "pointer" }}>
-                    {t("common.search")} файл
+                    {t("products.import_select_file")}
                     <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{ display: "none" }} />
                   </label>
                 </div>

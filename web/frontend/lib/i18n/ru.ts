@@ -188,7 +188,9 @@ export const ru = {
     sample_quantity: "Количество образцов (шт)",
     dispatch_confirm: "Отправить на витрину",
     dispatch_success: "Образец успешно отправлен!",
-    is_display: "Витрина"
+    is_display: "Витрина",
+    goods_label: "Товары",
+    assets_label: "Активы"
   },
 
   management: {

@@ -180,13 +180,13 @@ export default function InventoryPage() {
                   <div style={{ display: "flex", gap: 16 }}>
                     <div style={{ flex: 1, background: "var(--bg)", padding: "12px 14px", borderRadius: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>
-                        <Boxes size={14} /> ТОВАРЫ
+                        <Boxes size={14} /> {t("inventory.goods_label")}
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 700 }}>{fmt(store.total_items)} шт</div>
+                      <div style={{ fontSize: 16, fontWeight: 700 }}>{fmt(store.total_items)} {t("products.pcs")}</div>
                     </div>
                     <div style={{ flex: 1, background: "var(--bg)", padding: "12px 14px", borderRadius: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>
-                        <DollarSign size={14} /> АКТИВЫ
+                        <DollarSign size={14} /> {t("inventory.assets_label")}
                       </div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>{fmt(store.total_value)} TJS</div>
                     </div>

@@ -356,16 +356,24 @@ export default function ManagementPage() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ padding: "8px 12px", borderRadius: 10, display: "flex", alignItems: "center", gap: 6 }}
+                      onClick={() => openEmpForm()}
+                    >
+                      <UserPlus size={14} />
+                      {t("management.add_emp")}
+                    </button>
                     <button className="btn btn-ghost" style={{ padding: "6px", color: "var(--text-muted)", background: "transparent" }} onClick={() => openStoreForm(stores.find(s => s.id === selectedStoreId))} title={t("management.edit_store_btn_title")}>
                       <StoreIcon size={16} />
                     </button>
                   </div>
                 </div>
 
-                {empFormOpen && editingEmployeeId && (
+                {empFormOpen && (
                   <div style={{ background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--accent)", padding: 24, boxShadow: "0 8px 30px rgba(108,99,255,0.12)", marginBottom: 24 }}>
                     <h4 style={{ margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: 8, color: "var(--accent)" }}>
-                      <Shield size={16} /> {t("management.edit_emp")}
+                      <Shield size={16} /> {editingEmployeeId ? t("management.edit_emp") : t("management.add_emp_title")}
                     </h4>
                     <form onSubmit={handleSubmitEmployee} style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
                       <div style={{ flex: "1 1 200px" }}>
