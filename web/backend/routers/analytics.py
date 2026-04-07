@@ -2,7 +2,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, case, func, select
 
 from app.models.enums import OrderStatus
 from app.models.enums import UserRole
@@ -28,6 +28,8 @@ def _get_period_dates(period: str) -> tuple[datetime, datetime | None]:
         return today_start - timedelta(days=7), None
     elif period == "month":
         return today_start - timedelta(days=30), None
+    elif period == "year":
+        return today_start - timedelta(days=365), None
     return today_start, None  # today default
 
 
@@ -40,7 +42,7 @@ def _get_period_dates(period: str) -> tuple[datetime, datetime | None]:
 async def get_dashboard(
     session: SessionDep,
     current_user: CurrentUser,
-    period: str = Query("today", pattern="^(today|yesterday|week|month)$"),
+    period: str = Query("today", pattern="^(today|yesterday|week|month|year)$"),
 ) -> DashboardResponse:
     if current_user.role not in (UserRole.OWNER, UserRole.ADMIN):
         raise HTTPException(status_code=403, detail="Access denied")
@@ -89,17 +91,24 @@ async def get_dashboard(
     ]
 
     # ── 5. Выручка по магазинам за период ─────────────────────────────────────
-    sales_amount_expr = Sale.total_amount
     if end_date:
-        sales_amount_expr = sales_amount_expr.filter(
-            Sale.created_at >= start_date,
-            Sale.created_at < end_date,
-        )
+        period_condition = and_(Sale.created_at >= start_date, Sale.created_at < end_date)
     else:
-        sales_amount_expr = sales_amount_expr.filter(Sale.created_at >= start_date)
+        period_condition = Sale.created_at >= start_date
 
     revenue_stmt = (
-        select(Store.name, func.coalesce(func.sum(sales_amount_expr), 0))
+        select(
+            Store.name,
+            func.coalesce(
+                func.sum(
+                    case(
+                        (period_condition, Sale.total_amount),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+        )
         .join(Sale, Sale.store_id == Store.id, isouter=True)
         .where(Store.is_active.is_(True))
     )
