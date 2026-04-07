@@ -26,7 +26,7 @@ function fmt(n: number) {
 export default function OrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialStatus = searchParams.get("status") || "active";
+  const initialStatus = searchParams.get("status") || "";
   
   const { t } = useTranslation();
   const { showToast } = useToast();

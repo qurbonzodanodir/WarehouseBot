@@ -149,7 +149,11 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="kpi-card">
+              <div
+                className="kpi-card"
+                onClick={() => router.push("/finance")}
+                style={{ cursor: "pointer" }}
+              >
                 <div className="kpi-icon" style={{ background: "rgba(239,68,68,0.15)" }}>
                   <DollarSign size={20} color="var(--red)" />
                 </div>
@@ -218,7 +222,10 @@ export default function DashboardPage() {
                         </Pie>
                         <Tooltip
                           contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8 }}
-                          formatter={(v: any, name: any) => [v, name]}
+                          formatter={(v: any, name: any) => {
+                            const statusKey = String(name).toLowerCase();
+                            return [v, t(`statuses.${statusKey}`)];
+                          }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
