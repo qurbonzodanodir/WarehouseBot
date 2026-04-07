@@ -75,7 +75,7 @@ async def list_orders(
             enum_status = OrderStatus(status)
             stmt = stmt.where(Order.status == enum_status)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="Invalid status filter")
 
     result = await session.execute(stmt)
     return list(result.scalars().unique().all())
@@ -242,15 +242,22 @@ async def reject_order(
     try:
         order = await order_svc.reject_order(order_id)
         await session.commit()
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-        # Notify seller via Telegram
+    # Notify seller via Telegram (do not fail request if notification fails).
+    try:
         notif_svc = NotificationService(bot, session)
         await notif_svc.notify_sellers(
             store_id=order.store_id,
             text=lambda _t: _t("order_rejected_seller_notif", id=order.id, sku=order.product.sku, qty=order.quantity)
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        pass
 
     result = await session.execute(
         select(Order)

@@ -82,6 +82,9 @@ export const ru = {
     display_dispatched: "Отгружен (витрина)",
     sold: "Продан",
     return_pending: "Ожидает возврата",
+    display_return_pending: "Ожидает возврата (витрина)",
+    display_returned: "Возврат витрины принят",
+    display_rejected: "Возврат витрины отклонён",
     returned: "Возвращён",
     rejected: "Отклонён",
     partial_approval_pending: "Частичное подтверждение"
@@ -138,6 +141,8 @@ export const ru = {
     loading: "Загрузка...",
     pcs: "шт",
     not_available: "Нет в наличии ни в одном магазине",
+    action_order: "Заказать",
+    order_success: "Заявка создана!",
     receive_title: "Приёмка товара",
     receive_desc: "Добавить количество для",
     receive_main_warehouse: "на Главный Склад.",

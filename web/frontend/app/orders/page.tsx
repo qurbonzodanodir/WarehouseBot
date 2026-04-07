@@ -229,14 +229,14 @@ export default function OrdersPage() {
                       <th style={{ textAlign: "left" }}>{t("orders.col_total")}</th>
                       <th>{t("common.status")}</th>
                       <th>{t("orders.col_date")}</th>
-                      {canManage && <th>{t("common.actions")}</th>}
+                      {(canManage || user?.role === "seller") && <th>{t("common.actions")}</th>}
                     </tr>
                 </thead>
                 <tbody>
                   {filtered.map((order) => {
                     const isReturn = order.status.toLowerCase().includes("return");
                     return (
-                      <tr key={order.id} style={{ opacity: order.status === "REJECTED" ? 0.6 : 1 }}>
+                      <tr key={order.id} style={{ opacity: order.status.toLowerCase() === "rejected" ? 0.6 : 1 }}>
                         <td style={{ color: "var(--text-muted)", fontSize: 13 }}>#{order.id}</td>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -275,7 +275,7 @@ export default function OrdersPage() {
                               {order.status === "pending" && (
                                 <>
                                   <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleDispatch(order.id)} disabled={actionLoading === order.id}>
-                                    <Truck size={14} /> Отгрузить
+                                    <Truck size={14} /> {t("orders.action_dispatch")}
                                   </button>
                                   <button className="btn btn-danger" style={{ padding: "5px 10px" }} onClick={() => handleReject(order.id)} disabled={actionLoading === order.id}>
                                     <XCircle size={14} />
@@ -285,21 +285,23 @@ export default function OrdersPage() {
                               {isReturn && order.status.toLowerCase().includes("pending") && (
                                 <>
                                   <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleApproveReturn(order.id)} disabled={actionLoading === order.id}>
-                                    <CheckCircle2 size={14} /> Принять
+                                    <CheckCircle2 size={14} /> {t("orders.action_receive")}
                                   </button>
                                   <button className="btn btn-danger" style={{ padding: "5px 10px" }} onClick={() => handleRejectReturn(order.id)} disabled={actionLoading === order.id}>
-                                    <XCircle size={14} /> Отклонить
+                                    <XCircle size={14} /> {t("orders.status_rejected")}
                                   </button>
                                 </>
                               )}
                             </div>
                           </td>
                         )}
-                        {user?.role === "seller" && order.status === "dispatched" && (
+                        {!canManage && user?.role === "seller" && (
                           <td>
-                            <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
-                               <CheckCircle2 size={14} /> {t("orders.action_receive")}
-                            </button>
+                            {order.status === "dispatched" && (
+                              <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
+                                 <CheckCircle2 size={14} /> {t("orders.action_receive")}
+                              </button>
+                            )}
                           </td>
                         )}
                       </tr>

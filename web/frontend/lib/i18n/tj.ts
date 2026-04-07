@@ -80,6 +80,9 @@ export const tj = {
     display_dispatched: "Ирсол (витрина)",
     sold: "Фурӯхта шуд",
     return_pending: "Интизори бозгашт",
+    display_return_pending: "Интизори бозгашт (витрина)",
+    display_returned: "Бозгашти витрина қабул шуд",
+    display_rejected: "Бозгашти витрина рад шуд",
     returned: "Баргардонида шуд",
     rejected: "Рад шуд",
     partial_approval_pending: "Тасдиқи қисман"
@@ -135,6 +138,8 @@ export const tj = {
     loading: "Боргирӣ...",
     pcs: "дона",
     not_available: "Дар ягон мағоза мавҷуд нест",
+    action_order: "Фармоиш додан",
+    order_success: "Дархост бо муваффақият сохта шуд!",
     receive_title: "Қабули мол",
     receive_desc: "Илова кардани миқдор барои",
     receive_main_warehouse: "ба Анбори Асосӣ.",

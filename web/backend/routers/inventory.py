@@ -256,6 +256,9 @@ async def bulk_receive_inventory(
             updated_count += 1
             
         await session.commit()
+    except HTTPException:
+        await session.rollback()
+        raise
     except Exception:
         await session.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")

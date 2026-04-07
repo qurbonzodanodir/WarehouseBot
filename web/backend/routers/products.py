@@ -111,23 +111,32 @@ async def get_product_inventory(
     res_reg = await session.execute(stmt_reg)
     res_disp = await session.execute(stmt_disp)
     
-    out = []
+    # Merge regular and display quantities by store so each store appears once.
+    merged: dict[int, ProductInventoryOut] = {}
+
     for row in res_reg.all():
-        out.append(ProductInventoryOut(
-            store_id=row.id, 
-            store_name=row.name, 
-            quantity=int(row.quantity), 
-            is_display=False
-        ))
+        merged[row.id] = ProductInventoryOut(
+            store_id=row.id,
+            store_name=row.name,
+            quantity=int(row.quantity),
+            is_display=False,
+        )
+
     for row in res_disp.all():
-        out.append(ProductInventoryOut(
-            store_id=row.id, 
-            store_name=row.name, 
-            quantity=int(row.quantity), 
-            is_display=True
-        ))
+        qty = int(row.quantity)
+        if row.id in merged:
+            merged[row.id].quantity += qty
+            # Keep a single row per store; combined stock is represented as regular.
+            merged[row.id].is_display = False
+        else:
+            merged[row.id] = ProductInventoryOut(
+                store_id=row.id,
+                store_name=row.name,
+                quantity=qty,
+                is_display=False,
+            )
     
-    return sorted(out, key=lambda x: x.quantity, reverse=True)
+    return sorted(merged.values(), key=lambda x: x.quantity, reverse=True)
 
 
 @router.post(

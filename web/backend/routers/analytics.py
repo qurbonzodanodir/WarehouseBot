@@ -89,13 +89,20 @@ async def get_dashboard(
     ]
 
     # ── 5. Выручка по магазинам за период ─────────────────────────────────────
-    revenue_stmt = (
-        select(Store.name, func.coalesce(func.sum(Sale.total_amount), 0))
-        .join(Sale, Sale.store_id == Store.id, isouter=True)
-        .where(Store.is_active.is_(True), Sale.created_at >= start_date)
-    )
+    sales_amount_expr = Sale.total_amount
     if end_date:
-        revenue_stmt = revenue_stmt.where(Sale.created_at < end_date)
+        sales_amount_expr = sales_amount_expr.filter(
+            Sale.created_at >= start_date,
+            Sale.created_at < end_date,
+        )
+    else:
+        sales_amount_expr = sales_amount_expr.filter(Sale.created_at >= start_date)
+
+    revenue_stmt = (
+        select(Store.name, func.coalesce(func.sum(sales_amount_expr), 0))
+        .join(Sale, Sale.store_id == Store.id, isouter=True)
+        .where(Store.is_active.is_(True))
+    )
     revenue_stmt = revenue_stmt.group_by(Store.id, Store.name).order_by(
         func.sum(Sale.total_amount).desc()
     )

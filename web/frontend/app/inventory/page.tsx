@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { api, Store, InventoryItem, StoreCatalogCard } from "@/lib/api";
@@ -30,10 +30,13 @@ export default function InventoryPage() {
     if (!isAuthenticated() || !user) { router.push("/login"); return; }
     setUserRole(user.role);
     api.getStores().then((data) => {
-      setStores(data);
+      const visibleStores = user.role === "seller"
+        ? data.filter((s) => s.id === user.store_id)
+        : data;
+      setStores(visibleStores);
       // For owner/warehouse default to all stores (null), for seller default to their store
-      if (user.role === "seller" && data.length > 0) {
-        setSelectedStore(data[0].id);
+      if (user.role === "seller" && visibleStores.length > 0) {
+        setSelectedStore(visibleStores[0].id);
       } else {
         setSelectedStore(null);
       }
@@ -57,7 +60,26 @@ export default function InventoryPage() {
     }
   }, [selectedStore]);
 
-  const filtered = items.filter((i) => {
+  const mergedItems = useMemo(() => {
+    const byProduct = new Map<number, InventoryItem>();
+    for (const item of items) {
+      const existing = byProduct.get(item.product_id);
+      if (existing) {
+        existing.quantity += item.quantity;
+        existing.is_display = false;
+      } else {
+        byProduct.set(item.product_id, {
+          product_id: item.product_id,
+          product_sku: item.product_sku,
+          quantity: item.quantity,
+          is_display: !!item.is_display,
+        });
+      }
+    }
+    return Array.from(byProduct.values());
+  }, [items]);
+
+  const filtered = mergedItems.filter((i) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return i.product_sku.toLowerCase().includes(q);
