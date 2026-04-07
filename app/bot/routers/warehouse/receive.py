@@ -15,9 +15,9 @@ router = Router(name="warehouse.receive")
 # Menu texts that should NOT be treated as search queries
 WH_MENU_TEXTS = {
     "📥 Приход", "📋 Образцы", "🔔 Запросы", "📦 Остатки",
-    "🚚 Отгрузки", "Ещё 🔽", "🔙 Назад", "➕ Добавить товар",
+    "🚚 Отгрузки", "Ещё 🔽", "🔙 Назад",
     "📥 Қабули мол", "📋 Намунаҳо", "🔔 Дархостҳо", "📦 Боқимонда",
-    "🚚 Ирсолҳо", "Боз 🔽", "🔙 Ба қафо", "➕ Иловаи мол",
+    "🚚 Ирсолҳо", "Боз 🔽", "🔙 Ба қафо",
 }
 
 
@@ -38,7 +38,6 @@ async def btn_receive_stock(
             _("catalog_empty"),
             parse_mode="HTML",
         )
-        await state.set_state(ReceiveStockFlow.new_product_sku)
         return
 
     await message.answer(
@@ -91,20 +90,10 @@ async def receive_search_product(
         )
         return
 
-    # Not found — offer to create
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(
-            text=_("receive_create_new"),
-            callback_data="receive:create_new"
-        )
-    )
     await message.answer(
         _("receive_not_found", text=message.text.strip()),
         parse_mode="HTML",
-        reply_markup=builder.as_markup(),
     )
-    await state.update_data(pending_sku=message.text.strip().upper())
 
 
 # ─── Create new product inline ───────────────────────────────────────
@@ -180,18 +169,14 @@ async def receive_enter_quantity(
         return
 
     from app.services import TransactionService
-    from app.models.enums import StockMovementType
     txn_svc = TransactionService(session)
 
-    # Add to warehouse inventory WITH LOCK
-    inv = await txn_svc._get_or_create_inventory(warehouse_id, product_id, lock=True)
-    inv.quantity += quantity
-    await txn_svc.record_stock_movement(
-        product_id=product_id, quantity=quantity,
-        movement_type=StockMovementType.RECEIVE_FROM_SUPPLIER,
-        to_store_id=warehouse_id, user_id=user.id
+    inv = await txn_svc.receive_stock(
+        warehouse_store_id=warehouse_id,
+        product_id=product_id,
+        quantity=quantity,
+        user_id=user.id,
     )
-
     await session.commit()
 
     await message.answer(

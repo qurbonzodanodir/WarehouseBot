@@ -48,14 +48,14 @@ async def _send_vitrine_page(
         await message_or_callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
 
 
-@router.message(F.text.in_({"🖼 Витрина", "🖼 Витрина"}))
+@router.message(F.text.in_({"🖼 Витрина", "🖼 Рафи фурӯш"}))
 async def my_inventory(
     message: Message, user: User, session: AsyncSession, state: FSMContext, _: Any
 ) -> None:
     await state.clear()
     from app.services import OrderService
     order_svc = OrderService(session)
-    items = await order_svc.get_store_inventory(user.store_id)
+    items = await order_svc.get_store_vitrine_inventory(user.store_id)
     await _send_vitrine_page(message, items, page=0, _=_)
 
 
@@ -66,6 +66,6 @@ async def vitrine_page_nav(
     page = int(callback.data.split(":")[-1])
     from app.services import OrderService
     order_svc = OrderService(session)
-    items = await order_svc.get_store_inventory(user.store_id)
+    items = await order_svc.get_store_vitrine_inventory(user.store_id)
     await _send_vitrine_page(callback, items, page, _=_)
     await callback.answer()

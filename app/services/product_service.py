@@ -1,3 +1,4 @@
+from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -107,3 +108,12 @@ class ProductService:
         inventories = list(result.scalars().all())
         products = [inv.product for inv in inventories]
         return None, products, None
+    async def create_product(self, sku: str, price: Decimal = Decimal(0)) -> Product:
+        product = Product(
+            sku=sku,
+            price=price,
+            is_active=True,
+        )
+        self.session.add(product)
+        await self.session.flush()
+        return product

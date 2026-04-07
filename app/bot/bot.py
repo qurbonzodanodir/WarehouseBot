@@ -8,7 +8,6 @@ from app.bot.middlewares.i18n import I18nMiddleware
 from app.bot.routers.common import router as common_router
 from app.bot.routers.seller import seller_router
 from app.bot.routers.warehouse import router as warehouse_router
-from app.bot.routers.owner import router as owner_router
 from app.core.config import settings
 
 bot = Bot(
@@ -25,5 +24,4 @@ dp.include_routers(
     common_router,
     seller_router,
     warehouse_router,
-    owner_router,
 )

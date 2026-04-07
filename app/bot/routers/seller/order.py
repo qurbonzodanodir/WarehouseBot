@@ -6,14 +6,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.bot.keyboards.inline import (
-    catalog_kb, 
-    order_action_kb, 
-    delivery_accepted_kb, 
+    catalog_kb,
+    order_action_kb,
+    delivery_accepted_kb,
     delivery_confirm_kb,
     cart_action_kb,
-    batch_order_action_kb
+    batch_order_action_kb,
+    batch_delivery_accepted_kb,
 )
 from app.bot.states.states import OrderFlow
 from app.models.product import Product
@@ -23,6 +27,10 @@ from app.services import NotificationService, OrderService, ProductService
 from app.bot.routers.seller.common import MENU_TEXTS
 from typing import Any
 router = Router(name="seller.order")
+
+
+def _clean_search_query(text: str) -> str:
+    return text.strip().lower().replace(" ", "").replace("-", "")
 
 
 @router.message(F.text.in_({"🛒 Заказ", "🛒 Дархост"}))
@@ -54,37 +62,14 @@ async def search_product(
         await state.clear()
         return
 
-    from app.services import StoreService
-    store_svc = StoreService(session)
-    warehouse_id = await store_svc.get_main_warehouse_id()
-    
-    if not warehouse_id:
-        await message.answer(_("wh_not_found"))
-        return
-
-    # Check if product is in VITRINE AND in STOCK at WAREHOUSE
-    from app.models.inventory import Inventory
-    from sqlalchemy.orm import aliased
-    WhInventory = aliased(Inventory)
-    StoreInventory = aliased(Inventory)
-
-    clean_query = message.text.strip().lower().replace(" ", "").replace("-", "")
-    from app.services.product_service import ProductService
-    clean_sku = ProductService._clean_col(Product.sku)
-
-    stmt = (
-        select(Product)
-        .join(WhInventory, (Product.id == WhInventory.product_id) & (WhInventory.store_id == warehouse_id))
-        .join(StoreInventory, (Product.id == StoreInventory.product_id) & (StoreInventory.store_id == user.store_id))
-        .where(
-            Product.is_active.is_(True),
-            WhInventory.quantity > 0,
-            clean_sku.ilike(f"%{clean_query}%")
-        )
-    )
-    
-    result = await session.execute(stmt)
-    matches = list(result.scalars().all())
+    order_svc = OrderService(session)
+    items = await order_svc.get_available_products(store_id=user.store_id)
+    clean_query = _clean_search_query(message.text)
+    matches = [
+        product
+        for product in items
+        if clean_query in _clean_search_query(product.sku)
+    ]
 
     if not matches:
         await message.answer(_("order_not_found_search"))
@@ -186,8 +171,7 @@ async def enter_order_quantity(
 
     except Exception as e:
         await message.answer(_("sale_system_error"))
-        print(f"Error in enter_order_quantity: {e}")
-
+        logger.error(f"Error in enter_order_quantity: {e}", exc_info=True)
 
 @router.callback_query(OrderFlow.cart_action, F.data == "cart:add_more")
 async def cart_add_more(callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any) -> None:
@@ -238,12 +222,12 @@ async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, sess
         await session.commit()
         
         notif_svc = NotificationService(callback.bot, session)
-        store_name = user.store.name if user.store else "Магазин"
+        store_name = user.store.name if user.store else _("store_label")
         
         items_text = "\n".join([_("cart_item", sku=i["sku"], qty=i["qty"]) for i in cart])
         
         await notif_svc.notify_warehouse(
-            text=lambda _t: _t("order_batch_notif_new", store=(_t("store_label") if getattr(user, "store_id", None) else _t("unknown")), items=items_text),
+            text=lambda _t: _t("order_batch_notif_new", store=store_name, items=items_text),
             reply_markup=lambda _t: batch_order_action_kb(batch_id, _=_t)
         )
 
@@ -254,7 +238,7 @@ async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, sess
         await callback.message.edit_text(_("sale_error", error=_(str(e))))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in cart_send: {e}")
+        logger.error(f"Error in cart_send: {e}", exc_info=True)
 
     await state.clear()
 
@@ -279,7 +263,7 @@ async def accept_delivery(
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in accept_delivery: {e}")
+        logger.error(f"Error in accept_delivery: {order_id=}, {e}", exc_info=True)
     finally:
         await callback.answer()
 
@@ -293,45 +277,179 @@ async def batch_accept_delivery(
         order_svc = OrderService(session)
         orders = await order_svc.get_batch_orders(batch_id)
         
-        import logging
-        logging.getLogger("uvicorn.error").warning(f"BATCH_ACCEPT: Found {len(orders)} orders for batch {batch_id}")
-        
         from app.models.enums import OrderStatus
         delivered_info = []
         for order in orders:
             status_val = order.status.value if hasattr(order.status, "value") else str(order.status)
-            logging.getLogger("uvicorn.error").warning(f"BATCH_ACCEPT: Order {order.id} status is {order.status} ({type(order.status)})")
             
             if order.status == OrderStatus.DISPATCHED or status_val.lower() == "dispatched":
                 await order_svc.deliver_order(order.id)
                 delivered_info.append((order.id, order.quantity))
-                logging.getLogger("uvicorn.error").warning(f"BATCH_ACCEPT: Delivered {order.id}")
                 
         if not delivered_info:
-            await callback.message.edit_text("⚠️ Эта партия уже была обработана или пуста.")
+            await callback.message.edit_text(_("batch_empty_or_processed"))
             await callback.answer()
             return
             
         await session.commit()
 
         await callback.message.edit_text(
-            _("batch_delivery_success")
+            _("batch_delivery_success"),
+            reply_markup=batch_delivery_accepted_kb(batch_id, _=_)
         )
-        
-        # Send individual management messages with action buttons (Sell / Return)
-        for oid, qty in delivered_info:
-            await callback.message.answer(
-                _("order_accepted_msg", id=oid, qty=qty),
-                reply_markup=delivery_accepted_kb(oid, _=_)
-            )
             
     except ValueError as e:
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in batch_accept_delivery: {e}")
+        logger.error(f"Error in batch_accept_delivery: {batch_id=}, {e}", exc_info=True)
     finally:
         await callback.answer()
+
+
+@router.callback_query(F.data.startswith("order:sell_batch:"))
+async def sell_entire_batch(
+    callback: CallbackQuery, user: User, session: AsyncSession, _: Any
+) -> None:
+    batch_id = callback.data.split(":")[-1]
+    try:
+        from app.services import TransactionService
+        order_svc = OrderService(session)
+        txn_svc = TransactionService(session)
+        orders = await order_svc.get_batch_orders(batch_id)
+        
+        from app.models.enums import OrderStatus
+        sold_count = 0
+        
+        for order in orders:
+            status_val = order.status.value if hasattr(order.status, "value") else str(order.status)
+            if order.status == OrderStatus.DELIVERED or status_val.lower() == "delivered":
+                await txn_svc.record_sale(
+                    store_id=user.store_id,
+                    user_id=user.id,
+                    product_id=order.product_id,
+                    quantity=order.quantity,
+                    price_per_unit=order.price_per_item,
+                    order_id=order.id
+                )
+                sold_count += 1
+                
+        if sold_count == 0:
+            await callback.message.edit_text(_("batch_already_processed"))
+            await callback.answer()
+            return
+
+        await session.commit()
+        await callback.message.edit_text(_("sell_batch_success"))
+        
+    except ValueError as e:
+        await callback.message.edit_text(_("sale_error", error=str(e)))
+    except Exception as e:
+        await callback.message.edit_text(_("sale_system_error"))
+        logger.error(f"Error in sell_entire_batch: {batch_id=}, {e}", exc_info=True)
+    finally:
+        await callback.answer()
+
+
+@router.callback_query(F.data.startswith("order:return_batch:"))
+async def return_entire_batch(
+    callback: CallbackQuery, user: User, session: AsyncSession, _: Any
+) -> None:
+    batch_id = callback.data.split(":")[-1]
+    try:
+        from app.services import TransactionService, NotificationService
+        from app.bot.keyboards.inline import warehouse_return_kb
+        order_svc = OrderService(session)
+        orders = await order_svc.get_batch_orders(batch_id)
+        
+        from app.models.enums import OrderStatus
+        returned_count = 0
+        notif_svc = NotificationService(callback.bot, session)
+        txn_svc = TransactionService(session)
+        
+        for original_order in orders:
+            status_val = original_order.status.value if hasattr(original_order.status, "value") else str(original_order.status)
+            if original_order.status == OrderStatus.DELIVERED or status_val.lower() == "delivered" or original_order.status == OrderStatus.DISPLAY_DELIVERED or status_val.lower() == "display_delivered":
+                is_display = (original_order.status == OrderStatus.DISPLAY_DELIVERED or status_val.lower() == "display_delivered")
+                product_id = original_order.product_id
+                quantity = original_order.quantity
+                
+                # Check stock
+                regular_qty, display_qty = await order_svc.get_store_vitrine_product_stock(
+                    user.store_id, product_id
+                )
+                available_qty = display_qty if is_display else regular_qty
+                if available_qty < quantity:
+                    continue  # skip if they don't have enough anymore
+
+                # Create return order
+                return_order = Order(
+                    store_id=user.store_id,
+                    product_id=product_id,
+                    quantity=quantity,
+                    price_per_item=original_order.price_per_item,
+                    total_price=original_order.price_per_item * quantity,
+                    status=OrderStatus.DISPLAY_RETURN_PENDING if is_display else OrderStatus.RETURN_PENDING,
+                )
+                session.add(return_order)
+                await session.flush()
+
+                # Initiate return
+                await txn_svc.initiate_return(
+                    store_id=user.store_id,
+                    user_id=user.id,
+                    product_id=product_id,
+                    quantity=quantity,
+                    order_id=return_order.id,
+                )
+                
+                # Send explicit notification to warehouse per order
+                if not is_display:
+                    p = original_order.product.sku if original_order.product else str(product_id)
+                    await notif_svc.notify_warehouse(
+                        text=lambda _t, _ret=return_order, _p=p, _q=quantity, _is_disp=is_display: _t(
+                            "return_quick_wh_title",
+                            id=_ret.id,
+                            type=_t("return_type_samples") if _is_disp else _t("return_type_goods"),
+                            store=user.store.name if user.store and user.store.name else _t("store_label"),
+                            sku=_p,
+                            qty=_q,
+                            note=_t("return_debt_note") if not _is_disp else ""
+                        ),
+                        reply_markup=lambda _t, _ret=return_order: warehouse_return_kb(_ret.id, _=_t)
+                    )
+                else:
+                    p = original_order.product.sku if original_order.product else str(product_id)
+                    await notif_svc.notify_warehouse(
+                        text=lambda _t, _ret=return_order, _p=p, _q=quantity, _is_disp=is_display: _t(
+                            "return_quick_wh_title",
+                            id=_ret.id,
+                            type=_t("return_type_samples") if _is_disp else _t("return_type_goods"),
+                            store=user.store.name if user.store and user.store.name else _t("store_label"),
+                            sku=_p,
+                            qty=_q,
+                            note=""
+                        ),
+                        reply_markup=lambda _t, _ret=return_order: warehouse_return_kb(_ret.id, _=_t)
+                    )
+                returned_count += 1
+                
+        if returned_count == 0:
+            await callback.message.edit_text(_("return_quick_not_enough"))
+            await callback.answer()
+            return
+
+        await session.commit()
+        await callback.message.edit_text(_("return_confirm_msg_goods")) # General success message
+        
+    except ValueError as e:
+        await callback.message.edit_text(_("sale_error", error=str(e)))
+    except Exception as e:
+        await callback.message.edit_text(_("sale_system_error"))
+        logger.error(f"Error in return_entire_batch: {batch_id=}, {e}", exc_info=True)
+    finally:
+        await callback.answer()
+
 
 
 @router.callback_query(F.data.startswith("order:partial_accept:"))
@@ -376,7 +494,7 @@ async def partial_accept(
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in partial_accept: {e}")
+        logger.error(f"Error in partial_accept: {order_id=}, {e}", exc_info=True)
     finally:
         await callback.answer()
 
@@ -404,12 +522,12 @@ async def partial_reject(
         await session.commit()
         
         await callback.message.edit_text(
-            _("order_partial_reject_msg", id=order.id)
+            _("order_partial_reject_msg", id=order_id)
         )
 
         notif_svc = NotificationService(callback.bot, session)
         await notif_svc.notify_warehouse(
-            text=lambda _t: _t("order_partial_reject_wh", id=order.id),
+            text=lambda _t: _t("order_partial_reject_wh", id=order_id),
             reply_markup=None,
         )
 
@@ -441,7 +559,7 @@ async def partial_accept_batch(
         # 1. Fetch available again to ensure nothing changed
         avail = await order_svc.check_batch_availability(batch_id, warehouse_id)
         if not avail["orders"]:
-            await callback.message.edit_text("Заявка пуста или уже обработана.")
+            await callback.message.edit_text(_("batch_empty_or_processed"))
             await callback.answer()
             return
             
@@ -449,23 +567,23 @@ async def partial_accept_batch(
         from app.models.enums import OrderStatus
         for order in avail["orders"]:
             if order.status != OrderStatus.PARTIAL_APPROVAL_PENDING:
-                await callback.message.edit_text("⚠️ Эта заявка уже была обработана.")
+                await callback.message.edit_text(_("batch_already_processed"))
                 await callback.answer()
                 return
 
         # If literally NOTHING is available, we cannot create an adjusted batch!
-        if not avail["available"] and not avail["partial"]:
+        if not avail["available"]:
             for order in avail["orders"]:
                 order.status = OrderStatus.REJECTED
             await session.commit()
             
             items_text = "\n".join([_("cart_item", sku=o.product.sku, qty=o.quantity) for o in avail["orders"]])
-            await callback.message.edit_text("❌ Доступных товаров больше нет. Заявка отменена целиком.")
+            await callback.message.edit_text(_("batch_no_available_cancelled"))
             
             notif_svc = NotificationService(callback.bot, session)
             store_name = user.store.name if user.store else str(user.store_id)
             await notif_svc.notify_warehouse(
-                text=lambda _t: f"❌ <b>Продавец {store_name} отменил заявку (нет доступных товаров)!</b>\n\nПозиции:\n{items_text}",
+                text=lambda _t: _t("batch_cancelled_no_stock_wh", store=store_name, items=items_text),
                 reply_markup=None
             )
             await callback.answer()
@@ -479,7 +597,7 @@ async def partial_accept_batch(
         logging.getLogger("uvicorn.error").warning(f"PARTIAL_ACCEPT: new batch={new_batch_id}, committed!")
         
         # 3. Notify seller & warehouse
-        await callback.message.edit_text("✅ Заявка скорректирована и отправлена на склад.")
+        await callback.message.edit_text(_("batch_adjusted_sent"))
         
         notif_svc = NotificationService(callback.bot, session)
         store_name = user.store.name if user.store else str(user.store_id)
@@ -523,19 +641,19 @@ async def partial_reject_batch(
                 valid = True
                 
         if not valid:
-            await callback.message.edit_text("⚠️ Эта заявка уже была обработана.")
+            await callback.message.edit_text(_("batch_already_processed"))
             await callback.answer()
             return
             
         await session.commit()
         
         items_text = "\n".join([_("cart_item", sku=o.product.sku, qty=o.quantity) for o in orders])
-        await callback.message.edit_text("❌ Заявка отменена.")
+        await callback.message.edit_text(_("batch_cancelled"))
         
         notif_svc = NotificationService(callback.bot, session)
         store_name = user.store.name if user.store else str(user.store_id)
         await notif_svc.notify_warehouse(
-            text=lambda _t: f"❌ <b>Продавец {store_name} отменил заявку из-за нехватки товара!</b>\n\nПозиции:\n{items_text}",
+            text=lambda _t: _t("batch_cancelled_shortage_wh", store=store_name, items=items_text),
             reply_markup=None
         )
         

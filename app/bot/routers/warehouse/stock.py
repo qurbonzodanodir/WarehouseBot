@@ -89,33 +89,3 @@ async def warehouse_stock_page_nav(
     items = await order_svc.get_store_inventory(warehouse_id)
     await _send_stock_page(callback, items, page, _=_)
     await callback.answer()
-
-
-@router.message(F.text.in_({"🚚 Отгрузки", "🚚 Ирсолҳо"}))
-async def shipment_history(
-    message: Message, session: AsyncSession, _: Any
-) -> None:
-    stmt = (
-        select(Order)
-        .options(joinedload(Order.store), joinedload(Order.product))
-        .where(Order.status.in_([OrderStatus.DISPATCHED, OrderStatus.DELIVERED]))
-        .order_by(Order.created_at.desc())
-        .limit(15)
-    )
-    result = await session.execute(stmt)
-    orders = result.scalars().all()
-
-    if not orders:
-        await message.answer(_("shipment_history_empty"))
-        return
-
-    lines = [_(
-        "shipment_history_title"
-    )]
-    for o in orders:
-        status_emoji = "🚛" if o.status == OrderStatus.DISPATCHED else "✅"
-        lines.append(
-            f"{status_emoji} #{o.id} → {o.store.name} | "
-            f"{o.product.sku} x{o.quantity}"
-        )
-    await message.answer("\n".join(lines), parse_mode="HTML")

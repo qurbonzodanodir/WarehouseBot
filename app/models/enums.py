@@ -1,4 +1,17 @@
 import enum
+from sqlalchemy import Enum as SA_Enum
+
+def db_enum(enum_cls, name: str):
+    """
+    Returns a SQLAlchemy Enum type configured to use member values for storage.
+    native_enum=False stores as VARCHAR but validates against the Enum values.
+    """
+    return SA_Enum(
+        enum_cls,
+        name=name,
+        values_callable=lambda obj: [e.value for e in obj],
+        native_enum=False
+    )
 
 class CaseInsensitiveEnum(str, enum.Enum):
     @classmethod

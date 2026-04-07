@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Bot
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +8,9 @@ from app.models.user import User
 from typing import Any, Callable, Union
 from aiogram.types import InlineKeyboardMarkup
 from app.core.i18n import Translator
+
+
+logger = logging.getLogger(__name__)
 
 class NotificationService:
     def __init__(self, bot: Bot, session: AsyncSession):
@@ -41,8 +46,15 @@ class NotificationService:
                     text=actual_text,
                     reply_markup=actual_markup,
                 )
-            except Exception:
-                pass  # user might have blocked the bot
+            except Exception as exc:
+                logger.warning(
+                    "Notification send failed: role=%s store_id=%s user_id=%s telegram_id=%s error=%s",
+                    role.value,
+                    store_id,
+                    user.id,
+                    user.telegram_id,
+                    exc,
+                )
 
     async def notify_sellers(
         self,

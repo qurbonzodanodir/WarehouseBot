@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.enums import DebtLedgerReason
+from app.models.enums import DebtLedgerReason, db_enum
 
 
 class DebtLedger(Base):
@@ -16,7 +16,7 @@ class DebtLedger(Base):
     amount_change: Mapped[Decimal] = mapped_column(Numeric(12, 2))  # + = debt increased, - = debt decreased
     balance_after: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     reason: Mapped[DebtLedgerReason] = mapped_column(
-        Enum(DebtLedgerReason, name="debt_ledger_reason", native_enum=False)
+        db_enum(DebtLedgerReason, "debt_ledger_reason")
     )
     description: Mapped[str | None] = mapped_column(String(255), nullable=True) # E.g., "Sale Order #123"
     created_at: Mapped[datetime] = mapped_column(

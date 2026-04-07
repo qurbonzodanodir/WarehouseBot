@@ -179,45 +179,29 @@ async def display_enter_quantity(
         await message.answer(_("warehouse_not_found"))
         return
 
-    # Check warehouse stock
-    wh_result = await session.execute(
-        select(Inventory).where(
-            Inventory.store_id == warehouse_id,
-            Inventory.product_id == product_id,
+    from app.services import TransactionService
+    txn_svc = TransactionService(session)
+    try:
+        display_order, wh_inv = await txn_svc.dispatch_display_items(
+            warehouse_store_id=warehouse_id,
+            target_store_id=target_store_id,
+            product_id=product_id,
+            quantity=quantity,
+            user_id=user.id,
         )
-    )
-    wh_inv = wh_result.scalar_one_or_none()
-    if wh_inv is None or wh_inv.quantity < quantity:
+    except ValueError:
+        wh_result = await session.execute(
+            select(Inventory).where(
+                Inventory.store_id == warehouse_id,
+                Inventory.product_id == product_id,
+            )
+        )
+        wh_inv = wh_result.scalar_one_or_none()
         available = wh_inv.quantity if wh_inv else 0
         await message.answer(
             _("display_not_enough_stock", available=available, qty=quantity)
         )
         return
-
-    # 1. Deduct from warehouse immediately (reserve)
-    wh_inv.quantity -= quantity
-
-    # 2. Create a special "Order" for tracking display transfer
-    from app.models.order import Order
-    from app.models.enums import OrderStatus
-    
-    display_order = Order(
-        store_id=target_store_id,
-        product_id=product_id,
-        quantity=quantity,
-        status=OrderStatus.DISPLAY_DISPATCHED
-    )
-    session.add(display_order)
-    await session.flush()  # Get display_order.id
-    
-    from app.services import TransactionService
-    from app.models.enums import StockMovementType
-    txn_svc = TransactionService(session)
-    await txn_svc.record_stock_movement(
-        product_id=product_id, quantity=quantity,
-        movement_type=StockMovementType.DISPLAY_DISPATCH,
-        from_store_id=warehouse_id, to_store_id=target_store_id, user_id=user.id
-    )
 
     await session.commit()
 

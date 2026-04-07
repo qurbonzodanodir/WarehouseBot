@@ -18,7 +18,7 @@ async def seller_receive_display(
     order = await session.get(
         Order, order_id, options=[selectinload(Order.product)]
     )
-    if not order or order.status != OrderStatus.DISPLAY_DISPATCHED:
+    if not order or order.store_id != user.store_id or order.status != OrderStatus.DISPLAY_DISPATCHED:
         await callback.answer(_("display_not_found"), show_alert=True)
         return
 
@@ -50,14 +50,25 @@ async def seller_reject_display(
     order = await session.get(
         Order, order_id, options=[selectinload(Order.product)]
     )
-    if not order or order.status != OrderStatus.DISPLAY_DISPATCHED:
+    if not order or order.store_id != user.store_id or order.status != OrderStatus.DISPLAY_DISPATCHED:
         await callback.answer(_("display_not_found"), show_alert=True)
         return
 
     from app.services import TransactionService
-    # Return items to warehouse inventoy
+    from app.services import StoreService
+
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        await callback.answer(_("warehouse_not_found"), show_alert=True)
+        return
+
     txn_svc = TransactionService(session)
-    await txn_svc.reject_display_items(order_id)
+    await txn_svc.reject_display_items(
+        order_id=order_id,
+        warehouse_store_id=warehouse_id,
+        user_id=user.id,
+    )
     await session.commit()
 
     await callback.message.edit_text(

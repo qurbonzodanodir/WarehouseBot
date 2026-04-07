@@ -2,7 +2,9 @@ from app.models.user import User
 from app.models.store import Store
 from app.models.product import Product
 from app.models.inventory import Inventory
+from app.models.display_inventory import DisplayInventory
 from app.models.order import Order
+from app.models.sale import Sale
 from app.models.stock_movement import StockMovement
 from app.models.financial_transaction import FinancialTransaction
 from app.models.debt_ledger import DebtLedger
@@ -13,7 +15,9 @@ __all__ = [
     "Store",
     "Product",
     "Inventory",
+    "DisplayInventory",
     "Order",
+    "Sale",
     "StockMovement",
     "FinancialTransaction",
     "DebtLedger",

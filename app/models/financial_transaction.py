@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.enums import FinancialTransactionType
+from app.models.enums import FinancialTransactionType, db_enum
 
 
 class FinancialTransaction(Base):
@@ -15,7 +15,7 @@ class FinancialTransaction(Base):
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     type: Mapped[FinancialTransactionType] = mapped_column(
-        Enum(FinancialTransactionType, name="financial_transaction_type", native_enum=False)
+        db_enum(FinancialTransactionType, "financial_transaction_type")
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     created_at: Mapped[datetime] = mapped_column(

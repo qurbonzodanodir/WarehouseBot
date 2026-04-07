@@ -169,6 +169,21 @@ def delivery_accepted_kb(order_id: int, _: Any) -> InlineKeyboardMarkup:
     )
     return builder.as_markup()
 
+def batch_delivery_accepted_kb(batch_id: str, _: Any) -> InlineKeyboardMarkup:
+    """After seller accepts batch delivery — sell or return the entire batch."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text=_("btn_sold"),
+            callback_data=f"order:sell_batch:{batch_id}",
+        ),
+        InlineKeyboardButton(
+            text=_("btn_return_damaged"),
+            callback_data=f"order:return_batch:{batch_id}",
+        ),
+    )
+    return builder.as_markup()
+
 def warehouse_return_kb(order_id: int, _: Any) -> InlineKeyboardMarkup:
     """Keyboard for warehouse to approve or reject a return from a store."""
     builder = InlineKeyboardBuilder()
@@ -229,42 +244,7 @@ def product_select_kb(
 
 
 
-def stores_debt_kb(stores: list[Store], _: Any) -> InlineKeyboardMarkup:
-    """List stores with debt for the admin to pick from."""
-    builder = InlineKeyboardBuilder()
-    for store in stores:
-        builder.row(
-            InlineKeyboardButton(
-                text=f"🏪 {store.name} — {store.current_debt} {_('currency', default='сом')}",
-                callback_data=f"collect:store:{store.id}",
-            )
-        )
-    return builder.as_markup()
 
-
-def collection_amount_kb(
-    store_id: int, debt: float, _: Any
-) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(
-            text=_("collect_full_btn", amount=debt), # assuming I added this OR just use manual formatting if not
-            callback_data=f"collect:full:{store_id}",
-        ),
-    )
-    builder.row(
-        InlineKeyboardButton(
-            text=_("collect_partial_btn"),
-            callback_data=f"collect:partial:{store_id}",
-        ),
-    )
-    builder.row(
-        InlineKeyboardButton(
-            text=_("collect_skip_btn"),
-            callback_data=f"collect:skip:{store_id}",
-        ),
-    )
-    return builder.as_markup()
 
 
 
@@ -293,143 +273,7 @@ def catalog_kb(
     return builder.as_markup()
 
 
-def stores_list_kb(stores: list[Store], _: Any) -> InlineKeyboardMarkup:
-    """List stores with 'Add store' button."""
-    builder = InlineKeyboardBuilder()
-    for store in stores:
-        builder.row(
-            InlineKeyboardButton(
-                text=f"🏢 {store.name}",
-                callback_data=f"mgmt:store:{store.id}",
-            )
-        )
-    builder.row(
-        InlineKeyboardButton(text=_("mgmt_store_add_btn"), callback_data="mgmt:add_store"),
-    )
-    builder.row(
-        InlineKeyboardButton(text=_("btn_back"), callback_data="mgmt:back"),
-    )
-    return builder.as_markup()
 
-
-def store_mgmt_kb(store_id: int, _: Any) -> InlineKeyboardMarkup:
-    """Keyboard for managing a specific store."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=_("btn_edit_name"), callback_data=f"mgmt:edit_store_name:{store_id}"),
-        InlineKeyboardButton(text=_("btn_edit_addr"), callback_data=f"mgmt:edit_store_addr:{store_id}"),
-    )
-    builder.row(
-        InlineKeyboardButton(text=_("btn_delete_store"), callback_data=f"mgmt:delete_store_ask:{store_id}"),
-    )
-    builder.row(
-        InlineKeyboardButton(text=_("btn_back"), callback_data="mgmt:stores"),
-    )
-    return builder.as_markup()
-
-
-def confirm_delete_store_kb(store_id: int, _: Any) -> InlineKeyboardMarkup:
-    """Confirm store deletion."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=_("btn_confirm_delete"), callback_data=f"mgmt:delete_store_conf:{store_id}"),
-        InlineKeyboardButton(text=_("btn_cancel"), callback_data=f"mgmt:store:{store_id}"),
-    )
-    return builder.as_markup()
-
-
-def rating_period_kb(_: Any) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text=_("period_today"), callback_data="mgmt:rating:today")
-    builder.button(text=_("period_yesterday"), callback_data="mgmt:rating:yesterday")
-    builder.button(text=_("period_week"), callback_data="mgmt:rating:week")
-    builder.button(text=_("period_month"), callback_data="mgmt:rating:month")
-    builder.adjust(2)
-    builder.row(InlineKeyboardButton(text=_("btn_back"), callback_data="mgmt:main"))
-    return builder.as_markup()
-
-
-def employees_list_kb(users: list["User"], _: Any) -> InlineKeyboardMarkup:
-    """List employees with 'Invite' button."""
-    builder = InlineKeyboardBuilder()
-    for u in users:
-        role_emoji = {"seller": "🛒", "warehouse": "🏭", "owner": "👑"}.get(u.role.value, "👤")
-        store_name = u.store.name if u.store else "—"
-        builder.row(
-            InlineKeyboardButton(
-                text=f"{role_emoji} {u.name} — {store_name}",
-                callback_data=f"mgmt:employee:{u.id}",
-            )
-        )
-    builder.row(
-        InlineKeyboardButton(text=_("mgmt_empl_invite_btn"), callback_data="mgmt:invite"),
-    )
-    builder.row(
-        InlineKeyboardButton(text=_("btn_back"), callback_data="mgmt:back"),
-    )
-    return builder.as_markup()
-
-
-def employee_mgmt_kb(user_id: int, role: UserRole, _: Any) -> InlineKeyboardMarkup:
-    """Keyboard for managing a specific employee."""
-    builder = InlineKeyboardBuilder()
-    
-    # Owners don't need store/role changes as they have full access
-    if role != UserRole.OWNER:
-        builder.row(
-            InlineKeyboardButton(text=_("btn_edit_store"), callback_data=f"mgmt:edit_user_store:{user_id}"),
-            InlineKeyboardButton(text=_("btn_edit_role"), callback_data=f"mgmt:edit_user_role:{user_id}"),
-        )
-        
-    builder.row(
-        InlineKeyboardButton(text=_("btn_fire_empl"), callback_data=f"mgmt:delete_user_ask:{user_id}"),
-    )
-    builder.row(
-        InlineKeyboardButton(text=_("btn_back"), callback_data="mgmt:employees"),
-    )
-    return builder.as_markup()
-
-
-def confirm_delete_user_kb(user_id: int, _: Any) -> InlineKeyboardMarkup:
-    """Confirm user deletion."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=_("btn_confirm_fire"), callback_data=f"mgmt:delete_user_conf:{user_id}"),
-        InlineKeyboardButton(text=_("btn_cancel"), callback_data=f"mgmt:employee:{user_id}"),
-    )
-    return builder.as_markup()
-
-
-def invite_stores_kb(stores: list[Store], back_data: str = "mgmt:back", _: Any = None) -> InlineKeyboardMarkup:
-    """Pick store for invite code."""
-    builder = InlineKeyboardBuilder()
-    for store in stores:
-        builder.row(
-            InlineKeyboardButton(
-                text=f"🏢 {store.name}",
-                callback_data=f"invite:store:{store.id}",
-            )
-        )
-    builder.row(
-        InlineKeyboardButton(text=_("btn_back"), callback_data=back_data),
-    )
-    return builder.as_markup()
-
-
-def invite_role_kb(is_warehouse: bool = False, _: Any = None) -> InlineKeyboardMarkup:
-    """Pick role for invite code."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=_("role_seller"), callback_data="invite:role:seller"),
-    )
-    if is_warehouse:
-        builder.row(
-            InlineKeyboardButton(text=_("role_warehouse"), callback_data="invite:role:warehouse"),
-        )
-    builder.row(
-        InlineKeyboardButton(text=_("btn_cancel"), callback_data="mgmt:main"),
-    )
-    return builder.as_markup()
 
 
 def language_selection_kb() -> InlineKeyboardMarkup:

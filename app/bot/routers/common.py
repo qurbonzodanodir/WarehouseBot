@@ -20,7 +20,6 @@ router = Router(name="common")
 MENU_MAP = {
     UserRole.SELLER: reply.get_seller_menu,
     UserRole.WAREHOUSE: reply.get_warehouse_menu,
-    UserRole.OWNER: reply.get_owner_menu,
 }
 
 # Maps roles to translation keys
@@ -40,8 +39,16 @@ async def cmd_start(
 ) -> None:
     """Greet registered user or prompt for invite code."""
     if user is not None:
-        # Already registered → show menu
-        menu_func = MENU_MAP.get(user.role, reply.get_owner_menu)
+        if user.role == UserRole.OWNER:
+            # Owner → redirect to web dashboard
+            await message.answer(
+                _("owner_use_web"),
+                parse_mode="HTML",
+            )
+            return
+
+        # Seller/Warehouse → show menu
+        menu_func = MENU_MAP.get(user.role, reply.get_seller_menu)
         greeting_key = GREETING_KEYS.get(user.role, "👋")
         await message.answer(
             _("welcome", name=user.name, greeting=_(greeting_key)),
@@ -68,9 +75,35 @@ async def cmd_start(
         )
         return
 
-    # Unknown user → ask for invite code
+    # Unknown user → prompt for invite code
+    await message.answer(_("auth_enter_code"))
     await state.set_state(RegistrationFlow.enter_code)
-    await message.answer(_("auth_required"))
+
+
+
+
+# ─── /code — enter invite code manually ──────────────────────────────
+
+
+@router.message(Command("code"))
+async def cmd_code(
+    message: Message, user: User | None, state: FSMContext, _: Any,
+) -> None:
+    """Start invite code registration flow."""
+    if user is not None:
+        menu_func = MENU_MAP.get(user.role)
+        greeting_key = GREETING_KEYS.get(user.role, "👋")
+        if menu_func:
+            await message.answer(
+                _("welcome", name=user.name, greeting=_(greeting_key)),
+                reply_markup=menu_func(_),
+            )
+        else:
+            await message.answer(_("owner_use_web"), parse_mode="HTML")
+        return
+    await state.clear()
+    await state.set_state(RegistrationFlow.enter_code)
+    await message.answer(_("auth_enter_code"))
 
 
 # ─── Invite code registration ───────────────────────────────────────
@@ -127,14 +160,15 @@ async def process_invite_code(
 
     await state.clear()
 
-    menu_func = MENU_MAP.get(invite.role, reply.get_owner_menu)
+    menu_func = MENU_MAP.get(invite.role)
     greeting_key = GREETING_KEYS.get(invite.role, "👋")
     store_name = invite.store.name if invite.store else "—"
 
-    await message.answer(
-        _("welcome", name=full_name, greeting=_(greeting_key)) + f"\n" + _("store_label") + f": {store_name}",
-        reply_markup=menu_func(_),
-    )
+    text = _("welcome", name=full_name, greeting=_(greeting_key)) + f"\n" + _("store_label") + f": {store_name}"
+    if menu_func:
+        await message.answer(text, reply_markup=menu_func(_))
+    else:
+        await message.answer(text + "\n\n" + _("owner_use_web"), parse_mode="HTML")
 
 
 # ─── Language Switching ──────────────────────────────────────────────
@@ -155,83 +189,21 @@ async def set_language(callback: Any, user: User, session: AsyncSession, _: Any)
     from app.core.i18n import Translator
     lang = callback.data.split(":")[1]
     user.language_code = lang
+    _ = Translator(lang)
+    session.add(user)
     await session.commit()
     
-    _ = Translator(lang)
-    menu_func = MENU_MAP.get(user.role, reply.get_owner_menu)
-    
-    await callback.message.answer(
-        _("lang_changed"),
-        reply_markup=menu_func(_),
-    )
+    menu_func = MENU_MAP.get(user.role)
+    if menu_func:
+        await callback.message.answer(
+            _("lang_changed"),
+            reply_markup=menu_func(_),
+        )
+    else:
+        from aiogram.types import ReplyKeyboardRemove
+        await callback.message.answer(
+            _("lang_changed"),
+            reply_markup=ReplyKeyboardRemove(),
+        )
     await callback.answer()
 
-
-# ─── /switch_role (DEBUG only) ───────────────────────────────────────
-
-
-@router.message(Command("switch_role"))
-async def cmd_switch_role(
-    message: Message, user: User | None, session: AsyncSession, _: Any
-) -> None:
-    """Switch role for testing. Only works when DEBUG=true."""
-    if not settings.debug:
-        await message.answer(_("debug_mode_only"))
-        return
-
-    if user is None:
-        await message.answer(_("auth_not_registered"))
-        return
-
-    parts = message.text.split()
-    if len(parts) < 2:
-        await message.answer(
-            _("switch_role_usage", role=user.role.value),
-            parse_mode="HTML",
-        )
-        return
-
-    role_str = parts[1].lower()
-    try:
-        new_role = UserRole(role_str)
-    except ValueError:
-        await message.answer(
-            _("unknown_role", role=role_str)
-        )
-        return
-
-    store_id = None
-    if len(parts) >= 3 and parts[2] != "0":
-        try:
-            store_id = int(parts[2])
-        except ValueError:
-            await message.answer(_("invalid_store_id"))
-            return
-
-    user.role = new_role
-    user.store_id = store_id
-    await session.commit()
-
-    menu_func = MENU_MAP.get(new_role, reply.get_owner_menu)
-    greeting_key = GREETING_KEYS.get(new_role, "👋")
-    await message.answer(
-        _("role_changed", greeting=_(greeting_key), store_id=store_id or "—"),
-        reply_markup=menu_func(_),
-    )
-
-
-
-
-@router.message(Command("my_role"))
-async def cmd_my_role(
-    message: Message, user: User | None, _: Any
-) -> None:
-    """Show current role and store."""
-    if user is None:
-        await message.answer(_("auth_not_registered"))
-        return
-    store_name = user.store.name if user.store else "—"
-    await message.answer(
-        _("my_role_info", name=user.name, role=user.role.value, store=store_name),
-        parse_mode="HTML",
-    )

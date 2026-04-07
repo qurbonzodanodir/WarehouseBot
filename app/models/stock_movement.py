@@ -4,7 +4,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.enums import StockMovementType
+from app.models.enums import StockMovementType, db_enum
 
 
 class StockMovement(Base):
@@ -16,7 +16,7 @@ class StockMovement(Base):
     to_store_id: Mapped[int | None] = mapped_column(ForeignKey("stores.id"), nullable=True)
     quantity: Mapped[int] = mapped_column(Integer)
     movement_type: Mapped[StockMovementType] = mapped_column(
-        Enum(StockMovementType, name="stock_movement_type", native_enum=False)
+        db_enum(StockMovementType, "stock_movement_type")
     )
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True) # Who performed it
     created_at: Mapped[datetime] = mapped_column(

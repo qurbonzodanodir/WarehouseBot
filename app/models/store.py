@@ -4,7 +4,7 @@ from sqlalchemy import Enum, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.enums import StoreType
+from app.models.enums import StoreType, db_enum
 
 
 class Store(Base):
@@ -14,7 +14,7 @@ class Store(Base):
     name: Mapped[str] = mapped_column(String(255))
     address: Mapped[str] = mapped_column(String(500), default="")
     store_type: Mapped[StoreType] = mapped_column(
-        Enum(StoreType, name="store_type", native_enum=False),
+        db_enum(StoreType, "store_type"),
         default=StoreType.STORE,
     )
     current_debt: Mapped[Decimal] = mapped_column(
@@ -26,7 +26,11 @@ class Store(Base):
     inventory: Mapped[list["Inventory"]] = relationship(  # noqa: F821
         back_populates="store"
     )
+    display_inventory: Mapped[list["DisplayInventory"]] = relationship(  # noqa: F821
+        back_populates="store"
+    )
     orders: Mapped[list["Order"]] = relationship(back_populates="store")  # noqa: F821
+    sales: Mapped[list["Sale"]] = relationship(back_populates="store")  # noqa: F821
     financial_transactions: Mapped[list["FinancialTransaction"]] = relationship(  # noqa: F821
         back_populates="store"
     )

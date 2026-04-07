@@ -2,6 +2,10 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
+
 from app.bot.keyboards.inline import (
     delivery_confirm_kb, 
     order_action_kb, 
@@ -62,7 +66,13 @@ async def dispatch_order_start(
             return
 
         txn_svc = TransactionService(session)
-        inv = await txn_svc._get_or_create_inventory(warehouse_id, order.product_id)
+        inv = await txn_svc.get_inventory(warehouse_id, order.product_id)
+        if inv is None:
+            await callback.answer(
+                _("stock_error_zero", sku=order.product.sku),
+                show_alert=True
+            )
+            return
         available_qty = inv.quantity
 
         if available_qty == 0:
@@ -115,7 +125,7 @@ async def dispatch_order_start(
         await callback.message.edit_text(_("order_dispatch_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in dispatch_order_start: {e}")
+        logger.error(f"Error in dispatch_order_start: {e}", exc_info=True)
     finally:
         await callback.answer()
 
@@ -191,7 +201,7 @@ async def approve_return(
         await callback.message.edit_text(_("return_approve_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in approve_return: {e}")
+        logger.error(f"Error in approve_return: {e}", exc_info=True)
     finally:
         await callback.answer()
 
@@ -229,7 +239,7 @@ async def reject_return_request(
         await callback.message.edit_text(_("error_label", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in reject_return_request: {e}")
+        logger.error(f"Error in reject_return_request: {e}", exc_info=True)
     finally:
         await callback.answer()
 
@@ -256,7 +266,7 @@ async def approve_batch_order(
         orders = avail["orders"]
         
         if not orders:
-            await callback.message.edit_text("Заявка пуста или уже обработана.")
+            await callback.message.edit_text(_("batch_empty_or_processed"))
             return
 
         store_id = orders[0].store_id
@@ -268,7 +278,7 @@ async def approve_batch_order(
             dispatched_text = "\n".join([f"• {o.product.sku} — {o.quantity} шт" for o in dispatched])
             
             await session.commit()
-            await callback.message.edit_text(f"✅ Заявка (группа {batch_id}) полностью отправлена.")
+            await callback.message.edit_text(_("batch_dispatched_wh", batch_id=batch_id))
             
             from app.bot.keyboards.inline import batch_delivery_confirm_kb
             await notif_svc.notify_sellers(
@@ -287,10 +297,7 @@ async def approve_batch_order(
             missing_text = "\n".join([f"• {i['order'].product.sku} — {i['order'].quantity} шт" for i in missing]) if missing else "—"
             
             wh_msg = (
-                f"⚠️ Заявка (группа {batch_id}) отложена.\n"
-                f"Не хватает товаров. Отправлен запрос продавцу:\n\n"
-                f"✅ Предложено отправить:\n{avail_text}\n\n"
-                f"❌ Не хватает на складе:\n{missing_text}"
+                _("batch_partial_pending_wh", batch_id=batch_id, available=avail_text, missing=missing_text)
             )
             await callback.message.edit_text(wh_msg)
             
@@ -305,7 +312,7 @@ async def approve_batch_order(
         await callback.message.edit_text(_("error_label", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in approve_batch_order: {e}")
+        logger.error(f"Error in approve_batch_order: {e}", exc_info=True)
     finally:
         await callback.answer()
 
@@ -318,14 +325,14 @@ async def reject_batch_order(
         order_svc = OrderService(session)
         rejected_orders = await order_svc.reject_batch_order(batch_id)
         if not rejected_orders:
-            await callback.message.edit_text("Заявка пуста или уже обработана.")
+            await callback.message.edit_text(_("batch_empty_or_processed"))
             return
             
         store_id = rejected_orders[0].store_id
         items_text = "\n".join([f"• {o.product.sku} — {o.quantity} шт" for o in rejected_orders])
 
         await callback.message.edit_text(
-            f"❌ Заявка (группа {batch_id}) отклонена."
+            _("batch_rejected_wh", batch_id=batch_id)
         )
         
         notif_svc = NotificationService(callback.bot, session)

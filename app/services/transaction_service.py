@@ -9,7 +9,9 @@ from app.models.enums import (
     FinancialTransactionType,
     StockMovementType,
 )
+from app.models.display_inventory import DisplayInventory
 from app.models.inventory import Inventory
+from app.models.sale import Sale
 from app.models.store import Store
 from app.models.stock_movement import StockMovement
 from app.models.financial_transaction import FinancialTransaction
@@ -59,6 +61,28 @@ class TransactionService:
         self.session.add(txn)
         await self.session.flush()
         return txn
+
+    async def record_sale_entry(
+        self,
+        store_id: int,
+        user_id: int,
+        product_id: int,
+        quantity: int,
+        price_per_item: Decimal,
+        order_id: int | None = None,
+    ) -> Sale:
+        sale = Sale(
+            store_id=store_id,
+            user_id=user_id,
+            product_id=product_id,
+            order_id=order_id,
+            quantity=quantity,
+            price_per_item=price_per_item,
+            total_amount=price_per_item * quantity,
+        )
+        self.session.add(sale)
+        await self.session.flush()
+        return sale
 
     async def record_debt_ledger(
         self,
@@ -110,6 +134,7 @@ class TransactionService:
         price_per_unit: Decimal,
         order_id: int = None,
     ) -> FinancialTransaction:
+        effective_price = price_per_unit
 
         # CRITICAL: Lock inventory row to prevent race conditions (double selling)
         inv = await self._get_inventory(store_id, product_id, lock=True)
@@ -131,8 +156,9 @@ class TransactionService:
                 if order.status != OrderStatus.DELIVERED:
                     raise ValueError("Заявка уже обработана (продана или возвращена).")
                 order.status = OrderStatus.SOLD
+                effective_price = order.price_per_item
 
-        amount = price_per_unit * quantity
+        amount = effective_price * quantity
 
         # Deduct inventory
         inv.quantity -= quantity
@@ -148,7 +174,17 @@ class TransactionService:
             store_id, user_id, amount, FinancialTransactionType.PAYMENT
         )
 
-        # 3. Increase debt
+        # 3. Record sale snapshot
+        await self.record_sale_entry(
+            store_id=store_id,
+            user_id=user_id,
+            product_id=product_id,
+            quantity=quantity,
+            price_per_item=effective_price,
+            order_id=order_id,
+        )
+
+        # 4. Increase debt
         await self.record_debt_ledger(
             store_id, amount, DebtLedgerReason.SALE_COMPLETED,
             description=f"Продажа {quantity} шт. (Заявка {order_id if order_id else 'Витрина'})"
@@ -168,11 +204,6 @@ class TransactionService:
         Step 1: Seller initiates a return.
         - LOCKS and deducts quantity from the store inventory.
         """
-        inv = await self._get_inventory(store_id, product_id, lock=True)
-        if inv is None or inv.quantity < quantity:
-            available = inv.quantity if inv else 0
-            raise ValueError(f"Недостаточно товара для возврата: в наличии {available}, нужно {quantity}.")
-
         from app.models.order import Order
         from app.models.enums import OrderStatus
         
@@ -185,7 +216,19 @@ class TransactionService:
             allowed = (OrderStatus.DELIVERED, OrderStatus.RETURN_PENDING, OrderStatus.DISPLAY_RETURN_PENDING)
             if order.status not in allowed:
                 raise ValueError(f"Заявка #{order_id} уже в статусе {order.status}, возврат невозможен.")
-        
+
+        is_display_return = order.status == OrderStatus.DISPLAY_RETURN_PENDING
+        if is_display_return:
+            inv = await self._get_display_inventory(store_id, product_id, lock=True)
+            if inv is None or inv.quantity < quantity:
+                available = inv.quantity if inv else 0
+                raise ValueError(f"Недостаточно образцов для возврата: в наличии {available}, нужно {quantity}.")
+        else:
+            inv = await self._get_inventory(store_id, product_id, lock=True)
+            if inv is None or inv.quantity < quantity:
+                available = inv.quantity if inv else 0
+                raise ValueError(f"Недостаточно товара для возврата: в наличии {available}, нужно {quantity}.")
+
         inv.quantity -= quantity
         await self.session.flush()
 
@@ -228,9 +271,18 @@ class TransactionService:
             from_store_id=order.store_id, to_store_id=warehouse_store_id, user_id=warehouse_user_id
         )
 
-        # 2. Debt is NOT reduced here because DISPATCH does not increase debt.
-        # Debt only increases when the seller actually sells the item (record_sale).
-
+        # 2. Record Debt Reduction (CRITICAL FIX)
+        # If it's a regular item return, we MUST reduce the store's debt.
+        if not is_display_return:
+            # Calculate amount from the order's fixed price
+            amount = order.price_per_item * order.quantity
+            if amount > 0:
+                await self.record_debt_ledger(
+                    store_id=order.store_id,
+                    amount_change=-amount,  # Negative means debt reduction
+                    reason=DebtLedgerReason.RETURN_APPROVED,
+                    description=f"Возврат товара #{order.id} на склад (SKU: {product.sku}, {order.quantity} шт.)"
+                )
 
         return mov
 
@@ -255,7 +307,10 @@ class TransactionService:
         is_display = order.status == OrderStatus.DISPLAY_RETURN_PENDING
 
         # Put inventory back WITH LOCK
-        inv = await self._get_or_create_inventory(order.store_id, order.product_id, lock=True)
+        if is_display:
+            inv = await self._get_or_create_display_inventory(order.store_id, order.product_id, lock=True)
+        else:
+            inv = await self._get_or_create_inventory(order.store_id, order.product_id, lock=True)
         inv.quantity += order.quantity
 
         order.status = OrderStatus.DISPLAY_DELIVERED if is_display else OrderStatus.DELIVERED
@@ -279,12 +334,93 @@ class TransactionService:
         )
         return txn
 
+    async def get_inventory(
+        self,
+        store_id: int,
+        product_id: int,
+        *,
+        lock: bool = False,
+    ) -> Inventory | None:
+        return await self._get_inventory(store_id, product_id, lock=lock)
+
+    async def receive_stock(
+        self,
+        warehouse_store_id: int,
+        product_id: int,
+        quantity: int,
+        user_id: int,
+    ) -> Inventory:
+        inv = await self._get_or_create_inventory(warehouse_store_id, product_id, lock=True)
+        inv.quantity += quantity
+        await self.record_stock_movement(
+            product_id=product_id,
+            quantity=quantity,
+            movement_type=StockMovementType.RECEIVE_FROM_SUPPLIER,
+            to_store_id=warehouse_store_id,
+            user_id=user_id,
+        )
+        await self.session.flush()
+        return inv
+
+    async def dispatch_display_items(
+        self,
+        warehouse_store_id: int,
+        target_store_id: int,
+        product_id: int,
+        quantity: int,
+        user_id: int,
+    ):
+        from app.models.order import Order
+        from app.models.enums import OrderStatus
+
+        wh_inv = await self._get_or_create_inventory(warehouse_store_id, product_id, lock=True)
+        if wh_inv.quantity < quantity:
+            raise ValueError(
+                f"Недостаточно на складе: есть {wh_inv.quantity}, нужно {quantity}."
+            )
+
+        wh_inv.quantity -= quantity
+
+        display_order = Order(
+            store_id=target_store_id,
+            product_id=product_id,
+            quantity=quantity,
+            price_per_item=Decimal("0"),
+            total_price=Decimal("0"),
+            status=OrderStatus.DISPLAY_DISPATCHED,
+        )
+        self.session.add(display_order)
+        await self.session.flush()
+
+        await self.record_stock_movement(
+            product_id=product_id,
+            quantity=quantity,
+            movement_type=StockMovementType.DISPLAY_DISPATCH,
+            from_store_id=warehouse_store_id,
+            to_store_id=target_store_id,
+            user_id=user_id,
+        )
+        await self.session.flush()
+        return display_order, wh_inv
+
     async def _get_inventory(
         self, store_id: int, product_id: int, lock: bool = False
     ) -> Inventory | None:
         stmt = select(Inventory).where(
             Inventory.store_id == store_id,
             Inventory.product_id == product_id,
+        )
+        if lock:
+            stmt = stmt.with_for_update()
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _get_display_inventory(
+        self, store_id: int, product_id: int, lock: bool = False
+    ) -> DisplayInventory | None:
+        stmt = select(DisplayInventory).where(
+            DisplayInventory.store_id == store_id,
+            DisplayInventory.product_id == product_id,
         )
         if lock:
             stmt = stmt.with_for_update()
@@ -305,6 +441,18 @@ class TransactionService:
             # but in Postgres flush is usually enough for the session.
         return inv
 
+    async def _get_or_create_display_inventory(
+        self, store_id: int, product_id: int, lock: bool = False
+    ) -> DisplayInventory:
+        inv = await self._get_display_inventory(store_id, product_id, lock=lock)
+        if inv is None:
+            inv = DisplayInventory(
+                store_id=store_id, product_id=product_id, quantity=0
+            )
+            self.session.add(inv)
+            await self.session.flush()
+        return inv
+
     # (rest of the methods: get_store_financial_transactions, etc.)
     async def get_store_financial_transactions(
         self,
@@ -316,6 +464,21 @@ class TransactionService:
             .options(joinedload(FinancialTransaction.user))
             .where(FinancialTransaction.store_id == store_id)
             .order_by(FinancialTransaction.created_at.desc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_store_sales(
+        self,
+        store_id: int,
+        limit: int = 20,
+    ) -> list[Sale]:
+        stmt = (
+            select(Sale)
+            .options(joinedload(Sale.product))
+            .where(Sale.store_id == store_id)
+            .order_by(Sale.created_at.desc())
             .limit(limit)
         )
         result = await self.session.execute(stmt)
@@ -341,7 +504,7 @@ class TransactionService:
         if order is None or order.status != OrderStatus.DISPLAY_DISPATCHED:
             raise ValueError("Некорректный статус для приемки образцов.")
 
-        inv = await self._get_or_create_inventory(order.store_id, order.product_id, lock=True)
+        inv = await self._get_or_create_display_inventory(order.store_id, order.product_id, lock=True)
         inv.quantity += order.quantity
         order.status = OrderStatus.DISPLAY_DELIVERED
         
@@ -349,5 +512,35 @@ class TransactionService:
             product_id=order.product_id, quantity=order.quantity,
             movement_type=StockMovementType.DISPLAY_RECEIVE,
             to_store_id=order.store_id
+        )
+        await self.session.flush()
+
+    async def reject_display_items(
+        self,
+        order_id: int,
+        warehouse_store_id: int,
+        user_id: int | None = None,
+    ) -> None:
+        from app.models.order import Order
+        from app.models.enums import OrderStatus
+
+        stmt = select(Order).where(Order.id == order_id).with_for_update()
+        res = await self.session.execute(stmt)
+        order = res.scalar_one_or_none()
+
+        if order is None or order.status != OrderStatus.DISPLAY_DISPATCHED:
+            raise ValueError("Некорректный статус для отклонения образцов.")
+
+        wh_inv = await self._get_or_create_inventory(warehouse_store_id, order.product_id, lock=True)
+        wh_inv.quantity += order.quantity
+        order.status = OrderStatus.DISPLAY_REJECTED
+
+        await self.record_stock_movement(
+            product_id=order.product_id,
+            quantity=order.quantity,
+            movement_type=StockMovementType.DISPLAY_RETURN,
+            from_store_id=order.store_id,
+            to_store_id=warehouse_store_id,
+            user_id=user_id,
         )
         await self.session.flush()

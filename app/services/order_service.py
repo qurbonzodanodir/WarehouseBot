@@ -1,10 +1,19 @@
+from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.models.display_inventory import DisplayInventory
 from app.models.enums import OrderStatus
 from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.product import Product
+
+
+@dataclass
+class VitrineItem:
+    product: Product
+    quantity: int
+    regular_quantity: int = 0
+    display_quantity: int = 0
 
 
 class OrderService:
@@ -13,7 +22,7 @@ class OrderService:
 
     async def get_available_products(self, store_id: int) -> list[Product]:
         from app.services.store_service import StoreService
-        from app.models.inventory import Inventory
+        from sqlalchemy import exists, or_
         
         store_svc = StoreService(self.session)
         warehouse_id = await store_svc.get_main_warehouse_id()
@@ -25,14 +34,30 @@ class OrderService:
         from sqlalchemy.orm import aliased
         WhInventory = aliased(Inventory)
         StoreInventory = aliased(Inventory)
+        StoreDisplayInventory = aliased(DisplayInventory)
 
         stmt = (
             select(Product)
             .join(WhInventory, (Product.id == WhInventory.product_id) & (WhInventory.store_id == warehouse_id))
-            .join(StoreInventory, (Product.id == StoreInventory.product_id) & (StoreInventory.store_id == store_id))
             .where(
                 Product.is_active.is_(True),
-                WhInventory.quantity > 0
+                WhInventory.quantity > 0,
+                or_(
+                    exists(
+                        select(StoreInventory.id).where(
+                            StoreInventory.product_id == Product.id,
+                            StoreInventory.store_id == store_id,
+                            StoreInventory.quantity > 0,
+                        )
+                    ),
+                    exists(
+                        select(StoreDisplayInventory.id).where(
+                            StoreDisplayInventory.product_id == Product.id,
+                            StoreDisplayInventory.store_id == store_id,
+                            StoreDisplayInventory.quantity > 0,
+                        )
+                    ),
+                ),
             )
             .order_by(Product.sku)
         )
@@ -56,6 +81,68 @@ class OrderService:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_store_vitrine_inventory(
+        self,
+        store_id: int,
+        include_empty: bool = False,
+    ) -> list[VitrineItem]:
+        from sqlalchemy.orm import joinedload
+
+        regular_result = await self.session.execute(
+            select(Inventory)
+            .options(joinedload(Inventory.product))
+            .where(Inventory.store_id == store_id)
+        )
+        display_result = await self.session.execute(
+            select(DisplayInventory)
+            .options(joinedload(DisplayInventory.product))
+            .where(DisplayInventory.store_id == store_id)
+        )
+
+        merged: dict[int, VitrineItem] = {}
+
+        for inv in regular_result.scalars().all():
+            item = merged.get(inv.product_id)
+            if item is None:
+                item = VitrineItem(product=inv.product, quantity=0)
+                merged[inv.product_id] = item
+            item.regular_quantity = inv.quantity
+            item.quantity += inv.quantity
+
+        for inv in display_result.scalars().all():
+            item = merged.get(inv.product_id)
+            if item is None:
+                item = VitrineItem(product=inv.product, quantity=0)
+                merged[inv.product_id] = item
+            item.display_quantity = inv.quantity
+            item.quantity += inv.quantity
+
+        items = sorted(merged.values(), key=lambda item: item.product.id)
+        if not include_empty:
+            items = [item for item in items if item.quantity > 0]
+        return items
+
+    async def get_store_vitrine_product_stock(
+        self,
+        store_id: int,
+        product_id: int,
+    ) -> tuple[int, int]:
+        regular_result = await self.session.execute(
+            select(Inventory.quantity).where(
+                Inventory.store_id == store_id,
+                Inventory.product_id == product_id,
+            )
+        )
+        display_result = await self.session.execute(
+            select(DisplayInventory.quantity).where(
+                DisplayInventory.store_id == store_id,
+                DisplayInventory.product_id == product_id,
+            )
+        )
+        regular_qty = regular_result.scalar_one_or_none() or 0
+        display_qty = display_result.scalar_one_or_none() or 0
+        return regular_qty, display_qty
+
     async def create_order(
         self,
         store_id: int,
@@ -68,11 +155,8 @@ class OrderService:
             raise ValueError(f"Product #{product_id} not found.")
 
         # EXTRA SECURITY: Check if product is in VITRINE
-        from app.models.inventory import Inventory
-        res = await self.session.execute(
-            select(Inventory).where(Inventory.store_id == store_id, Inventory.product_id == product_id)
-        )
-        if not res.scalar_one_or_none():
+        regular_qty, display_qty = await self.get_store_vitrine_product_stock(store_id, product_id)
+        if regular_qty <= 0 and display_qty <= 0:
             raise ValueError("order_must_be_in_vitrine")
 
         price = product.price
@@ -102,7 +186,7 @@ class OrderService:
 
         # Deduct from warehouse inventory
         inv = await self._get_or_create_inventory(
-            warehouse_store_id, order.product_id
+            warehouse_store_id, order.product_id, lock=True
         )
         if inv.quantity < order.quantity:
             raise ValueError(
@@ -142,15 +226,15 @@ class OrderService:
         warehouse_store_id: int,
     ) -> dict:
         """
-        Check if the batch can be fully fulfilled or only partially.
-        Returns a dict with 'available', 'partial', and 'missing' lists of dictionaries.
+        Check whether each line in the batch is fully available.
+        Current workflow only supports full fulfillment per line item:
+        an item is either available in full or missing.
         """
         orders = await self.get_batch_orders(batch_id)
         if not orders:
             raise ValueError(f"Batch #{batch_id} not found.")
 
         available = []
-        partial = []
         missing = []
 
         from app.models.enums import OrderStatus
@@ -165,7 +249,7 @@ class OrderService:
                 else:
                     available.append({"order": order, "available_qty": order.quantity})
 
-        return {"available": available, "partial": partial, "missing": missing, "orders": orders}
+        return {"available": available, "partial": [], "missing": missing, "orders": orders}
 
     async def create_adjusted_batch(
         self,
@@ -174,14 +258,13 @@ class OrderService:
     ) -> str:
         """
         Seller accepts partial fulfillment:
-        Reject missing/partial remainders, return a new batch ID with available items as PENDING.
+        Reject missing items and move fully available ones into a new batch ID as PENDING.
         """
         import uuid
         new_batch_id = uuid.uuid4().hex[:12]
         
         # Original orders from the availability dict
         available = availability_data["available"]
-        partial = availability_data["partial"]
         missing = availability_data["missing"]
         
         # 1. Reject missing entirely
@@ -189,30 +272,7 @@ class OrderService:
             order = item["order"]
             order.status = OrderStatus.REJECTED
             
-        # 2. Split partial ones
-        for item in partial:
-            order = item["order"]
-            available_qty = item["available_qty"]
-            remainder_qty = order.quantity - available_qty
-            
-            # Reject original order as remainder
-            order.status = OrderStatus.REJECTED
-            order.quantity = remainder_qty
-            order.total_price = order.price_per_item * remainder_qty
-            
-            # Create new order for available qty in new batch
-            new_order = Order(
-                store_id=order.store_id,
-                product_id=order.product_id,
-                quantity=available_qty,
-                price_per_item=order.price_per_item,
-                total_price=order.price_per_item * available_qty,
-                status=OrderStatus.PENDING,
-                batch_id=new_batch_id,
-            )
-            self.session.add(new_order)
-            
-        # 3. Move fully available ones to new batch
+        # 2. Move fully available ones to new batch
         for item in available:
             order = item["order"]
             order.status = OrderStatus.PENDING
@@ -300,11 +360,14 @@ class OrderService:
 
         original_quantity = order.quantity
         remainder = original_quantity - proposed_quantity
+        import uuid
+        partial_group_id = order.batch_id or f"partial-{uuid.uuid4().hex[:12]}"
         
         # Reserve the proposed quantity by deducting it from warehouse
         inv.quantity -= proposed_quantity
         
         # Update the order to the proposed quantity
+        order.batch_id = partial_group_id
         order.quantity = proposed_quantity
         order.total_price = order.price_per_item * proposed_quantity
         order.status = OrderStatus.PARTIAL_APPROVAL_PENDING
@@ -318,6 +381,7 @@ class OrderService:
                 price_per_item=order.price_per_item,
                 total_price=order.price_per_item * remainder,
                 status=OrderStatus.PENDING,
+                batch_id=partial_group_id,
             )
             self.session.add(remainder_order)
         
@@ -362,7 +426,33 @@ class OrderService:
         )
         inv.quantity += order.quantity
 
+        if order.batch_id:
+            sibling_stmt = (
+                select(Order)
+                .where(
+                    Order.batch_id == order.batch_id,
+                    Order.store_id == order.store_id,
+                    Order.product_id == order.product_id,
+                    Order.status == OrderStatus.PENDING,
+                    Order.id != order.id,
+                )
+                .order_by(Order.created_at.desc())
+            )
+            sibling_result = await self.session.execute(sibling_stmt)
+            sibling = sibling_result.scalars().first()
+            if sibling:
+                sibling.quantity += order.quantity
+                sibling.total_price = sibling.price_per_item * sibling.quantity
+                if sibling.batch_id.startswith("partial-"):
+                    sibling.batch_id = None
+                order.status = OrderStatus.REJECTED
+                await self.session.flush()
+                return sibling
+
         order.status = OrderStatus.REJECTED
+        if order.batch_id and order.batch_id.startswith("partial-"):
+            order.batch_id = None
+            order.status = OrderStatus.PENDING
         await self.session.flush()
         return order
 
@@ -444,12 +534,15 @@ class OrderService:
         self,
         store_id: int,
         product_id: int,
+        lock: bool = False,
     ) -> Inventory:
         """Get an inventory row or create one with quantity=0."""
         stmt = select(Inventory).where(
             Inventory.store_id == store_id,
             Inventory.product_id == product_id,
         )
+        if lock:
+            stmt = stmt.with_for_update()
         result = await self.session.execute(stmt)
         inv = result.scalar_one_or_none()
         if inv is None:

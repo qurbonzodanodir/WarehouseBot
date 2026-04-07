@@ -6,7 +6,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.enums import UserRole
+from app.models.enums import UserRole, db_enum
 
 
 def _generate_code(length: int = 6) -> str:
@@ -21,9 +21,7 @@ class InviteCode(Base):
     code: Mapped[str] = mapped_column(
         String(10), unique=True, index=True, default=_generate_code
     )
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role", native_enum=False)
-    )
+    role: Mapped[UserRole] = mapped_column(db_enum(UserRole, "user_role"))
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

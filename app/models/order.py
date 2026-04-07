@@ -6,7 +6,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, fun
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.models.enums import OrderStatus
+from app.models.enums import OrderStatus, db_enum
 
 
 class Order(Base):
@@ -20,7 +20,7 @@ class Order(Base):
     price_per_item: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus, name="order_status", native_enum=False),
+        db_enum(OrderStatus, "order_status"),
         default=OrderStatus.PENDING,
     )
     created_at: Mapped[datetime] = mapped_column(

@@ -3,15 +3,12 @@ from datetime import date, datetime, time
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-import sqlalchemy as sa
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.bot.keyboards.inline import catalog_kb
 from app.bot.states.states import SaleFlow
-from app.models.enums import StockMovementType
-from app.models.stock_movement import StockMovement
 from app.models.user import User
 from app.services import OrderService, ProductService, TransactionService
 from app.bot.routers.seller.common import MENU_TEXTS
@@ -184,38 +181,19 @@ async def sales_history(
     message: Message, user: User, session: AsyncSession, state: FSMContext, _: Any
 ) -> None:
     await state.clear()
-    from app.models.debt_ledger import DebtLedger
-    from app.models.enums import DebtLedgerReason
-
-    stmt = (
-        select(StockMovement, DebtLedger)
-        .options(selectinload(StockMovement.product))
-        .join(DebtLedger, sa.and_(
-            DebtLedger.store_id == StockMovement.from_store_id,
-            DebtLedger.reason == DebtLedgerReason.SALE_COMPLETED,
-            # Match approximate time (within 1 minute)
-            func.abs(func.extract('epoch', StockMovement.created_at) - func.extract('epoch', DebtLedger.created_at)) < 60
-        ))
-        .where(
-            StockMovement.from_store_id == user.store_id,
-            StockMovement.movement_type == StockMovementType.SALE,
-        )
-        .order_by(StockMovement.created_at.desc())
-        .limit(10)
-    )
-    result = await session.execute(stmt)
-    rows = result.all()
+    txn_svc = TransactionService(session)
+    rows = await txn_svc.get_store_sales(user.store_id, limit=10)
 
     if not rows:
         await message.answer(_("sales_history_empty"))
         return
 
     lines = [_("sales_history_title") + "\n"]
-    for mov, ledger in rows:
-        dt_str = mov.created_at.strftime("%d.%m %H:%M")
-        amount = ledger.amount_change
+    for sale in rows:
+        dt_str = sale.created_at.strftime("%d.%m %H:%M")
+        amount = sale.total_amount
         lines.append(
-            _("sales_history_item", date=dt_str, sku=mov.product.sku, qty=mov.quantity, amount=amount)
+            _("sales_history_item", date=dt_str, sku=sale.product.sku, qty=sale.quantity, amount=amount)
         )
     await message.answer("\n".join(lines), parse_mode="HTML")
 
@@ -239,12 +217,12 @@ async def quick_sold_order(
             user_id=user.id,
             product_id=order.product_id,
             quantity=order.quantity,
-            price_per_unit=order.product.price,
+            price_per_unit=order.price_per_item,
             order_id=order_id,
         )
         await session.commit()
         await callback.message.edit_text(
-            _("sale_quick_success", sku=order.product.sku, qty=order.quantity, total=order.product.price * order.quantity),
+            _("sale_quick_success", sku=order.product.sku, qty=order.quantity, total=order.price_per_item * order.quantity),
             parse_mode="HTML"
         )
     except ValueError as e:
