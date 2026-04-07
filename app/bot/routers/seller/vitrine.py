@@ -1,11 +1,8 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from typing import Any
-from app.models.inventory import Inventory
 from app.models.user import User
 
 router = Router(name="seller.vitrine")

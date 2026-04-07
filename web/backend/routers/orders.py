@@ -1,14 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from app.models.enums import OrderStatus
 from app.models.order import Order
-from app.models.user import User
 from app.services.order_service import OrderService
 from web.backend.dependencies import CurrentUser, SessionDep
-from web.backend.schemas.orders import OrderCreate, OrderFilters, OrderOut
+from web.backend.schemas.orders import OrderCreate, OrderOut
 
 from app.bot.bot import bot
 from app.services.notification_service import NotificationService

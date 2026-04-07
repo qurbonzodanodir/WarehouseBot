@@ -1,11 +1,7 @@
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 from typing import Any
-from app.models.enums import OrderStatus
-from app.models.order import Order
 from app.models.user import User
 from app.services import OrderService
 

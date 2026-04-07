@@ -1,4 +1,3 @@
-import re
 
 file_path = "app/core/i18n.py"
 with open(file_path, "r", encoding="utf-8") as f:

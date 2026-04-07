@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.bot.bot import bot
-from app.core.config import settings
 from web.backend.routers import auth, orders, products, inventory, analytics, stores, finance, invites
 
 @asynccontextmanager

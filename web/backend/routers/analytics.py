@@ -3,10 +3,8 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Query
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import FinancialTransactionType, OrderStatus
-from app.models.financial_transaction import FinancialTransaction
+from app.models.enums import OrderStatus
 from app.models.order import Order
 from app.models.sale import Sale
 from app.models.store import Store

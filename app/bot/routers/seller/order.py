@@ -1,7 +1,6 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -12,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 from app.bot.keyboards.inline import (
     catalog_kb,
-    order_action_kb,
     delivery_accepted_kb,
     delivery_confirm_kb,
     cart_action_kb,
@@ -21,11 +19,11 @@ from app.bot.keyboards.inline import (
 )
 from app.bot.states.states import OrderFlow
 from app.models.product import Product
-from app.models.user import User
-from app.models.store import Store
-from app.services import NotificationService, OrderService, ProductService
-from app.bot.routers.seller.common import MENU_TEXTS
 from typing import Any
+from app.models.order import Order
+from app.models.user import User
+from app.services import NotificationService, OrderService
+from app.bot.routers.seller.common import MENU_TEXTS
 router = Router(name="seller.order")
 
 
@@ -631,7 +629,6 @@ async def partial_reject_batch(
     try:
         order_svc = OrderService(session)
         orders = await order_svc.get_batch_orders(batch_id)
-        import logging
         
         from app.models.enums import OrderStatus
         valid = False

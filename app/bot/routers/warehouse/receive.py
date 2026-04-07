@@ -1,12 +1,10 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
 from app.bot.states.states import ReceiveStockFlow
-from app.models.inventory import Inventory
 from app.models.product import Product
 from app.models.user import User
 

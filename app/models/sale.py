@@ -1,4 +1,12 @@
+from __future__ import annotations
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.store import Store
+    from app.models.product import Product
+    from app.models.order import Order
+    from app.models.user import User
 from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, func
@@ -22,10 +30,10 @@ class Sale(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    store: Mapped["Store"] = relationship(back_populates="sales")  # noqa: F821
-    product: Mapped["Product"] = relationship()  # noqa: F821
-    order: Mapped["Order | None"] = relationship()  # noqa: F821
-    user: Mapped["User"] = relationship(back_populates="sales")  # noqa: F821
+    store: Mapped[Store] = relationship(back_populates="sales")
+    product: Mapped[Product] = relationship()
+    order: Mapped[Order | None] = relationship()
+    user: Mapped[User] = relationship(back_populates="sales")
 
     def __repr__(self) -> str:
         return (

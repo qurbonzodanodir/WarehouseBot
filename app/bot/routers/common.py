@@ -164,7 +164,7 @@ async def process_invite_code(
     greeting_key = GREETING_KEYS.get(invite.role, "👋")
     store_name = invite.store.name if invite.store else "—"
 
-    text = _("welcome", name=full_name, greeting=_(greeting_key)) + f"\n" + _("store_label") + f": {store_name}"
+    text = _("welcome", name=full_name, greeting=_(greeting_key)) + "\n" + _("store_label") + f": {store_name}"
     if menu_func:
         await message.answer(text, reply_markup=menu_func(_))
     else:

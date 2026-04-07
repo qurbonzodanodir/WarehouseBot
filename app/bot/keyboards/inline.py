@@ -4,9 +4,6 @@ from typing import Any
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.models.enums import UserRole
-from app.models.order import Order
-from app.models.store import Store
 
 
 def get_page_slice(total_items: int, page: int, limit: int) -> tuple[int, int]:

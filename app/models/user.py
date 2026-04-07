@@ -1,5 +1,13 @@
-from sqlalchemy import BigInteger, Enum, ForeignKey, String
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+from sqlalchemy import BigInteger, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from app.models.store import Store
+    from app.models.sale import Sale
+    from app.models.financial_transaction import FinancialTransaction
 
 from app.core.database import Base
 from app.models.enums import UserRole, db_enum
@@ -27,9 +35,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     language_code: Mapped[str] = mapped_column(String(5), default="ru")
 
-    store: Mapped["Store | None"] = relationship(back_populates="users")  # noqa: F821
-    sales: Mapped[list["Sale"]] = relationship(back_populates="user")  # noqa: F821
-    financial_transactions: Mapped[list["FinancialTransaction"]] = relationship(  # noqa: F821
+    store: Mapped[Store | None] = relationship(back_populates="users")
+    sales: Mapped[list[Sale]] = relationship(back_populates="user")
+    financial_transactions: Mapped[list[FinancialTransaction]] = relationship(
         back_populates="user"
     )
 

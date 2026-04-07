@@ -1,7 +1,13 @@
+from __future__ import annotations
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.store import Store
+    from app.models.user import User
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, func
+from sqlalchemy import DateTime, ForeignKey, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -22,8 +28,8 @@ class FinancialTransaction(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    store: Mapped["Store"] = relationship(back_populates="financial_transactions")  # noqa: F821
-    user: Mapped["User"] = relationship(back_populates="financial_transactions")  # noqa: F821
+    store: Mapped[Store] = relationship(back_populates="financial_transactions")
+    user: Mapped[User] = relationship(back_populates="financial_transactions")
 
     def __repr__(self) -> str:
         return (

@@ -1,9 +1,15 @@
+from __future__ import annotations
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from app.models.store import Store
+    from app.models.user import User
 
 from app.core.database import Base
 from app.models.enums import UserRole, db_enum
@@ -32,8 +38,8 @@ class InviteCode(Base):
         ForeignKey("users.id"), nullable=True
     )
 
-    store: Mapped["Store"] = relationship()  # noqa: F821
-    used_by: Mapped["User | None"] = relationship()  # noqa: F821
+    store: Mapped[Store] = relationship()
+    used_by: Mapped[User | None] = relationship()
 
     def __init__(self, **kwargs):
         if "expires_at" not in kwargs:

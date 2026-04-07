@@ -1,7 +1,4 @@
 from fastapi import APIRouter, HTTPException, status
-
-from app.core.config import settings
-import bcrypt
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -9,11 +6,7 @@ from app.models.user import User
 from web.backend.dependencies import SessionDep, create_access_token
 from web.backend.schemas.auth import LoginRequest, TokenResponse, UserMe
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    try:
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    except ValueError:
-        return False
+from app.core.security import verify_password
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -64,5 +57,4 @@ async def login(body: LoginRequest, session: SessionDep) -> TokenResponse:
 async def get_me(session: SessionDep) -> UserMe:
     """Protected endpoint — используй токен из /login."""
     # NOTE: используется через CurrentUser dependency в main.py или отдельно
-    from web.backend.dependencies import get_current_user
     raise HTTPException(status_code=501, detail="Use Authorization header")

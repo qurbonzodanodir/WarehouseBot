@@ -1,5 +1,4 @@
 from decimal import Decimal
-import logging
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -7,9 +6,14 @@ from sqlalchemy.orm import joinedload
 from app.models.display_inventory import DisplayInventory
 from app.models.inventory import Inventory
 from app.models.store import Store
-from app.services.order_service import OrderService
 from web.backend.dependencies import CurrentUser, SessionDep
 from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, BulkReceiveInput, DispatchDisplayInput
+from app.bot.bot import bot
+from app.services.notification_service import NotificationService
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import logging
+
+logger = logging.getLogger(__name__)
 # ... (lines 12-19)
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])

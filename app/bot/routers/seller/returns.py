@@ -12,12 +12,10 @@ from app.bot.keyboards.inline import catalog_kb, warehouse_return_kb
 from app.bot.states.states import ReturnFlow
 from app.models.user import User
 from app.models.product import Product
-from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.enums import OrderStatus
 from app.services import (
     OrderService, 
-    ProductService, 
     TransactionService, 
     NotificationService
 )

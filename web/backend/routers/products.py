@@ -1,10 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.product import Product
 from app.models.enums import UserRole
-from app.services.product_service import ProductService
 from web.backend.dependencies import CurrentUser, SessionDep
 from web.backend.schemas.products import ProductCreate, ProductOut, ProductUpdate, ProductInventoryOut, ProductPaginationOut
 

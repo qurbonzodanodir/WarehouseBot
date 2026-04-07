@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import async_session_factory
 from app.models.user import User
-from app.services.user_service import UserService
+from app.models.enums import UserRole
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -76,8 +76,6 @@ async def get_current_user(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
-
-from app.models.enums import UserRole
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Role Checkers

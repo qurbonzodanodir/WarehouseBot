@@ -1,17 +1,15 @@
 import asyncio
 import sys
 import os
-import bcrypt
 
+# Allow imports from project root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.core.database import async_session_factory
 from sqlalchemy import select
 from app.models.user import User
 from app.models.enums import UserRole
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+from app.core.security import get_password_hash
 
 async def main():
     email = "admin@warehouse.com"
@@ -24,7 +22,7 @@ async def main():
         
         if user:
             print(f"Updating existing user with email {email}")
-            user.password_hash = hash_password(password)
+            user.password_hash = get_password_hash(password)
             user.role = UserRole.OWNER
         else:
             print(f"Creating new admin user {email}")
@@ -34,12 +32,12 @@ async def main():
             if owner and not owner.email:
                 print(f"Found existing owner {owner.name}, updating email and password")
                 owner.email = email
-                owner.password_hash = hash_password(password)
+                owner.password_hash = get_password_hash(password)
             else:
                 new_admin = User(
                     name="Admin",
                     email=email,
-                    password_hash=hash_password(password),
+                    password_hash=get_password_hash(password),
                     role=UserRole.OWNER,
                     telegram_id=None,
                     language_code="ru"
@@ -47,7 +45,7 @@ async def main():
                 session.add(new_admin)
         
         await session.commit()
-        print("Done!")
+        print(f"Done! Admin created/updated: {email} / {password}")
 
 if __name__ == "__main__":
     asyncio.run(main())

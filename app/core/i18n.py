@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict
 
 TRANSLATIONS: Dict[str, Dict[str, str]] = {
     "ru": {
@@ -34,7 +34,6 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_sales_list": "📜 Продажи",
         "btn_more": "Ещё 🔽",
         "btn_report": "📊 Отчет",
-        "btn_make_return": "↩️ Сделать возврат",
         "btn_make_return": "↩️ Сделать возврат",
         "btn_wh_requests": "🔔 Запросы",
         "btn_wh_stock": "📦 Остатки",
@@ -149,8 +148,6 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "store_label": "Магазин",
 
         # Warehouse
-        "menu_warehouse": "📦 Меню Складчика",
-        "btn_requests": "🔔 Запросы",
         "btn_requests": "🔔 Запросы",
         "btn_stock_wh": "📦 Остатки",
 
@@ -167,10 +164,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_type_goods_label": "товара",
 
         "stock_empty": "Склад пуст.",
-        "stock_title": "📦 <b>Остатки склада (стр {page}):</b>\n",
-        "stock_title": "📦 <b>Остатки склада (стр {page}):</b>\n",
-
-
+        "stock_title": "📦 Остатки склада (стр {page}):",
 
         "stores_not_found": "Нет магазинов.",
         "display_transfer_title": "📋 <b>Отправить образцы</b>\n\nВыберите магазин:",
@@ -198,12 +192,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_quick_seller_samples": "✅ <b>Запрос на возврат образцов #{id} создан!</b>\n\n📦 SKU: {sku}\n🔢 Кол-во: {qty} шт\n\nОжидайте подтверждения от склада.",
         "return_quick_seller_goods": "✅ <b>Запрос на возврат товара #{id} создан!</b>\n\n📦 SKU: {sku}\n🔢 Кол-во: {qty} шт\n\nТовар списан с витрины. Ваш долг уменьшится после приемки складом.",
         "return_quick_wh_title": "🔄 <b>Быстрый возврат: {type}</b>\n\nМагазин: {store}\nID: #{id}\n📦 SKU: {sku}\n🔢 Кол-во: {qty} шт\n{note}",
-        "return_debt_note": "\nПримите товар и нажмите 'Принять возврат', чтобы списать долг магазина.",
         "return_invalid_status": "Некорректный статус товара для возврата.",
-        "return_approved_wh": "✅ Возврат {type} #{id} одобрен анбором.",
-        "return_type_samples_label": "образцы",
-        "return_type_goods_label": "товар",
-        "batch_rejected_wh": "❌ Партия #{batch_id} полностью отклонена.",
     },
     "tg": {
         "menu_seller": "🛒 Менюи фурӯшанда",
@@ -238,7 +227,6 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_sales_list": "📜 Фурӯшҳо",
         "btn_more": "Боз 🔽",
         "btn_report": "📊 Ҳисобот",
-        "btn_make_return": "↩️ Бозгашти мол",
         "btn_make_return": "↩️ Бозгашти мол",
         "btn_wh_requests": "🔔 Дархостҳо",
         "btn_wh_stock": "📦 Боқимонда",
@@ -349,8 +337,6 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "auth_not_registered": "⛔ Шумо ба қайд гирифта нашудаед.",
 
         # Warehouse
-        "menu_warehouse": "📦 Менюи Складчик",
-        "btn_requests": "🔔 Дархостҳо",
         "btn_requests": "🔔 Дархостҳо",
         "btn_stock_wh": "📦 Боқимонда",
 
@@ -367,10 +353,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_type_goods_label": "мол",
 
         "stock_empty": "Анбор холӣ аст.",
-        "stock_title": "📦 <b>Боқимондаи анбор (сах. {page}):</b>\n",
-        "stock_title": "📦 <b>Боқимондаи анбор (сах. {page}):</b>\n",
-
-
+        "stock_title": "📦 Боқимондаи анбор (сах. {page}):",
 
         "stores_not_found": "Мағозаҳо нестанд.",
         "display_transfer_title": "📋 <b>Фиристодани намунаҳо</b>\n\nМағозаро интихоб кунед:",

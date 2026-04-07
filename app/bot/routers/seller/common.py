@@ -5,7 +5,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.bot.keyboards import reply
-from app.bot.states.states import OrderFlow, ReturnFlow
 
 router = Router(name="seller.common")
 

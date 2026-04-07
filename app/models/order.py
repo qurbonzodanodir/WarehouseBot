@@ -1,8 +1,14 @@
+from __future__ import annotations
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.store import Store
+    from app.models.product import Product
 
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -27,8 +33,8 @@ class Order(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    store: Mapped["Store"] = relationship(back_populates="orders")  # noqa: F821
-    product: Mapped["Product"] = relationship()  # noqa: F821
+    store: Mapped[Store] = relationship(back_populates="orders")
+    product: Mapped[Product] = relationship()
 
     def __repr__(self) -> str:
         return (

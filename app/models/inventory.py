@@ -1,5 +1,12 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from app.models.store import Store
+    from app.models.product import Product
 
 from app.core.database import Base
 
@@ -15,8 +22,8 @@ class Inventory(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     quantity: Mapped[int] = mapped_column(Integer, default=0)
 
-    store: Mapped["Store"] = relationship(back_populates="inventory")  # noqa: F821
-    product: Mapped["Product"] = relationship()  # noqa: F821
+    store: Mapped[Store] = relationship(back_populates="inventory")
+    product: Mapped[Product] = relationship()
 
     def __repr__(self) -> str:
         return (

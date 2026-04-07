@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from app.models.enums import UserRole
 from app.models.store import Store
@@ -220,7 +219,7 @@ async def update_employee(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
     if body.password is not None and body.password.strip():
         from app.core.security import get_password_hash
-        user.hashed_password = get_password_hash(body.password)
+        user.password_hash = get_password_hash(body.password)
         
     await session.commit()
     await session.refresh(user)
