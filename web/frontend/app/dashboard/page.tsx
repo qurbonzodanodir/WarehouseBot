@@ -26,6 +26,7 @@ import {
   DollarSign,
   ShoppingCart,
   RefreshCw,
+  LayoutDashboard,
 } from "lucide-react";
 
 const PERIODS = [

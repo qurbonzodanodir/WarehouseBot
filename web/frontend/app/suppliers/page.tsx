@@ -8,7 +8,7 @@ import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
 import { createPortal } from "react-dom";
 import {
-  TruckIcon, Plus, AlertCircle, ChevronRight, ChevronDown,
+  Truck, Plus, AlertCircle, ChevronRight, ChevronDown,
   Receipt, Wallet, X, History, ArrowDownCircle, ArrowUpCircle,
   Search, Trash2, ShoppingCart
 } from "lucide-react";

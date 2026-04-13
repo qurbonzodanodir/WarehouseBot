@@ -6,7 +6,7 @@ import { api, Product, ProductInventoryOut, Store } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, PackageOpen, FileUp, X, CheckCircle2, ShoppingCart, Trash2 } from "lucide-react";
+import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, PackageOpen, Package, FileUp, X, CheckCircle2, ShoppingCart, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createPortal } from "react-dom";
 

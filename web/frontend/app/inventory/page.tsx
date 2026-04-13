@@ -6,7 +6,7 @@ import { api, Store, InventoryItem, StoreCatalogCard } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Package, Search, Store as StoreIcon, DollarSign, Boxes } from "lucide-react";
+import { Package, Search, Store as StoreIcon, DollarSign, Boxes, Warehouse } from "lucide-react";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
