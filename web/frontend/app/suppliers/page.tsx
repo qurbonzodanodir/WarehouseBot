@@ -201,10 +201,10 @@ export default function SuppliersPage() {
         <div className="page-header" style={{ marginBottom: 32 }}>
           <div>
             <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <TruckIcon size={28} style={{ color: "var(--accent)" }} />
+              <Truck size={32} style={{ color: "var(--accent)" }} />
               {t("suppliers.title")}
             </h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: 14, marginTop: 4 }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
               {t("suppliers.subtitle")}
             </p>
           </div>

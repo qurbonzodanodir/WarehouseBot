@@ -198,14 +198,15 @@ export default function ManagementPage() {
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
-      <main className="main-layout" style={{ padding: "32px 40px" }}>
+      <main className="main-layout">
         {/* Header */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+        <div className="page-header" style={{ marginBottom: 32 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.5px", margin: 0, color: "var(--text-primary)" }}>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Users size={32} style={{ color: "var(--accent)" }} />
               {t("management.title")}
             </h1>
-            <p style={{ color: "var(--text-muted)", fontSize: 14, marginTop: 4 }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
               {t("management.subtitle")}
             </p>
           </div>
@@ -261,12 +262,9 @@ export default function ManagementPage() {
             {/* Panel Header */}
             <div style={{ padding: "20px 20px 16px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-card)", zIndex: 10 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ background: "rgba(108,99,255,0.1)", padding: 8, borderRadius: 8 }}>
-                    <StoreIcon size={16} color="var(--accent)" />
-                  </div>
-                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{t("management.stores_title")}</h3>
-                </div>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                  <StoreIcon size={16} /> {t("management.stores_title")}
+                </h3>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", background: "var(--bg-hover)", padding: "4px 10px", borderRadius: 20 }}>
                   {stores.length}
                 </div>
@@ -335,12 +333,12 @@ export default function ManagementPage() {
             {!selectedStoreId ? (
               <div style={{ 
                 background: "var(--bg-card)", borderRadius: 16, border: "1px dashed var(--border)", 
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 400, color: "var(--text-muted)"
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400, padding: 40, color: "var(--text-muted)", textAlign: "center"
               }}>
                 <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--bg-hover)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
                   <StoreIcon size={32} opacity={0.5} />
                 </div>
-                <h3 style={{ fontSize: 16, color: "var(--text-secondary)" }}>{t("management.emp_select_store")}</h3>
+                <h3 style={{ fontSize: 16, color: "var(--text-secondary)", maxWidth: 300, lineHeight: 1.5 }}>{t("management.emp_select_store")}</h3>
               </div>
             ) : (
               <>

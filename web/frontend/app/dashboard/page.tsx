@@ -81,8 +81,11 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="page-header" style={{ marginBottom: 24 }}>
           <div>
-            <h1 className="page-title">{t("dashboard.title")}</h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 2 }}>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <LayoutDashboard size={32} style={{ color: "var(--accent)" }} />
+              {t("dashboard.title")}
+            </h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
               {t("dashboard.subtitle")}
             </p>
           </div>

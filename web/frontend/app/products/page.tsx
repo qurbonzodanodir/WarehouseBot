@@ -336,8 +336,11 @@ export default function ProductsPage() {
       <main className="main-layout">
         <div className="page-header">
           <div>
-            <h1 className="page-title">{t("products.title")}</h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 2 }}>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Package size={32} style={{ color: "var(--accent)" }} />
+              {t("products.title")}
+            </h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
               {t("products.found", { count: total })}
             </p>
           </div>

@@ -147,8 +147,11 @@ export default function OrdersPage() {
       <main className="main-layout">
         <div className="page-header">
           <div>
-            <h1 className="page-title">{t("orders.title")}</h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 2 }}>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <ShoppingCart size={32} style={{ color: "var(--accent)" }} />
+              {t("orders.title")}
+            </h1>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
               {t("orders.found", { count: orders.length })}
             </p>
           </div>
