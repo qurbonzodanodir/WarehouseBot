@@ -220,7 +220,7 @@ export default function InventoryPage() {
                   <tbody>
                     {filtered.map((item) => (
                       <tr key={item.product_id}>
-                        <td style={{ fontWeight: 700, color: "var(--accent)", fontFamily: "monospace", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                        <td data-label={t("inventory.col_sku")} style={{ fontWeight: 700, color: "var(--accent)", fontFamily: "monospace", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                           {item.product_sku}
                           {item.is_display && (
                             <span className="badge badge-pending" style={{ fontSize: 10, padding: "2px 6px" }}>
@@ -228,12 +228,12 @@ export default function InventoryPage() {
                             </span>
                           )}
                         </td>
-                        <td style={{ textAlign: "center", fontWeight: 700, fontSize: 16 }}>
-                          {item.quantity}
+                        <td data-label={t("inventory.col_qty")} style={{ textAlign: "center", fontWeight: 700 }}>
+                          {item.quantity} шт
                         </td>
-                        <td style={{ textAlign: "center" }}>
-                          <span className={item.quantity > 10 ? "badge badge-delivered" : item.quantity > 0 ? "badge badge-pending" : "badge badge-rejected"}>
-                            {item.quantity > 10 ? t("inventory.status_in_stock") : item.quantity > 0 ? t("inventory.status_low") : t("inventory.status_no")}
+                        <td data-label={t("inventory.col_status")} style={{ textAlign: "center" }}>
+                          <span className={`badge ${item.quantity > 5 ? 'badge-delivered' : 'badge-pending'}`}>
+                            {item.quantity > 5 ? t("inventory.status_in_stock") : t("inventory.status_low")}
                           </span>
                         </td>
                       </tr>

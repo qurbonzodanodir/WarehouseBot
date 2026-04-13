@@ -417,20 +417,20 @@ export default function ProductsPage() {
                         style={{ cursor: "pointer", background: expandedRow === p.id ? "var(--bg-hover)" : "transparent", transition: "background 0.2s", opacity: p.is_active ? 1 : 0.55 }}
                         onClick={() => handleToggleExpand(p.id)}
                       >
-                        <td style={{ fontWeight: 700, color: "var(--accent)", fontSize: 13 }}>
+                        <td data-label={t("products.col_sku")} style={{ fontWeight: 700, color: "var(--accent)", fontSize: 13 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             {expandedRow === p.id ? <ChevronDown size={14} color="var(--text-muted)" /> : <ChevronRight size={14} color="var(--text-muted)" />}
                             {p.sku}
                           </div>
                         </td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{fmt(Number(p.price))} TJS</td>
-                        <td style={{ textAlign: "center" }}>
+                        <td data-label={t("products.col_price")} style={{ textAlign: "right", fontWeight: 600 }}>{fmt(Number(p.price))} TJS</td>
+                        <td data-label={t("common.status")} style={{ textAlign: "center" }}>
                           <span className={p.is_active ? "badge badge-delivered" : "badge badge-rejected"}>
                             {p.is_active ? t("products.active") : t("products.inactive")}
                           </span>
                         </td>
                         {isWarehouse && (
-                          <td style={{ textAlign: "center" }}>
+                          <td data-label={t("common.actions")} style={{ textAlign: "center" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                               {p.is_active && (
                                 <button onClick={(e) => { e.stopPropagation(); setReceivingProduct(p); }} className="btn btn-primary" style={{ padding: "4px 12px", fontSize: 12, display: "flex", gap: "4px", alignItems: "center" }}>
