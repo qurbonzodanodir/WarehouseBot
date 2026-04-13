@@ -171,12 +171,10 @@ export default function InventoryPage() {
             ) : (
               catalog.map((store) => (
                 <div key={store.id} className="card" style={{ padding: 20, cursor: "pointer", transition: "transform 0.2s" }} onClick={() => setSelectedStore(store.id)}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(108,99,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <StoreIcon size={20} color="var(--accent)" />
-                    </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                    <StoreIcon size={24} style={{ color: "var(--accent)" }} />
                     <div>
-                      <h3 style={{ margin: 0, fontSize: 15 }}>{store.name}</h3>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{store.name}</h3>
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{store.address || "—"}</div>
                     </div>
                   </div>

@@ -134,21 +134,21 @@ export default function DashboardPage() {
             {/* KPI Cards */}
             <div className="kpi-grid" style={{ marginBottom: 24 }}>
               <div className="kpi-card">
-                <div className="kpi-icon" style={{ background: "rgba(108,99,255,0.15)" }}>
-                  <TrendingUp size={20} color="var(--accent)" />
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <TrendingUp size={24} style={{ color: "var(--accent)" }} />
+                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.revenue")}</div>
                 </div>
-                <div className="kpi-label">{t("dashboard.revenue")}</div>
-                <div className="kpi-value" style={{ color: "var(--accent)" }}>
-                  {fmt(data.total_revenue_today)} TJS
+                <div className="kpi-value" style={{ color: "var(--accent)", fontSize: 24 }}>
+                  {fmt(data.total_revenue_today)} <span style={{ fontSize: 14, fontWeight: 500 }}>TJS</span>
                 </div>
               </div>
 
               <div className="kpi-card">
-                <div className="kpi-icon" style={{ background: "rgba(34,197,94,0.15)" }}>
-                  <ShoppingCart size={20} color="var(--green)" />
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <ShoppingCart size={24} style={{ color: "var(--green)" }} />
+                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.sales")}</div>
                 </div>
-                <div className="kpi-label">{t("dashboard.sales")}</div>
-                <div className="kpi-value" style={{ color: "var(--green)" }}>
+                <div className="kpi-value" style={{ color: "var(--green)", fontSize: 24 }}>
                   {data.total_orders_today}
                 </div>
               </div>
@@ -158,12 +158,12 @@ export default function DashboardPage() {
                 onClick={() => router.push("/finance")}
                 style={{ cursor: "pointer" }}
               >
-                <div className="kpi-icon" style={{ background: "rgba(239,68,68,0.15)" }}>
-                  <DollarSign size={20} color="var(--red)" />
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <DollarSign size={24} style={{ color: "var(--red)" }} />
+                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.total_debt")}</div>
                 </div>
-                <div className="kpi-label">{t("dashboard.total_debt")}</div>
-                <div className="kpi-value" style={{ color: "var(--red)" }}>
-                  {fmt(data.total_debt)} TJS
+                <div className="kpi-value" style={{ color: "var(--red)", fontSize: 24 }}>
+                  {fmt(data.total_debt)} <span style={{ fontSize: 14, fontWeight: 500 }}>TJS</span>
                 </div>
               </div>
 
@@ -172,21 +172,21 @@ export default function DashboardPage() {
                 onClick={() => router.push("/suppliers")}
                 style={{ cursor: "pointer" }}
               >
-                <div className="kpi-icon" style={{ background: "rgba(124,58,237,0.15)" }}>
-                  <TrendingUp size={20} color="var(--accent)" />
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <TrendingUp size={24} style={{ color: "var(--accent)" }} />
+                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.total_supplier_debt")}</div>
                 </div>
-                <div className="kpi-label">{t("dashboard.total_supplier_debt")}</div>
-                <div className="kpi-value" style={{ color: "var(--accent)" }}>
-                  {fmt(data.total_supplier_debt || 0)} TJS
+                <div className="kpi-value" style={{ color: "var(--accent)", fontSize: 24 }}>
+                  {fmt(data.total_supplier_debt || 0)} <span style={{ fontSize: 14, fontWeight: 500 }}>TJS</span>
                 </div>
               </div>
 
               <div className="kpi-card" onClick={() => router.push("/orders?status=active")} style={{ cursor: "pointer" }}>
-                <div className="kpi-icon" style={{ background: "rgba(245,158,11,0.15)" }}>
-                  <Package size={20} color="var(--yellow)" />
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <Package size={24} style={{ color: "var(--yellow)" }} />
+                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.pending_orders")}</div>
                 </div>
-                <div className="kpi-label">{t("dashboard.pending_orders")}</div>
-                <div className="kpi-value" style={{ color: "var(--yellow)" }}>
+                <div className="kpi-value" style={{ color: "var(--yellow)", fontSize: 24 }}>
                   {data.pending_orders}
                 </div>
               </div>

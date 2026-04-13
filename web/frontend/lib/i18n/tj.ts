@@ -44,7 +44,7 @@ export const tj = {
   },
 
   orders: {
-    title: "🛒 Фармоишҳо",
+    title: "Фармоишҳо",
     found: "{count} фармоиш ёфт шуд",
     search_placeholder: "Ҷустуҷӯ аз рӯи SKU, мағоза...",
     all_stores: "Ҳамаи мағозаҳо",
@@ -90,7 +90,7 @@ export const tj = {
   },
 
   dashboard: {
-    title: "📊 Омор",
+    title: "Омор",
     subtitle: "Таҳлил ва нишондиҳандаҳои молиявӣ",
     period_today: "Имрӯз",
     period_yesterday: "Дурӯз",
@@ -114,7 +114,7 @@ export const tj = {
   },
 
   products: {
-    title: "📦 Каталоги молҳо",
+    title: "Каталоги молҳо",
     found: "{count} мол",
     add: "Иловаи мол",
     new: "Моли нав",
@@ -173,7 +173,7 @@ export const tj = {
   },
 
   inventory: {
-    title: "🏪 Бақияи анбор",
+    title: "Бақияи анбор",
     found: "{count} дона мол",
     search: "Ҷустуҷӯ аз рӯи SKU...",
     col_sku: "SKU",
@@ -195,7 +195,7 @@ export const tj = {
   },
 
   management: {
-    title: "⚙️ Идоракунӣ",
+    title: "Идоракунӣ",
     subtitle: "Мағозаҳо ва кормандони шабака",
     add_store: "Мағозаи нав",
     store_form_title: "Мағозаи нав",

@@ -6,7 +6,7 @@ import { api, Product, ProductInventoryOut, Store } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, PackageOpen, Package, FileUp, X, CheckCircle2, ShoppingCart, Trash2 } from "lucide-react";
+import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, CheckCircle2, ShoppingCart, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createPortal } from "react-dom";
 
@@ -517,10 +517,14 @@ export default function ProductsPage() {
         </div>
 
         {!loading && totalPages > 1 && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24 }}>
-            <button className="btn btn-ghost" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← {t("common.back")}</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 40 }}>
+            <button className="btn btn-ghost" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <ChevronLeft size={16} /> {t("common.back")}
+            </button>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{page} / {totalPages}</div>
-            <button className="btn btn-ghost" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>{t("common.next")} →</button>
+            <button className="btn btn-ghost" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {t("common.next")} <ChevronRight size={16} />
+            </button>
           </div>
         )}
       </main>

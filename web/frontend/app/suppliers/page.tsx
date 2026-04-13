@@ -215,23 +215,19 @@ export default function SuppliersPage() {
 
         {/* KPIs */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
-          <div className="card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--accent-muted)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Truck size={22} style={{ color: "var(--accent)" }} />
+          <div className="card" style={{ padding: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <Truck size={24} style={{ color: "var(--accent)" }} />
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>{t("suppliers.total_suppliers")}</div>
             </div>
-            <div>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 2 }}>{t("suppliers.total_suppliers")}</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{suppliers.length}</div>
-            </div>
+            <div style={{ fontSize: 24, fontWeight: 700 }}>{suppliers.length}</div>
           </div>
-          <div className="card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(239,68,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <AlertCircle size={22} style={{ color: "#ef4444" }} />
+          <div className="card" style={{ padding: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <AlertCircle size={24} style={{ color: "var(--red)" }} />
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>{t("suppliers.total_debt")}</div>
             </div>
-            <div>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 2 }}>{t("suppliers.total_debt")}</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(totalDebt)} <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>TJS</span></div>
-            </div>
+            <div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(totalDebt)} <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>TJS</span></div>
           </div>
         </div>
 

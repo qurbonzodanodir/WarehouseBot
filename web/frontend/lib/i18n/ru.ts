@@ -46,7 +46,7 @@ export const ru = {
   },
 
   orders: {
-    title: "🛒 Заказы",
+    title: "Заказы",
     found: "{count} заказов найдено",
     search_placeholder: "Поиск по SKU, магазину...",
     all_stores: "Все магазины",
@@ -92,7 +92,7 @@ export const ru = {
   },
 
   dashboard: {
-    title: "📊 Дашборд",
+    title: "Дашборд",
     subtitle: "Аналитика и финансовые показатели.",
     period_today: "Сегодня",
     period_yesterday: "Вчера",
@@ -116,7 +116,7 @@ export const ru = {
   },
 
   products: {
-    title: "📦 Каталог товаров",
+    title: "Каталог товаров",
     found: "{count} товаров",
     total_count: "Всего: {count} товаров",
     add: "Добавить товар",
@@ -176,7 +176,7 @@ export const ru = {
   },
 
   inventory: {
-    title: "🏪 Остатки",
+    title: "Остатки",
     found: "{count} единиц товара",
     search: "Поиск по SKU...",
     col_sku: "SKU",
@@ -198,7 +198,7 @@ export const ru = {
   },
 
   management: {
-    title: "⚙️ Управление",
+    title: "Управление",
     subtitle: "Магазины и сотрудники сети.",
     add_store: "Новый магазин",
     store_form_title: "Новый магазин",

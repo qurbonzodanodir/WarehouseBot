@@ -6,7 +6,7 @@ import { api, Order } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { CheckCircle2, XCircle, Truck, RefreshCw, Search, ArrowUpRight, ArrowDownLeft, ShoppingCart } from "lucide-react";
+import { CheckCircle2, XCircle, Truck, RefreshCw, Search, ArrowUpRight, ArrowDownLeft, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
 
 function badgeClass(status: string) {
   const s = status.toLowerCase();
@@ -317,9 +317,13 @@ export default function OrdersPage() {
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 40 }}>
-          <button className="btn btn-ghost" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← {t("common.back")}</button>
+          <button className="btn btn-ghost" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <ChevronLeft size={16} /> {t("common.back")}
+          </button>
           <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-muted)" }}>{t("common.page")} {page}</div>
-          <button className="btn btn-ghost" onClick={() => setPage(p => p + 1)} disabled={orders.length < PAGE_SIZE}>{t("common.next")} →</button>
+          <button className="btn btn-ghost" onClick={() => setPage(p => p + 1)} disabled={orders.length < PAGE_SIZE} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {t("common.next")} <ChevronRight size={16} />
+          </button>
         </div>
       </main>
     </div>
