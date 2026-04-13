@@ -6,7 +6,7 @@ import { api, Order } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { CheckCircle2, XCircle, Truck, RefreshCw, Search, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { CheckCircle2, XCircle, Truck, RefreshCw, Search, ArrowUpRight, ArrowDownLeft, ShoppingCart } from "lucide-react";
 
 function badgeClass(status: string) {
   const s = status.toLowerCase();

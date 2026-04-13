@@ -217,7 +217,7 @@ export default function SuppliersPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
           <div className="card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--accent-muted)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <TruckIcon size={22} style={{ color: "var(--accent)" }} />
+              <Truck size={22} style={{ color: "var(--accent)" }} />
             </div>
             <div>
               <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 2 }}>{t("suppliers.total_suppliers")}</div>
@@ -240,7 +240,7 @@ export default function SuppliersPage() {
           <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><div className="spinner" /></div>
         ) : suppliers.length === 0 ? (
           <div className="card" style={{ textAlign: "center", padding: 60 }}>
-            <TruckIcon size={48} style={{ color: "var(--text-muted)", margin: "0 auto 16px" }} />
+            <Truck size={48} style={{ color: "var(--text-muted)", margin: "0 auto 16px" }} />
             <p style={{ color: "var(--text-secondary)", fontSize: 16 }}>{t("suppliers.empty")}</p>
           </div>
         ) : (
