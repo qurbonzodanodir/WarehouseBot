@@ -8,7 +8,7 @@ import { ToastProvider } from "@/lib/ToastContext";
 const inter = Inter({ subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
-  title: "Yasham ERP",
+  title: "Yasham",
   description: "Система управления складом и магазинами",
 };
 

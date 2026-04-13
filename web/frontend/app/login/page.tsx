@@ -70,7 +70,7 @@ export default function LoginPage() {
       <div className="card" style={{ width: "100%", maxWidth: 420, position: "relative" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <h1 style={{ fontSize: "1.5rem", marginBottom: 6 }}>Yasham ERP</h1>
+          <h1 style={{ fontSize: "1.5rem", marginBottom: 6 }}>Yasham</h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>
             {t("login.subtitle")}
           </p>
