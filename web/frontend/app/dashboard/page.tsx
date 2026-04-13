@@ -163,6 +163,20 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              <div
+                className="kpi-card"
+                onClick={() => router.push("/suppliers")}
+                style={{ cursor: "pointer" }}
+              >
+                <div className="kpi-icon" style={{ background: "rgba(124,58,237,0.15)" }}>
+                  <TrendingUp size={20} color="var(--accent)" />
+                </div>
+                <div className="kpi-label">{t("dashboard.total_supplier_debt")}</div>
+                <div className="kpi-value" style={{ color: "var(--accent)" }}>
+                  {fmt(data.total_supplier_debt || 0)} TJS
+                </div>
+              </div>
+
               <div className="kpi-card" onClick={() => router.push("/orders?status=active")} style={{ cursor: "pointer" }}>
                 <div className="kpi-icon" style={{ background: "rgba(245,158,11,0.15)" }}>
                   <Package size={20} color="var(--yellow)" />
@@ -179,25 +193,31 @@ export default function DashboardPage() {
               {/* Revenue by store */}
               <div className="card">
                 <h3 style={{ marginBottom: 16 }}>{t("dashboard.revenue_by_store")}</h3>
-                {data.store_revenues.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={data.store_revenues} barSize={32}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="store_name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} />
-                      <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} />
-                      <Tooltip
-                        contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8 }}
-                        labelStyle={{ color: "var(--text-primary)" }}
-                        formatter={(v: any) => [`${fmt(Number(v))} TJS`, t("dashboard.revenue")]}
-                      />
-                      <Bar dataKey="total_revenue" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                    {t("common.empty")}
-                  </div>
-                )}
+                {(() => {
+                  const activeRevenues = data.store_revenues.filter(r => Number(r.total_revenue) > 0);
+                  if (activeRevenues.length > 0) {
+                    return (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={activeRevenues} barSize={32}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                          <XAxis dataKey="store_name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} />
+                          <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} />
+                          <Tooltip
+                            contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8 }}
+                            labelStyle={{ color: "var(--text-primary)" }}
+                            formatter={(v: any) => [`${fmt(Number(v))} TJS`, t("dashboard.revenue")]}
+                          />
+                          <Bar dataKey="total_revenue" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+                  return (
+                    <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                      {t("common.empty")}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Orders by status pie */}
@@ -247,35 +267,69 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Store debts */}
-            <div className="card">
-              <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_store")}</h3>
-              {data.store_debts.length > 0 ? (
-                <div className="table-wrap">
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.store")}</th>
-                      <th style={{ textAlign: "right", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.debt")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.store_debts.map((s) => (
-                      <tr key={s.store_id} style={{ borderTop: "1px solid var(--border)" }}>
-                        <td style={{ padding: "12px 0", fontWeight: 500 }}>{s.store_name}</td>
-                        <td style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: Number(s.current_debt) > 0 ? "var(--red)" : "var(--green)" }}>
-                          {fmt(Number(s.current_debt))} TJS
-                        </td>
+            {/* Debts section */}
+            <div className="dashboard-charts" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+              {/* Store debts */}
+              <div className="card">
+                <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_store")}</h3>
+                {data.store_debts.length > 0 ? (
+                  <div className="table-wrap">
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.store")}</th>
+                        <th style={{ textAlign: "right", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.debt")}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-              ) : (
-                <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                  {t("common.empty")}
-                </div>
-              )}
+                    </thead>
+                    <tbody>
+                      {data.store_debts.map((s) => (
+                        <tr key={s.store_id} style={{ borderTop: "1px solid var(--border)" }}>
+                          <td style={{ padding: "12px 0", fontWeight: 500 }}>{s.store_name}</td>
+                          <td style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: Number(s.current_debt) > 0 ? "var(--red)" : "var(--green)" }}>
+                            {fmt(Number(s.current_debt))} TJS
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
+                ) : (
+                  <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                    {t("common.empty")}
+                  </div>
+                )}
+              </div>
+
+              {/* Supplier debts */}
+              <div className="card">
+                <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_supplier")}</h3>
+                {data.supplier_debts && data.supplier_debts.length > 0 ? (
+                  <div className="table-wrap">
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Оптовик</th>
+                        <th style={{ textAlign: "right", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.debt")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.supplier_debts.map((s) => (
+                        <tr key={s.supplier_id} style={{ borderTop: "1px solid var(--border)" }}>
+                          <td style={{ padding: "12px 0", fontWeight: 500 }}>{s.supplier_name}</td>
+                          <td style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: "var(--accent)" }}>
+                            {fmt(Number(s.current_debt))} TJS
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
+                ) : (
+                  <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                    {t("common.empty")}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         ) : null}

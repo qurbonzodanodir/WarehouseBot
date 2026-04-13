@@ -105,6 +105,7 @@ h3 { font-size: 1rem; font-weight: 600; }
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px 16px;
   border-radius: 8px;
@@ -113,6 +114,8 @@ h3 { font-size: 1rem; font-weight: 600; }
   cursor: pointer;
   border: none;
   transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
@@ -398,15 +401,12 @@ select.input { cursor: pointer; }
     box-sizing: border-box;
   }
   
-  /* Page headers stack vertically */
+  /* Page headers stack vertically or wrap cleanly */
   .page-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    flex-direction: row;
+    align-items: center;
     gap: 12px;
-  }
-  .page-header .btn {
-    width: 100%;
-    justify-content: center;
   }
   
   /* Cards tighter on mobile */
@@ -454,13 +454,62 @@ select.input { cursor: pointer; }
     margin-left: auto;
   }
 
-  /* Table wrap: always allow horizontal scroll */
+  /* Mobile Card Tables */
   .table-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
+    background: transparent;
   }
-  table {
-    min-width: 480px;
+  .table-wrap table, .table-wrap thead, .table-wrap tbody, .table-wrap th, .table-wrap td, .table-wrap tr {
+    display: block;
+    width: 100%;
+  }
+  .table-wrap thead {
+    display: none;
+  }
+  .table-wrap tbody tr {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    padding: 12px;
+  }
+  .table-wrap tbody tr:hover {
+    background: var(--bg-card);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  .table-wrap tbody td {
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1px dashed var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: right;
+  }
+  .table-wrap tbody td:last-child {
+    border-bottom: none;
+    margin-top: 4px;
+    justify-content: center;
+  }
+  .table-wrap tbody td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+    margin-right: 12px;
+  }
+  
+  /* Modals better adapt */
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+  .modal-card {
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 40px;
   }
 
   /* Floating avatar button: hide on mobile (user info is in sidebar) */

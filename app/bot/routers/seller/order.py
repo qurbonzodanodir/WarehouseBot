@@ -239,10 +239,14 @@ async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, sess
         
         items_text = "\n".join([_("cart_item", sku=i["sku"], qty=i["qty"]) for i in cart])
         
-        await notif_svc.notify_warehouse(
+        chat_message_ids = await notif_svc.notify_warehouse(
             text=lambda _t: _t("order_batch_notif_new", store=store_name, items=items_text),
             reply_markup=lambda _t: batch_order_action_kb(batch_id, _=_t)
         )
+
+        orders = await order_svc.get_batch_orders(batch_id)
+        await notif_svc.save_order_notifications([o.id for o in orders], chat_message_ids)
+        await session.commit()
 
         await callback.message.edit_text(
             _("order_batch_created")
@@ -425,10 +429,9 @@ async def return_entire_batch(
                     order_id=return_order.id,
                 )
                 
-                # Send explicit notification to warehouse per order
                 if not is_display:
                     p = original_order.product.sku if original_order.product else str(product_id)
-                    await notif_svc.notify_warehouse(
+                    cm_ids = await notif_svc.notify_warehouse(
                         text=lambda _t, _ret=return_order, _p=p, _q=quantity, _is_disp=is_display: _t(
                             "return_quick_wh_title",
                             id=_ret.id,
@@ -440,9 +443,10 @@ async def return_entire_batch(
                         ),
                         reply_markup=lambda _t, _ret=return_order: warehouse_return_kb(_ret.id, _=_t)
                     )
+                    await notif_svc.save_order_notifications([return_order.id], cm_ids)
                 else:
                     p = original_order.product.sku if original_order.product else str(product_id)
-                    await notif_svc.notify_warehouse(
+                    cm_ids = await notif_svc.notify_warehouse(
                         text=lambda _t, _ret=return_order, _p=p, _q=quantity, _is_disp=is_display: _t(
                             "return_quick_wh_title",
                             id=_ret.id,
@@ -454,6 +458,7 @@ async def return_entire_batch(
                         ),
                         reply_markup=lambda _t, _ret=return_order: warehouse_return_kb(_ret.id, _=_t)
                     )
+                    await notif_svc.save_order_notifications([return_order.id], cm_ids)
                 returned_count += 1
                 
         if returned_count == 0:
@@ -641,10 +646,12 @@ async def partial_accept_batch(
         
         items_text = "\n".join([_("cart_item", sku=o.product.sku, qty=o.quantity) for o in new_orders])
         
-        await notif_svc.notify_warehouse(
+        cm_ids = await notif_svc.notify_warehouse(
             text=lambda _t: _t("order_batch_notif_new", store=store_name, items=items_text),
             reply_markup=lambda _t: batch_order_action_kb(new_batch_id, _=_t)
         )
+        await notif_svc.save_order_notifications([o.id for o in new_orders], cm_ids)
+        await session.commit()
         
     except ValueError as e:
         await callback.message.edit_text(_("sale_error", error=str(e)))

@@ -1,8 +1,8 @@
 const getApiBase = () => {
   if (typeof window !== "undefined") {
-    return `http://${window.location.hostname}:8001/api`;
+    return `http://${window.location.hostname}:8030/api`;
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001/api";
+  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8030/api";
 };
 
 function getToken(): string | null {
@@ -10,9 +10,22 @@ function getToken(): string | null {
   return localStorage.getItem("wh_token");
 }
 
+let isRefreshing = false;
+let refreshSubscribers: ((t: string) => void)[] = [];
+
+function subscribeTokenRefresh(cb: (t: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+}
+
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retried = false
 ): Promise<T> {
   const token = getToken();
   const res = await fetch(`${getApiBase()}${path}`, {
@@ -25,6 +38,39 @@ async function request<T>(
   });
 
   if (!res.ok) {
+    if (res.status === 401 && !retried && !path.startsWith("/auth/")) {
+      const refreshToken = typeof window !== "undefined" ? localStorage.getItem("wh_refresh_token") : null;
+      if (refreshToken) {
+        if (!isRefreshing) {
+          isRefreshing = true;
+          try {
+            const refreshRes = await fetch(`${getApiBase()}/auth/refresh`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ refresh_token: refreshToken })
+            });
+
+            if (!refreshRes.ok) throw new Error("Session expired");
+
+            const data = await refreshRes.json();
+            localStorage.setItem("wh_token", data.access_token);
+            localStorage.setItem("wh_refresh_token", data.refresh_token);
+            isRefreshing = false;
+            onRefreshed(data.access_token);
+          } catch (e) {
+            isRefreshing = false;
+            localStorage.removeItem("wh_token");
+            localStorage.removeItem("wh_refresh_token");
+            localStorage.removeItem("wh_user");
+            window.location.href = "/login";
+            throw e;
+          }
+        }
+        return new Promise(resolve => {
+          subscribeTokenRefresh(() => resolve(request<T>(path, options, true)));
+        });
+      }
+    }
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(error.detail || "Request failed");
   }
@@ -35,7 +81,7 @@ async function request<T>(
 export const api = {
   // Auth
   login: (email: string, password: string) =>
-    request<{ access_token: string; user: UserMe }>("/auth/login", {
+    request<{ access_token: string; refresh_token: string; user: UserMe }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
@@ -142,6 +188,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  // Suppliers
+  getSuppliers: () => request<Supplier[]>("/suppliers"),
+  createSupplier: (data: { name: string; contact_info?: string; address?: string; notes?: string }) =>
+    request<Supplier>("/suppliers", { method: "POST", body: JSON.stringify(data) }),
+  getSupplierDetail: (id: number) => request<SupplierDetail>(`/suppliers/${id}`),
+  addSupplierInvoice: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+    request<SupplierInvoiceItem>(`/suppliers/${id}/invoices`, { method: "POST", body: JSON.stringify(data) }),
+  addSupplierPayment: (id: number, data: { amount: number; notes?: string | null }) =>
+    request<SupplierPaymentItem>(`/suppliers/${id}/payments`, { method: "POST", body: JSON.stringify(data) }),
 };
 
 export interface PaginatedResponse<T> {
@@ -167,8 +223,10 @@ export interface DashboardData {
   total_orders_today: number;
   total_revenue_today: number;
   total_debt: number;
+  total_supplier_debt: number;
   pending_orders: number;
   store_debts: { store_id: number; store_name: string; current_debt: number }[];
+  supplier_debts: { supplier_id: number; supplier_name: string; current_debt: number }[];
   store_revenues: { store_name: string; total_revenue: number }[];
   orders_by_status: { status: string; count: number }[];
 }
@@ -273,3 +331,47 @@ export interface Invite {
   created_at: string;
 }
 
+export interface Supplier {
+  id: number;
+  name: string;
+  contact_info: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  current_debt: number;
+}
+
+export interface SupplierInvoiceLineItem {
+  product_id: number;
+  sku: string;
+  quantity: number;
+  price_per_unit: number;
+  line_total: number;
+}
+
+export interface SupplierInvoiceItem {
+  id: number;
+  supplier_id: number;
+  total_amount: number;
+  notes: string | null;
+  created_at: string;
+  user_name: string | null;
+  items?: SupplierInvoiceLineItem[];
+}
+
+export interface SupplierPaymentItem {
+  id: number;
+  supplier_id: number;
+  amount: number;
+  notes: string | null;
+  created_at: string;
+  user_name: string | null;
+}
+
+export interface SupplierDetail extends Supplier {
+  total_invoiced: number;
+  total_paid: number;
+  invoices: SupplierInvoiceItem[];
+  payments: SupplierPaymentItem[];
+}

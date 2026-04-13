@@ -237,8 +237,8 @@ export default function OrdersPage() {
                     const isReturn = order.status.toLowerCase().includes("return");
                     return (
                       <tr key={order.id} style={{ opacity: order.status.toLowerCase() === "rejected" ? 0.6 : 1 }}>
-                        <td style={{ color: "var(--text-muted)", fontSize: 13 }}>#{order.id}</td>
-                        <td>
+                        <td data-label="ID" style={{ color: "var(--text-muted)", fontSize: 13 }}>#{order.id}</td>
+                        <td data-label={t("orders.col_store_product")}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                              <div style={{ 
                                width: 24, 
@@ -257,21 +257,21 @@ export default function OrdersPage() {
                              </div>
                           </div>
                         </td>
-                        <td style={{ textAlign: "right", fontWeight: 700 }}>{order.quantity} шт</td>
-                        <td style={{ fontWeight: 600 }}>{fmt(Number(order.total_price))} TJS</td>
-                        <td>
+                        <td data-label={t("orders.col_qty")} style={{ textAlign: "right", fontWeight: 700 }}>{order.quantity} шт</td>
+                        <td data-label={t("orders.col_total")} style={{ fontWeight: 600 }}>{fmt(Number(order.total_price))} TJS</td>
+                        <td data-label={t("common.status")}>
                           <span className={badgeClass(order.status)}>
                             {t(`statuses.${order.status.toLowerCase()}`) || order.status}
                           </span>
                         </td>
-                        <td style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                        <td data-label={t("orders.col_date")} style={{ color: "var(--text-muted)", fontSize: 12 }}>
                           {new Date(order.created_at).toLocaleString("ru-RU", {
                             day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
                           })}
                         </td>
                         {canManage && (
-                          <td>
-                            <div style={{ display: "flex", gap: 6 }}>
+                          <td data-label={t("common.actions")}>
+                            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
                               {order.status === "pending" && (
                                 <>
                                   <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleDispatch(order.id)} disabled={actionLoading === order.id}>
@@ -296,9 +296,9 @@ export default function OrdersPage() {
                           </td>
                         )}
                         {!canManage && user?.role === "seller" && (
-                          <td>
+                          <td data-label={t("common.actions")}>
                             {order.status === "dispatched" && (
-                              <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
+                              <button className="btn btn-success" style={{ padding: "5px 10px", width: "100%", justifyContent: "center" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
                                  <CheckCircle2 size={14} /> {t("orders.action_receive")}
                               </button>
                             )}

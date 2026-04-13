@@ -7,6 +7,9 @@ from fastapi import FastAPI, Request
 from app.bot.bot import bot, dp
 from app.core.config import settings
 
+from fastapi.middleware.cors import CORSMiddleware
+from web.backend.routers import auth, orders, products, inventory, analytics, stores, finance, invites, suppliers
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,10 +46,31 @@ async def _start_polling():
 
 
 app = FastAPI(
-    title="Warehouse Bot API",
-    version="0.1.0",
+    title="Warehouse ERP & Bot API",
+    version="1.0.0",
     lifespan=lifespan,
 )
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include Web Routers
+API_PREFIX = "/api"
+app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(orders.router, prefix=API_PREFIX)
+app.include_router(products.router, prefix=API_PREFIX)
+app.include_router(inventory.router, prefix=API_PREFIX)
+app.include_router(analytics.router, prefix=API_PREFIX)
+app.include_router(stores.router, prefix=API_PREFIX)
+app.include_router(finance.router, prefix=API_PREFIX)
+app.include_router(invites.router, prefix=API_PREFIX)
+app.include_router(suppliers.router, prefix=API_PREFIX)
 
 
 @app.post(settings.webhook_path)
@@ -60,4 +84,4 @@ async def telegram_webhook(request: Request) -> dict:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "service": "warehouse-combined-api"}

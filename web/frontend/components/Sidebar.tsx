@@ -14,6 +14,7 @@ import {
   BoxIcon,
   Menu,
   X,
+  Truck,
 } from "lucide-react";
 import { clearAuth, getStoredUser } from "@/lib/auth";
 import { UserMe } from "@/lib/api";
@@ -26,6 +27,7 @@ const ownerNav = [
   { href: "/inventory", icon: Warehouse, label: "sidebar.inventory" },
   { href: "/products", icon: Package, label: "sidebar.products" },
   { href: "/finance", icon: DollarSign, label: "sidebar.finance" },
+  { href: "/suppliers", icon: Truck, label: "sidebar.suppliers" },
   { href: "/management", icon: Users, label: "sidebar.management" },
   { href: "/settings", icon: Settings, label: "sidebar.settings" },
 ];
@@ -80,11 +82,12 @@ export default function Sidebar() {
     <>
       {/* Mobile Header */}
       <div className="mobile-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <BoxIcon size={18} color="#fff" />
-          </div>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>Warehouse</div>
+        <div 
+          style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+          onClick={() => window.location.reload()}
+          title="Обновить страницу"
+        >
+          <div style={{ fontWeight: 700, fontSize: 18 }}>Yasham</div>
         </div>
         <button onClick={() => setIsOpen(true)} className="mobile-menu-btn" aria-label="Open menu">
           <Menu size={26} />
@@ -102,23 +105,13 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="sidebar-logo">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: "var(--accent)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <BoxIcon size={20} color="#fff" />
-              </div>
+            <div 
+              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+              onClick={() => window.location.reload()}
+              title="Обновить страницу"
+            >
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>Warehouse</div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>ERP System</div>
+                <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: "-0.5px" }}>Yasham</div>
               </div>
             </div>
             

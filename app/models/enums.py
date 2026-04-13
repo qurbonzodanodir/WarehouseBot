@@ -58,6 +58,7 @@ class StockMovementType(CaseInsensitiveEnum):
     DISPLAY_DISPATCH = "display_dispatch"
     DISPLAY_RECEIVE = "display_receive"
     DISPLAY_RETURN = "display_return"
+    DISPATCH_TO_WHOLESALER = "dispatch_to_wholesaler"
 
 class FinancialTransactionType(CaseInsensitiveEnum):
     PAYMENT = "payment"

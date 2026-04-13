@@ -221,7 +221,13 @@ export default function ProductsPage() {
       setForm({ sku: "", price: "" });
       setAdding(false);
       await fetchProducts();
-    } catch (e: any) { showToast(e.message, "error"); }
+    } catch (e: any) { 
+      if (e.message === "Product with this SKU already exists") {
+        showToast(t("products.sku_exists") || "Товар с таким артикулом (SKU) уже существует", "error");
+      } else {
+        showToast(e.message, "error"); 
+      }
+    }
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,21 +244,40 @@ export default function ProductsPage() {
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
         const grouped = new Map<string, { sku: string; total: number; priceSum: number; priceCount: number }>();
         const errors: string[] = [];
+        
         for (let i = 0; i < data.length; i++) {
           const row = data[i];
           if (!row || row.length < 6) continue;
-          const sku = normalizeSku(row[2]);
+          
+          const skuRaw = String(row[2] || "").trim();
+          const sku = normalizeSku(skuRaw);
+          
+          if (!sku) continue;
+
+          // Skip header or footer rows
+          const upperSku = sku.toUpperCase();
+          if (upperSku.includes("НОМГУИ") || upperSku.includes("ЧАМЪ") || upperSku.includes("АРТИКУЛ")) {
+            continue;
+          }
+
           const unitsPerBox = parseLocalizedNumber(row[3]);
           const boxes = parseLocalizedNumber(row[4]);
           const total = parseLocalizedNumber(row[5]);
           const price = parseLocalizedNumber(row[6]);
-          const derivedTotal = !Number.isNaN(total) ? total : boxes * unitsPerBox;
+          
+          // Determine quantity
+          const derivedTotal = !Number.isNaN(total) ? total : (Number.isNaN(boxes) || Number.isNaN(unitsPerBox) ? NaN : boxes * unitsPerBox);
 
-          if (!sku) continue;
-          if (!Number.isFinite(derivedTotal) || derivedTotal <= 0) {
-            errors.push(`row ${i + 1}: invalid quantity for SKU ${sku}`);
+          // Silent skip for rows that don't look like products (e.g. empty rows or extra text)
+          if (Number.isNaN(derivedTotal)) {
             continue;
           }
+
+          if (derivedTotal <= 0) {
+            errors.push(`row ${i + 1}: invalid quantity (${derivedTotal}) for SKU ${sku}`);
+            continue;
+          }
+
           if (!Number.isNaN(price) && price < 0) {
             errors.push(`row ${i + 1}: negative price for SKU ${sku}`);
             continue;
@@ -405,8 +430,8 @@ export default function ProductsPage() {
                           <td style={{ textAlign: "center" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                               {p.is_active && (
-                                <button onClick={(e) => { e.stopPropagation(); setReceivingProduct(p); }} className="btn btn-primary" style={{ padding: "4px 12px", fontSize: 12 }}>
-                                  <PackageOpen size={14} />
+                                <button onClick={(e) => { e.stopPropagation(); setReceivingProduct(p); }} className="btn btn-primary" style={{ padding: "4px 12px", fontSize: 12, display: "flex", gap: "4px", alignItems: "center" }}>
+                                  <PackageOpen size={13} style={{ opacity: 0.8 }} /> {t("products.btn_receive") || "Добавить"}
                                 </button>
                               )}
                               <button

@@ -27,7 +27,7 @@ export default function LoginPage() {
         return;
       }
 
-      saveAuth(res.access_token, res.user);
+      saveAuth(res.access_token, res.refresh_token, res.user);
 
       // Warehouse → сразу на заказы, Admin/Owner → дашборд
       if (res.user.role === "warehouse") {
@@ -70,22 +70,7 @@ export default function LoginPage() {
       <div className="card" style={{ width: "100%", maxWidth: 420, position: "relative" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 14,
-              background: "linear-gradient(135deg, var(--accent), #a78bfa)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 16px",
-              boxShadow: "0 0 30px var(--accent-muted)",
-            }}
-          >
-            <BoxIcon size={28} color="#fff" />
-          </div>
-          <h1 style={{ fontSize: "1.5rem", marginBottom: 6 }}>Warehouse ERP</h1>
+          <h1 style={{ fontSize: "1.5rem", marginBottom: 6 }}>Yasham ERP</h1>
           <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>
             {t("login.subtitle")}
           </p>

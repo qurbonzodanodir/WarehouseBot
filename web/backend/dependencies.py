@@ -15,7 +15,8 @@ from app.models.enums import UserRole
 # Constants
 # ──────────────────────────────────────────────────────────────────────────────
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 дней
+ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 час
+REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 дней
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -36,11 +37,17 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 # ──────────────────────────────────────────────────────────────────────────────
 def create_access_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "exp": expire}
+    payload = {"sub": str(user_id), "type": "access", "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
-def decode_token(token: str) -> int:
+def create_refresh_token(user_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    payload = {"sub": str(user_id), "type": "refresh", "exp": expire}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_token(token: str, expected_type: str = "access") -> int:
     """Decode JWT and return user id. Raises HTTPException on failure."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -49,6 +56,12 @@ def decode_token(token: str) -> int:
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != expected_type and expected_type:
+            # For backward compatibility with old tokens that don't have "type", we just let it pass if type is missing?
+            # Or we strictly enforce. Since we are changing it now, users will be forced to re-login, which is fine.
+            if "type" in payload:
+                raise credentials_exception
+                
         user_id_str: str | None = payload.get("sub")
         if user_id_str is None:
             raise credentials_exception

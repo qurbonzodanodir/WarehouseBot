@@ -175,6 +175,16 @@ async def dispatch_order(
             text=lambda _t: _t("order_dispatch_notif_seller", id=order.id, qty=order.quantity),
             reply_markup=lambda _t: delivery_confirm_kb(order.id, order.quantity, _=_t),
         )
+
+        try:
+            await notif_svc.clear_order_notifications(
+                order_id=order.id,
+                new_text=f"✅ Заказ #{order.id} отгружен через веб-панель."
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"Error clearing notifications: {e}")
+
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -256,6 +266,10 @@ async def reject_order(
             store_id=order.store_id,
             text=lambda _t: _t("order_rejected_seller_notif", id=order.id, sku=order.product.sku, qty=order.quantity)
         )
+        await notif_svc.clear_order_notifications(
+            order_id=order.id,
+            new_text=f"❌ Заказ #{order.id} отклонен через веб-панель."
+        )
     except Exception:
         pass
 
@@ -310,6 +324,16 @@ async def approve_return(
             store_id=order.store_id,
             text=lambda _t: _t("return_approved_seller_notif", type=(_t("return_type_samples_label") if is_display else _t("return_type_goods_label")), id=order_id),
         )
+
+        try:
+            await notif_svc.clear_order_notifications(
+                order_id=order.id,
+                new_text=f"✅ Возврат #{order.id} принят через веб-панель."
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"Error clearing notifications: {e}")
+
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -356,6 +380,16 @@ async def reject_return(
             store_id=order.store_id,
             text=lambda _t: _t("return_rejected_seller_notif", id=order_id),
         )
+
+        try:
+            await notif_svc.clear_order_notifications(
+                order_id=order.id,
+                new_text=f"❌ Возврат #{order.id} отклонен через веб-панель."
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"Error clearing notifications: {e}")
+
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))

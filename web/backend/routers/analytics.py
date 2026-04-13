@@ -9,11 +9,15 @@ from app.models.enums import UserRole
 from app.models.order import Order
 from app.models.sale import Sale
 from app.models.store import Store
+from app.models.supplier import Supplier
+from app.models.supplier_invoice import SupplierInvoice
+from app.models.supplier_payment import SupplierPayment
 from web.backend.dependencies import CurrentUser, SessionDep
 from web.backend.schemas.analytics import (
     DashboardResponse,
     OrderStatusCount,
     StoreDebt,
+    SupplierDebt,
     StoreRevenue,
 )
 
@@ -90,6 +94,30 @@ async def get_dashboard(
         for row in stores_result.all()
     ]
 
+    # ── 4B. Долги по оптовикам ────────────────────────────────────────────────
+    inv_subq = select(SupplierInvoice.supplier_id, func.sum(SupplierInvoice.total_amount).label('tot')).group_by(SupplierInvoice.supplier_id).subquery()
+    pay_subq = select(SupplierPayment.supplier_id, func.sum(SupplierPayment.amount).label('tot')).group_by(SupplierPayment.supplier_id).subquery()
+    
+    sup_stmt = (
+        select(
+            Supplier.id, 
+            Supplier.name, 
+            func.coalesce(inv_subq.c.tot, 0) - func.coalesce(pay_subq.c.tot, 0)
+        )
+        .outerjoin(inv_subq, Supplier.id == inv_subq.c.supplier_id)
+        .outerjoin(pay_subq, Supplier.id == pay_subq.c.supplier_id)
+        .where(Supplier.is_active.is_(True))
+    )
+    sup_res = await session.execute(sup_stmt)
+    
+    supplier_debts = []
+    total_supplier_debt = Decimal("0")
+    for row in sup_res.all():
+        debt = Decimal(row[2])
+        if debt > 0:
+            supplier_debts.append(SupplierDebt(supplier_id=row[0], supplier_name=row[1], current_debt=debt))
+            total_supplier_debt += debt
+
     # ── 5. Выручка по магазинам за период ─────────────────────────────────────
     if end_date:
         period_condition = and_(Sale.created_at >= start_date, Sale.created_at < end_date)
@@ -133,8 +161,10 @@ async def get_dashboard(
         total_orders_today=orders_count,
         total_revenue_today=revenue_today,
         total_debt=total_debt,
+        total_supplier_debt=total_supplier_debt,
         pending_orders=pending_orders,
         store_debts=store_debts,
+        supplier_debts=supplier_debts,
         store_revenues=store_revenues,
         orders_by_status=orders_by_status,
     )

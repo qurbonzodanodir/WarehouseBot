@@ -16,7 +16,8 @@ export const tj = {
     owner: "Роҳбар",
     warehouse: "Анборчӣ",
     seller: "Фурӯшанда",
-    admin: "Админ"
+    admin: "Админ",
+    suppliers: "Оптовик",
   },
   
   // Common
@@ -100,12 +101,14 @@ export const tj = {
     period_year: "Сол",
     revenue: "Вуруд",
     sales: "Фурӯш",
-    total_debt: "Қарзи умумӣ",
-    pending_orders: "Дархостҳои фаъол",
+    total_debt: "Қарзи мағоз.",
+    total_supplier_debt: "Қарздор ба мо (Опт.)",
+    pending_orders: "Дар ҳоли коркард",
     sales_dyn: "Динамикаи вуруд",
     order_status: "Вазъияти фармоишҳо",
     revenue_by_store: "Даромад аз рӯи мағозаҳо",
-    debt_by_store: "Қарз аз рӯи мағозаҳо",
+    debt_by_store: "Қарздорон (Мағозаҳо)",
+    debt_by_supplier: "Қарздорон (Оптовикҳо)",
     store: "Мағоза",
     debt: "Қарз"
   },
@@ -132,7 +135,7 @@ export const tj = {
     btn_delete: "Нест кардан",
     delete_confirm: "Шумо дар ҳақиқат мехоҳед ин маҳсулотро нест кунед?",
     delete_failed: "Нест кардани маҳсулот ғайриимкон аст: дар анборҳо боқимонда дорад ё таърихи фармоишҳо вуҷуд дорад. Лутфан, ба ҷои нест кардан тугмаи «Хомӯш кардан»-ро истифода баред.",
-    btn_receive: "Қабул",
+    btn_receive: "Илова кардан",
     availability: "Мавҷудият дар мағозаҳо",
     total_stock: "Бақияи умумӣ",
     loading: "Боргирӣ...",
@@ -165,7 +168,8 @@ export const tj = {
     hard_delete_title: "Тасдиқи пурра нест кардан",
     hard_delete_confirm: "Моли {sku} абадан нест карда мешавад. Ин амал баргардонида намешавад. Давом диҳем?",
     hard_delete_success: "Мол абадан нест карда шуд",
-    hard_delete_failed: "Нест кардани мол муваффақ нашуд"
+    hard_delete_failed: "Нест кардани мол муваффақ нашуд",
+    sku_exists: "Маҳсулот бо чунин артикул (SKU) аллакай дар система вуҷуд дорад"
   },
 
   inventory: {
@@ -278,6 +282,34 @@ export const tj = {
     hint: "Email ва рамзи маъмур ё кормандро ворид кунед",
     err_auth: "Хатогии вуруд",
     err_no_access: "Фурӯшандагон ба веб-панел дастрасӣ надоранд. Telegram-ботро истифода баред."
+  },
+
+  suppliers: {
+    title: "Оптовикҳо",
+    subtitle: "Муштариюне, ки аз анбор мол мегиранд ва баъдтар мпердозад пардохт мекунанд.",
+    add_btn: "Илова кардани оптовик",
+    add_title: "Оптовики нав",
+    total_suppliers: "Ҳамаи оптовикҳо",
+    total_debt: "Қарзи умумии оптовикҳо ба мо",
+    col_name: "Оптовик",
+    col_contact: "Тамос",
+    col_address: "Суроға",
+    col_debt: "Қарз ба мо",
+    empty: "Оптовикҳо нестанд. Аввалинашро илова кунед!",
+    created_success: "Оптовик илова шуд",
+    btn_invoice: "Мол фиристодан",
+    btn_pay: "Пардохт Қабул",
+    invoice_title: "Фиристодани мол ба оптовик (Қарз меафзояд)",
+    payment_title: "Қабули пардохт аз оптовик (Қарз кам мешавад)",
+    invoices_title: "Фиристоданиҳо",
+    payments_title: "Пардохтҳо",
+    no_invoices: "Фиристоданӣ нест",
+    no_payments: "Пардохт нест",
+    invoice_added: "Фиристоданӣ қайд карда шуд",
+    payment_success: "Пардохт қабул шуд",
+    current_debt: "Қарзи ҷорӣ",
+    notes: "Эзоҳ",
+    notes_ph: "Ихтиёрӣ..."
   },
 
   settings: {

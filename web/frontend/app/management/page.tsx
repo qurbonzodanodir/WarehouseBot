@@ -200,7 +200,7 @@ export default function ManagementPage() {
       <Sidebar />
       <main className="main-layout" style={{ padding: "32px 40px" }}>
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.5px", margin: 0, color: "var(--text-primary)" }}>
               {t("management.title")}
@@ -243,10 +243,10 @@ export default function ManagementPage() {
         )}
 
         {/* Main Content Split */}
-        <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+        <div className="mobile-stack" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
           
           {/* LEFT: Stores Panel */}
-          <div style={{ 
+          <div className="mobile-full" style={{ 
             flex: "0 0 340px", 
             background: "var(--bg-card)", 
             borderRadius: 16, 
@@ -254,6 +254,7 @@ export default function ManagementPage() {
             display: "flex", 
             flexDirection: "column",
             height: "calc(100vh - 160px)",
+            minHeight: "400px", /* For mobile fallback */
             overflow: "hidden",
             boxShadow: "0 2px 10px rgba(0,0,0,0.02)"
           }}>
@@ -345,7 +346,7 @@ export default function ManagementPage() {
               <>
                 <div style={{ 
                   background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--border)", padding: "24px 32px",
-                  display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 2px 10px rgba(0,0,0,0.02)"
+                  display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "space-between", alignItems: "center", boxShadow: "0 2px 10px rgba(0,0,0,0.02)"
                 }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
@@ -430,7 +431,7 @@ export default function ManagementPage() {
                         <tbody>
                           {employees.map((emp) => (
                             <tr key={emp.id} style={{ transition: "background 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                              <td style={{ paddingLeft: 24 }}>
+                              <td data-label={t("management.col_name")} style={{ paddingLeft: 24 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--accent-muted)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
                                     {emp.name.charAt(0).toUpperCase()}
@@ -449,18 +450,18 @@ export default function ManagementPage() {
                                   </div>
                                 </div>
                               </td>
-                              <td>
+                              <td data-label={t("management.col_role")}>
                                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "rgba(108,99,255,0.1)", color: "var(--accent)" }}>
                                   <Shield size={12} /> {roleBadge(emp.role)}
                                 </span>
                               </td>
-                              <td style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+                              <td data-label={t("management.col_contact")} style={{ color: "var(--text-secondary)", fontSize: 13 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                   <Mail size={14} color="var(--text-muted)" /> {emp.email || "—"}
                                 </div>
                               </td>
-                              <td style={{ paddingRight: 24, textAlign: "right" }}>
-                                <button className="btn btn-ghost" style={{ padding: "6px 10px", fontSize: 13, background: "var(--bg-hover)" }} onClick={() => openEmpForm(emp)}>
+                              <td data-label={t("management.col_actions")} style={{ paddingRight: 24, textAlign: "right" }}>
+                                <button className="btn btn-ghost" style={{ padding: "6px 10px", fontSize: 13, background: "var(--bg-hover)", width: "100%", justifyContent: "center" }} onClick={() => openEmpForm(emp)}>
                                   {t("management.btn_edit_emp")}
                                 </button>
                               </td>
@@ -474,7 +475,7 @@ export default function ManagementPage() {
 
                 {/* Invite Codes Section */}
                 <div style={{ background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden", marginTop: 24 }}>
-                  <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "space-between", alignItems: "center" }}>
                     <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                       <Key size={16} /> {t("management.invites_title")}
                     </h3>

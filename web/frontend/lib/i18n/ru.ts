@@ -16,7 +16,8 @@ export const ru = {
     owner: "Владелец",
     warehouse: "Складщик",
     seller: "Продавец",
-    admin: "Админ"
+    admin: "Админ",
+    suppliers: "Оптовики",
   },
   
   // Common
@@ -102,12 +103,14 @@ export const ru = {
     period_year: "Год",
     revenue: "Выручка",
     sales: "Продаж",
-    total_debt: "Общий долг",
-    pending_orders: "Активных заявок",
+    total_debt: "Долги магаз.",
+    total_supplier_debt: "Нам должны (Опт.)",
+    pending_orders: "В обработке",
     sales_dyn: "Динамика выручки",
-    order_status: "Статусы заказов",
+    order_status: "Заказы по статусам",
     revenue_by_store: "Выручка по магазинам",
-    debt_by_store: "Долги по магазинам",
+    debt_by_store: "Должники (Магазины)",
+    debt_by_supplier: "Должники (Оптовики)",
     store: "Магазин",
     debt: "Долг"
   },
@@ -135,7 +138,7 @@ export const ru = {
     btn_delete: "Удалить",
     delete_confirm: "Вы точно хотите удалить этот товар?",
     delete_failed: "Невозможно удалить товар: по нему есть остатки или история заказов. Пожалуйста, используйте кнопку «Отключить» вместо удаления.",
-    btn_receive: "Приход",
+    btn_receive: "Добавить",
     availability: "Наличие в магазинах",
     total_stock: "Общий остаток",
     loading: "Загрузка...",
@@ -168,7 +171,8 @@ export const ru = {
     hard_delete_title: "Подтверждение полного удаления",
     hard_delete_confirm: "Товар {sku} будет удалён навсегда. Это действие необратимо. Продолжить?",
     hard_delete_success: "Товар удалён навсегда",
-    hard_delete_failed: "Не удалось удалить товар"
+    hard_delete_failed: "Не удалось удалить товар",
+    sku_exists: "Товар с таким артикулом (SKU) уже существует в системе"
   },
 
   inventory: {
@@ -281,6 +285,34 @@ export const ru = {
     hint: "Введите Email и пароль администратора или сотрудника.",
     err_auth: "Ошибка входа",
     err_no_access: "У продавцов нет доступа к веб-панели. Используйте Telegram-бот."
+  },
+
+  suppliers: {
+    title: "Оптовики",
+    subtitle: "Клиенты, которые берут товар у склада в долг и расплачиваются позже.",
+    add_btn: "Добавить оптовика",
+    add_title: "Новый оптовик",
+    total_suppliers: "Всего оптовиков",
+    total_debt: "Общий долг оптовиков нам",
+    col_name: "Оптовик",
+    col_contact: "Контакт",
+    col_address: "Адрес",
+    col_debt: "Долг нам",
+    empty: "Нет оптовиков. Добавьте первого!",
+    created_success: "Оптовик добавлен",
+    btn_invoice: "Отгрузить товар",
+    btn_pay: "Принять оплату",
+    invoice_title: "Отгрузка товара оптовику (долг растёт)",
+    payment_title: "Приём оплаты от оптовика (долг уменьшается)",
+    invoices_title: "Отгрузки",
+    payments_title: "Оплаты",
+    no_invoices: "Отгрузок нет",
+    no_payments: "Оплат нет",
+    invoice_added: "Отгрузка записана",
+    payment_success: "Оплата принята",
+    current_debt: "Долг перед нами",
+    notes: "Заметка",
+    notes_ph: "Необязательно..."
   },
 
   settings: {

@@ -22,7 +22,7 @@ async def list_products(
     only_inactive: bool = Query(False),
     search: str | None = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=10000),
 ) -> ProductPaginationOut:
     stmt = select(Product).order_by(Product.sku)
 
