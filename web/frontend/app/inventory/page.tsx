@@ -158,7 +158,11 @@ export default function InventoryPage() {
                       for (let r = 1; r < data.length; r++) {
                         for (let c = 0; c < data[r].length; c++) {
                           if (brandsMap[c] && data[r][c]) {
-                            const sku = String(data[r][c]).trim();
+                            let sku = String(data[r][c]).trim();
+                            // Fix Excel removing leading zeros: pad numeric SKUs to 5 digits
+                            if (/^\d+$/.test(sku) && sku.length < 5) {
+                              sku = sku.padStart(5, '0');
+                            }
                             if (sku && !sku.toLowerCase().includes("пример") && sku.toLowerCase() !== "sku") {
                               parsed.push({ sku, brand: brandsMap[c] });
                             }
