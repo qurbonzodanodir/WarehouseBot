@@ -33,6 +33,7 @@ async def get_store_inventory(
     session: SessionDep,
     current_user: CurrentUser,
     include_empty: bool = Query(False),
+    search: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
 ) -> PaginatedInventoryResponse:
@@ -93,6 +94,12 @@ async def get_store_inventory(
     # Convert to list and sort by SKU
     items_list = list(merged.values())
     items_list.sort(key=lambda x: x.product_sku)
+
+    # Apply search filter (case-insensitive substring over SKU)
+    if search:
+        q = search.strip().lower()
+        if q:
+            items_list = [it for it in items_list if q in it.product_sku.lower()]
 
     # Apply pagination
     total = len(items_list)

@@ -45,6 +45,18 @@ export default function InventoryPage() {
     api.getStores().then(setStores).catch(console.error);
   }, [router]);
 
+  // Debounce search (300ms)
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset to page 1 when search or store changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedStore]);
+
   useEffect(() => {
     setLoading(true);
     if (!selectedStore) {
@@ -56,7 +68,7 @@ export default function InventoryPage() {
       setTotalItems(0);
       setTotalPages(0);
     } else {
-      api.getInventory(selectedStore, currentPage, pageSize)
+      api.getInventory(selectedStore, currentPage, pageSize, debouncedSearch)
         .then((data) => {
           setItems(data.items);
           setTotalItems(data.total);
@@ -66,7 +78,7 @@ export default function InventoryPage() {
         .finally(() => setLoading(false));
       setCatalog([]);
     }
-  }, [selectedStore, currentPage, pageSize]);
+  }, [selectedStore, currentPage, pageSize, debouncedSearch]);
 
   const handleConfirmImport = async () => {
     if (!selectedStore || importData.length === 0) return;
@@ -88,13 +100,10 @@ export default function InventoryPage() {
     }
   };
 
-  const filtered = items.filter((i) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return i.product_sku.toLowerCase().includes(q);
-  });
+  // Backend handles search filtering now; `items` is already filtered & paginated
+  const filtered = items;
 
-  const totalQuantity = selectedStore ? filtered.reduce((s, i) => s + i.quantity, 0) : catalog.reduce((s, c) => s + c.total_items, 0);
+  const totalQuantity = selectedStore ? totalItems : catalog.reduce((s, c) => s + c.total_items, 0);
 
   return (
     <div style={{ display: "flex" }}>
@@ -216,32 +225,107 @@ export default function InventoryPage() {
           )}
         </div>
 
-        <div className="page-filters">
-          <select 
-            className="select" 
-            value={selectedStore ?? ""} 
-            onChange={(e) => {
-              setSelectedStore(e.target.value ? Number(e.target.value) : null);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="">{t("inventory.all_stores")}</option>
-            {stores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.name} {store.total_items && store.total_items > 0 && `(${fmt(store.total_items)})`}
-              </option>
-            ))}
-          </select>
-          <div className="input-group" style={{ flex: 1, maxWidth: 400 }}>
-            <Search size={18} style={{ color: "var(--text-secondary)" }} />
-            <input
-              type="text"
-              className="input"
-              placeholder={t("inventory.search_placeholder")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className="page-filters" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
+          {/* Store pill-chips */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setSelectedStore(null)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 999,
+                border: selectedStore === null ? "1px solid var(--accent)" : "1px solid var(--border)",
+                background: selectedStore === null ? "var(--accent)" : "transparent",
+                color: selectedStore === null ? "#fff" : "var(--text-primary)",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Boxes size={14} /> {t("inventory.all_stores")}
+            </button>
+            {stores.map((store) => {
+              const active = selectedStore === store.id;
+              return (
+                <button
+                  key={store.id}
+                  type="button"
+                  onClick={() => setSelectedStore(store.id)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 999,
+                    border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
+                    background: active ? "var(--accent)" : "transparent",
+                    color: active ? "#fff" : "var(--text-primary)",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <StoreIcon size={14} />
+                  {store.name}
+                  {store.total_items && store.total_items > 0 ? (
+                    <span
+                      style={{
+                        padding: "2px 7px",
+                        borderRadius: 999,
+                        background: active ? "rgba(255,255,255,0.25)" : "var(--bg-card)",
+                        fontSize: 11,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {fmt(store.total_items)}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Search input (only when a store is selected) */}
+          {selectedStore && (
+            <div className="input-group" style={{ maxWidth: 480, position: "relative" }}>
+              <Search size={18} style={{ color: "var(--text-secondary)" }} />
+              <input
+                type="text"
+                className="input"
+                placeholder={t("inventory.search_placeholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingRight: search ? 34 : undefined }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  title="Очистить"
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text-secondary)",
+                    padding: 4,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="page-content">
