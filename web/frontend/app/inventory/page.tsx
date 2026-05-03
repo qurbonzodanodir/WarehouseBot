@@ -22,6 +22,10 @@ export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const [catalog, setCatalog] = useState<StoreCatalogCard[]>([]);
   const [userRole, setUserRole] = useState<string>("seller");
@@ -56,14 +60,20 @@ export default function InventoryPage() {
         .catch(console.error)
         .finally(() => setLoading(false));
       setItems([]);
+      setTotalItems(0);
+      setTotalPages(0);
     } else {
-      api.getInventory(selectedStore)
-        .then(setItems)
+      api.getInventory(selectedStore, currentPage, pageSize)
+        .then((data) => {
+          setItems(data.items);
+          setTotalItems(data.total);
+          setTotalPages(data.total_pages);
+        })
         .catch(console.error)
         .finally(() => setLoading(false));
       setCatalog([]);
     }
-  }, [selectedStore]);
+  }, [selectedStore, currentPage, pageSize]);
 
   const handleConfirmImport = async () => {
     if (!selectedStore || importData.length === 0) return;
@@ -73,7 +83,11 @@ export default function InventoryPage() {
       showToast(`✅ Загружено успешно! Фирм: ${new Set(importData.map(d=>d.brand)).size}, Артикулов: ${importData.length}. Сохранено новых: ${res.created}, обновлено на витрине: ${res.added_qty}`, "success");
       setIsImportModalOpen(false);
       setImportData([]);
-      api.getInventory(selectedStore).then(setItems);
+      api.getInventory(selectedStore, currentPage, pageSize).then((data) => {
+        setItems(data.items);
+        setTotalItems(data.total);
+        setTotalPages(data.total_pages);
+      });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Ошибка сохранения", "error");
     } finally {
@@ -81,32 +95,13 @@ export default function InventoryPage() {
     }
   };
 
-  const mergedItems = useMemo(() => {
-    const byProduct = new Map<number, InventoryItem>();
-    for (const item of items) {
-      const existing = byProduct.get(item.product_id);
-      if (existing) {
-        existing.quantity += item.quantity;
-        existing.is_display = false;
-      } else {
-        byProduct.set(item.product_id, {
-          product_id: item.product_id,
-          product_sku: item.product_sku,
-          quantity: item.quantity,
-          is_display: !!item.is_display,
-        });
-      }
-    }
-    return Array.from(byProduct.values());
-  }, [items]);
-
-  const filtered = mergedItems.filter((i) => {
+  const filtered = items.filter((i) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return i.product_sku.toLowerCase().includes(q);
   });
 
-  const totalItems = selectedStore ? filtered.reduce((s, i) => s + i.quantity, 0) : catalog.reduce((s, c) => s + c.total_items, 0);
+  const totalQuantity = selectedStore ? filtered.reduce((s, i) => s + i.quantity, 0) : catalog.reduce((s, c) => s + c.total_items, 0);
 
   return (
     <div style={{ display: "flex" }}>
@@ -119,7 +114,7 @@ export default function InventoryPage() {
               {t("inventory.title")}
             </h1>
             <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
-              {t("inventory.found", { count: totalItems })}
+              {t("inventory.found", { count: totalQuantity })}
             </p>
           </div>
           {userRole !== "seller" && (
@@ -341,6 +336,62 @@ export default function InventoryPage() {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div style={{ 
+                  display: "flex", 
+                  justifyContent: "center", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginTop: 20,
+                  padding: "16px 0",
+                  borderTop: "1px solid var(--border)"
+                }}>
+                  <button 
+                    className="btn btn-ghost" 
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    style={{ padding: "6px 12px", fontSize: 12 }}
+                  >
+                    ⟪
+                  </button>
+                  <button 
+                    className="btn btn-ghost" 
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    style={{ padding: "6px 12px", fontSize: 12 }}
+                  >
+                    ⟨
+                  </button>
+                  
+                  <span style={{ 
+                    padding: "0 16px", 
+                    fontSize: 13, 
+                    color: "var(--text-primary)",
+                    fontWeight: 500
+                  }}>
+                    {currentPage} / {totalPages}
+                  </span>
+                  
+                  <button 
+                    className="btn btn-ghost" 
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    style={{ padding: "6px 12px", fontSize: 12 }}
+                  >
+                    ⟩
+                  </button>
+                  <button 
+                    className="btn btn-ghost" 
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    style={{ padding: "6px 12px", fontSize: 12 }}
+                  >
+                    ⟫
+                  </button>
+                </div>
+              )}
             )}
           </div>
         )}

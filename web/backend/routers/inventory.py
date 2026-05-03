@@ -12,7 +12,7 @@ from app.models.inventory import Inventory
 from app.models.enums import UserRole
 from app.models.store import Store
 from web.backend.dependencies import CurrentUser, SessionDep
-from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, BulkReceiveInput, DispatchDisplayInput, BulkVitrinaInput
+from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, BulkReceiveInput, DispatchDisplayInput, BulkVitrinaInput, PaginatedInventoryResponse
 from app.bot.bot import bot
 from app.services.notification_service import NotificationService
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 @router.get(
     "/{store_id:int}",
-    response_model=list[InventoryItemOut],
+    response_model=PaginatedInventoryResponse,
     summary="Остатки магазина / склада",
     description="Возвращает товары с количеством для указанного магазина (включая витрину).",
 )
@@ -33,7 +33,9 @@ async def get_store_inventory(
     session: SessionDep,
     current_user: CurrentUser,
     include_empty: bool = Query(False),
-) -> list[InventoryItemOut]:
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+) -> PaginatedInventoryResponse:
     if current_user.role == UserRole.SELLER and current_user.store_id != store_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -61,25 +63,50 @@ async def get_store_inventory(
     res_disp = await session.execute(stmt_disp)
     items_disp = res_disp.scalars().all()
 
-    # Combine
-    out = []
+    # Combine and merge by product_id
+    merged = {}
     for inv in items_reg:
-        out.append(InventoryItemOut(
-            product_id=inv.product_id,
-            product_sku=inv.product.sku,
-            quantity=inv.quantity,
-            is_display=False
-        ))
+        product_id = inv.product_id
+        if product_id in merged:
+            merged[product_id].quantity += inv.quantity
+        else:
+            merged[product_id] = InventoryItemOut(
+                product_id=inv.product_id,
+                product_sku=inv.product.sku,
+                quantity=inv.quantity,
+                is_display=False
+            )
     
     for inv in items_disp:
-        out.append(InventoryItemOut(
-            product_id=inv.product_id,
-            product_sku=inv.product.sku,
-            quantity=inv.quantity,
-            is_display=True
-        ))
+        product_id = inv.product_id
+        if product_id in merged:
+            merged[product_id].quantity += inv.quantity
+            merged[product_id].is_display = True
+        else:
+            merged[product_id] = InventoryItemOut(
+                product_id=inv.product_id,
+                product_sku=inv.product.sku,
+                quantity=inv.quantity,
+                is_display=True
+            )
 
-    return out
+    # Convert to list and sort by SKU
+    items_list = list(merged.values())
+    items_list.sort(key=lambda x: x.product_sku)
+
+    # Apply pagination
+    total = len(items_list)
+    total_pages = (total + page_size - 1) // page_size
+    offset = (page - 1) * page_size
+    paginated_items = items_list[offset:offset + page_size]
+
+    return PaginatedInventoryResponse(
+        items=paginated_items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
 
 
 @router.get(

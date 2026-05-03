@@ -237,8 +237,14 @@ export const api = {
     request(`/products/${id}`, { method: "DELETE" }),
 
   // Inventory
-  getInventory: (store_id: number) =>
-    request<InventoryItem[]>(`/inventory/${store_id}`),
+  getInventory: (store_id: number, page: number = 1, pageSize: number = 50) =>
+    request<{
+      items: InventoryItem[];
+      total: number;
+      page: number;
+      page_size: number;
+      total_pages: number;
+    }>(`/inventory/${store_id}?page=${page}&page_size=${pageSize}`),
   getAllInventory: () => request<Record<string, StoreInventory>>("/inventory"),
   receiveStock: (data: { product_id: number; quantity: number }) =>
     request<{success: boolean; product_id: number; new_quantity: number}>("/inventory/receive", { method: "POST", body: JSON.stringify(data) }),

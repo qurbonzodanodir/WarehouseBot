@@ -1,7 +1,7 @@
 from decimal import Decimal
 from pydantic import BaseModel, Field
 from app.models.enums import StoreType
-from typing import Optional
+from typing import Optional, List
 
 
 class StoreOut(BaseModel):
@@ -80,3 +80,11 @@ class BulkVitrinaItem(BaseModel):
 class BulkVitrinaInput(BaseModel):
     store_id: int
     items: list[BulkVitrinaItem]
+
+
+class PaginatedInventoryResponse(BaseModel):
+    items: List[InventoryItemOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
