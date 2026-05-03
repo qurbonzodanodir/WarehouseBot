@@ -6,7 +6,10 @@ import { tj } from "./tj";
 
 type LangType = "ru" | "tj";
 
-type TranslationValue = string | Record<string, TranslationValue>;
+interface TranslationObject {
+  [key: string]: TranslationValue;
+}
+type TranslationValue = string | TranslationObject;
 
 function subscribe() {
   return () => {};
