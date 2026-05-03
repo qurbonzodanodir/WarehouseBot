@@ -159,6 +159,7 @@ async def list_products(
     include_inactive: bool = Query(False),
     only_inactive: bool = Query(False),
     search: str | None = Query(None),
+    brand: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=10000),
 ) -> ProductPaginationOut:
@@ -168,6 +169,13 @@ async def list_products(
         stmt = stmt.where(Product.is_active.is_(False))
     elif not include_inactive:
         stmt = stmt.where(Product.is_active.is_(True))
+
+    if brand:
+        # Case-insensitive brand match (also normalize spaces/dashes)
+        normalized = brand.strip().lower().replace(" ", "").replace("-", "")
+        stmt = stmt.where(
+            func.replace(func.replace(func.lower(Product.brand), ' ', ''), '-', '') == normalized
+        )
 
     if search:
         pattern = f"%{search.lower()}%"

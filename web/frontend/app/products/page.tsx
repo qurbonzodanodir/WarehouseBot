@@ -105,20 +105,19 @@ export default function ProductsPage() {
     () => brandOptions.filter((b) => b.name !== "UNKNOWN"),
     [brandOptions]
   );
-  const filteredProducts = React.useMemo(() => {
-    if (!selectedBrand) return products;
-    const normalizedSelectedBrand = normalizeBrandName(selectedBrand);
-    return products.filter((p) => normalizeBrandName(p.brand) === normalizedSelectedBrand);
-  }, [products, selectedBrand]);
+  // Backend now filters by brand, so filteredProducts === products
+  const filteredProducts = products;
 
-  const fetchProducts = useCallback(async (overrides?: { search?: string; page?: number; showInactive?: boolean }) => {
+  const fetchProducts = useCallback(async (overrides?: { search?: string; page?: number; showInactive?: boolean; brand?: string | null }) => {
     const searchValue = overrides?.search ?? search;
     const pageValue = overrides?.page ?? page;
     const showInactiveValue = overrides?.showInactive ?? showInactive;
+    const brandValue = overrides?.brand !== undefined ? overrides.brand : selectedBrand;
     try {
       setLoading(true);
       const data = await api.getProducts({
         search: searchValue,
+        brand: brandValue || undefined,
         page: pageValue,
         page_size: PAGE_SIZE,
         only_inactive: showInactiveValue,
@@ -131,7 +130,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, page, showInactive, showToast]);
+  }, [search, page, showInactive, selectedBrand, showToast]);
 
   const fetchBrandOptions = useCallback(async () => {
     try {
@@ -163,7 +162,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, selectedBrand]);
 
   useEffect(() => {
     setMounted(true);
@@ -429,7 +428,7 @@ export default function ProductsPage() {
               {t("products.title")}
             </h1>
             <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
-              {t("products.found", { count: selectedBrand ? filteredProducts.length : total })}
+              {t("products.found", { count: total })}
             </p>
           </div>
           {isWarehouse && (

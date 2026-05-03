@@ -201,9 +201,10 @@ export const api = {
     }),
 
   // Products
-  getProducts: (params?: { search?: string; include_inactive?: boolean; only_inactive?: boolean; page?: number; page_size?: number }) => {
+  getProducts: (params?: { search?: string; brand?: string; include_inactive?: boolean; only_inactive?: boolean; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams();
     if (params?.search) qs.set("search", params.search);
+    if (params?.brand) qs.set("brand", params.brand);
     if (params?.include_inactive) qs.set("include_inactive", "true");
     if (params?.only_inactive) qs.set("only_inactive", "true");
     if (params?.page) qs.set("page", String(params.page));
