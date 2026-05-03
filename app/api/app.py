@@ -15,26 +15,42 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     if settings.webhook_host:
-        await bot.set_webhook(
-            settings.webhook_url,
-            drop_pending_updates=True,
-        )
-        logger.info("Webhook set: %s", settings.webhook_url)
+        try:
+            await asyncio.wait_for(
+                bot.set_webhook(settings.webhook_url, drop_pending_updates=True),
+                timeout=10,
+            )
+            logger.info("Webhook set: %s", settings.webhook_url)
+        except Exception as e:
+            logger.warning("Failed to set webhook (Telegram unreachable?): %s", e)
     else:
-        logger.info("No WEBHOOK_HOST set — starting long polling")
-        await bot.delete_webhook(drop_pending_updates=True)
-        import asyncio
-
-        polling_task = asyncio.create_task(_start_polling())
+        try:
+            await asyncio.wait_for(
+                bot.delete_webhook(drop_pending_updates=True),
+                timeout=10,
+            )
+            logger.info("No WEBHOOK_HOST set — starting long polling")
+            polling_task = asyncio.create_task(_start_polling())
+        except Exception as e:
+            logger.warning("Failed to delete webhook (Telegram unreachable?): %s. Skipping polling.", e)
+            polling_task = None
 
     yield
 
     if settings.webhook_host:
-        await bot.delete_webhook()
+        try:
+            await asyncio.wait_for(bot.delete_webhook(), timeout=5)
+        except Exception:
+            pass
     else:
-        polling_task.cancel()
-    await bot.session.close()
+        if polling_task:
+            polling_task.cancel()
+    try:
+        await bot.session.close()
+    except Exception:
+        pass
 
 
 async def _start_polling():
