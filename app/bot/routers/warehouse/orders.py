@@ -1,25 +1,26 @@
+import logging
+from typing import Any
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any
-import logging
-
-logger = logging.getLogger(__name__)
 
 from app.bot.keyboards.inline import (
-    delivery_confirm_kb, 
-    order_action_kb, 
-    partial_approval_kb
+    delivery_confirm_kb,
+    order_action_kb,
+    partial_approval_kb,
 )
-from app.models.user import User
-from app.models.order import Order
 from app.models.enums import OrderStatus
+from app.models.order import Order
+from app.models.user import User
 from app.services import (
-    NotificationService, 
-    OrderService, 
+    NotificationService,
+    OrderService,
+    StoreService,
     TransactionService,
-    StoreService
 )
+
+logger = logging.getLogger(__name__)
 
 router = Router(name="warehouse.orders")
 
@@ -182,10 +183,8 @@ async def approve_return(
         )
         await session.commit()
         
-        return_amount = order.price_per_item * order.quantity
-        
         return_type_label = _("return_type_samples_label") if is_display else _("return_type_goods_label")
-        
+
         await callback.message.edit_text(
             _("return_approved_wh", type=return_type_label, id=order_id)
         )
@@ -287,10 +286,17 @@ async def approve_batch_order(
                 reply_markup=lambda _t: batch_delivery_confirm_kb(batch_id, _=_t)
             )
         else:
-            # Propose partial fulfillment to seller
+            # Propose partial fulfillment to seller.
+            # Reserve available items NOW to prevent race conditions while waiting for seller response.
             from app.models.enums import OrderStatus
-            for o in orders:
+            txn_svc = TransactionService(session)
+            for item in available:
+                o = item["order"]
+                inv = await txn_svc._get_or_create_inventory(warehouse_id, o.product_id, lock=True)
+                inv.quantity -= o.quantity
                 o.status = OrderStatus.PARTIAL_APPROVAL_PENDING
+            for item in missing:
+                item["order"].status = OrderStatus.PARTIAL_APPROVAL_PENDING
             await session.commit()
             
             avail_text = "\n".join([f"• {i['order'].product.sku} — {i['available_qty']} шт" for i in available]) if available else "—"

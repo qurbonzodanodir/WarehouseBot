@@ -1,4 +1,5 @@
 
+import logging
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -12,6 +13,8 @@ from app.models.user import User
 from app.services import OrderService, ProductService, TransactionService
 from app.bot.routers.seller.common import MENU_TEXTS
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 router = Router(name="seller.sales")
 
@@ -170,7 +173,7 @@ async def enter_sale_quantity(
         await message.answer(_("sale_error", error=str(e)))
     except Exception as e:
         await message.answer(_("sale_system_error"))
-        print(f"Error in enter_sale_quantity: {e}")
+        logger.exception("Error in enter_sale_quantity: %s", e)
     finally:
         await state.clear()
 
@@ -228,6 +231,6 @@ async def quick_sold_order(
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in quick_sold_order: {e}")
+        logger.exception("Error in quick_sold_order: %s", e)
     finally:
         await callback.answer()

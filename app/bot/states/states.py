@@ -21,29 +21,5 @@ class ReturnFlow(StatesGroup):
 
 
 
-
-
 class RegistrationFlow(StatesGroup):
     enter_code = State()
-
-
-
-
-
-
-
-class ReceiveStockFlow(StatesGroup):
-    """Warehouse worker receiving new stock."""
-    select_product = State()
-    enter_quantity = State()
-
-
-class DisplayTransferFlow(StatesGroup):
-    """Warehouse worker sending display samples to a store."""
-    select_store = State()
-    select_product = State()
-    enter_quantity = State()
-
-
-
-

@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from aiogram import F, Router
@@ -21,6 +22,9 @@ from app.services import (
 )
 from app.bot.routers.seller.common import MENU_TEXTS
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
 router = Router(name="seller.returns")
 
 
@@ -276,7 +280,7 @@ async def return_enter_quantity(
         await message.answer(_("sale_error", error=str(e)))
     except Exception as e:
         await message.answer(_("sale_system_error"))
-        print(f"Error in return_enter_quantity: {e}")
+        logger.exception("Error in return_enter_quantity: %s", e)
     finally:
         await state.clear()
 
@@ -373,6 +377,6 @@ async def quick_return_order(
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in quick return_order: {e}")
+        logger.exception("Error in quick_return_order: %s", e)
     finally:
         await callback.answer()

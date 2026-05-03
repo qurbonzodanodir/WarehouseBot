@@ -1,12 +1,12 @@
 "use client";
 import React, { useEffect, useState, useCallback, Fragment } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
-import { api, Product, ProductInventoryOut, Store } from "@/lib/api";
+import { api, Brand, BrandStat, Product, ProductInventoryOut, Store, UserMe } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, CheckCircle2, ShoppingCart, Trash2 } from "lucide-react";
+import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, ShoppingCart, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createPortal } from "react-dom";
 
@@ -18,6 +18,12 @@ function normalizeSku(raw: unknown): string {
   return String(raw ?? "").trim().toUpperCase();
 }
 
+function normalizeBrandName(brand: string | undefined): string {
+  const normalized = String(brand || "").trim();
+  if (normalized) return normalized.toUpperCase();
+  return "UNKNOWN";
+}
+
 function parseLocalizedNumber(value: unknown): number {
   if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
   const text = String(value ?? "").trim().replace(",", ".");
@@ -26,23 +32,43 @@ function parseLocalizedNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+interface OrderModalItem {
+  product_id: number;
+  sku: string;
+  quantity: number;
+}
+
+interface ImportItem {
+  sku: string;
+  total: number;
+  price: number;
+  brand: string;
+}
+
 export default function ProductsPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { showToast } = useToast();
   
-  const [user, setUser] = useState<any>(null);
+  const [user] = useState<UserMe | null>(() => getStoredUser());
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [brandOptions, setBrandOptions] = useState<{ name: string; count: number }[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [showInactive, setShowInactive] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const PAGE_SIZE = 50;
 
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ sku: "", price: "" });
+  const [form, setForm] = useState({ sku: "", brand: "", price: "" });
   const [pendingToggleProduct, setPendingToggleProduct] = useState<Product | null>(null);
   const [toggling, setToggling] = useState(false);
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<Product | null>(null);
@@ -64,43 +90,76 @@ export default function ProductsPage() {
   const [dispatchQty, setDispatchQty] = useState<string>("1");
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [orderItem, setOrderItem] = useState<any>(null);
+  const [orderItem, setOrderItem] = useState<OrderModalItem | null>(null);
 
   const [importModalOpen, setImportModalOpen] = useState(false);
-  const [importData, setImportData] = useState<any[]>([]);
+  const [importFillBrand, setImportFillBrand] = useState(""); // global fill-all brand
+  const [importReplaceQty, setImportReplaceQty] = useState(true);
+  const [importData, setImportData] = useState<ImportItem[]>([]);
   const [importing, setImporting] = useState(false);
-  const [importParsing, setImportParsing] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   const isWarehouse = user?.role === "owner" || user?.role === "warehouse" || user?.role === "admin";
   const isSeller = user?.role === "seller";
+  const visibleBrands = React.useMemo(
+    () => brandOptions.filter((b) => b.name !== "UNKNOWN"),
+    [brandOptions]
+  );
+  const filteredProducts = React.useMemo(() => {
+    if (!selectedBrand) return products;
+    const normalizedSelectedBrand = normalizeBrandName(selectedBrand);
+    return products.filter((p) => normalizeBrandName(p.brand) === normalizedSelectedBrand);
+  }, [products, selectedBrand]);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (overrides?: { search?: string; page?: number; showInactive?: boolean }) => {
+    const searchValue = overrides?.search ?? search;
+    const pageValue = overrides?.page ?? page;
+    const showInactiveValue = overrides?.showInactive ?? showInactive;
     try {
       setLoading(true);
       const data = await api.getProducts({
-        search,
-        page,
+        search: searchValue,
+        page: pageValue,
         page_size: PAGE_SIZE,
-        only_inactive: showInactive,
+        only_inactive: showInactiveValue,
       });
       setProducts(data.items);
       setTotal(data.total);
       setTotalPages(data.total_pages);
-    } catch (e: any) {
-      showToast(e.message || "Failed to fetch products", "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, "Failed to fetch products"), "error");
     } finally {
       setLoading(false);
     }
   }, [search, page, showInactive, showToast]);
 
+  const fetchBrandOptions = useCallback(async () => {
+    try {
+      const [catalog, stats] = await Promise.all([
+        api.getBrands(),
+        api.getBrandStats(),
+      ]);
+      setBrands(catalog);
+      const counts = new Map<string, number>(
+        stats.map((item: BrandStat) => [item.name.toUpperCase(), item.product_count])
+      );
+      const list = catalog
+        .map((brand) => ({ name: brand.name, count: counts.get(brand.name.toUpperCase()) || 0 }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setBrandOptions(list);
+    } catch (e) {
+      showToast(getErrorMessage(e, t("common.error")), "error");
+    }
+  }, [showToast, t]);
+
   useEffect(() => {
-    const usr = getStoredUser();
-    setUser(usr);
     if (!isAuthenticated()) { router.push("/login"); return; }
-    api.getStores().then(setStores).catch(console.error);
-    fetchProducts();
-  }, [router, fetchProducts]);
+    api.getStores().then(setStores).catch((error) => {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    });
+    void fetchProducts();
+    void fetchBrandOptions();
+  }, [router, fetchProducts, fetchBrandOptions, showToast, t]);
 
   useEffect(() => {
     setPage(1);
@@ -116,8 +175,8 @@ export default function ProductsPage() {
       await api.updateProduct(p.id, { is_active: !p.is_active });
       setPendingToggleProduct(null);
       await fetchProducts();
-    } catch (err: any) {
-      showToast(err.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     } finally {
       setToggling(false);
     }
@@ -130,8 +189,8 @@ export default function ProductsPage() {
       setPendingDeleteProduct(null);
       await fetchProducts();
       showToast(t("products.hard_delete_success"), "success");
-    } catch (err: any) {
-      showToast(err.message || t("products.hard_delete_failed"), "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("products.hard_delete_failed")), "error");
     } finally {
       setDeleting(false);
     }
@@ -149,8 +208,8 @@ export default function ProductsPage() {
       try {
         const data = await api.getProductInventory(productId);
         setInventoryCache((prev) => ({ ...prev, [productId]: data }));
-      } catch (e: any) {
-        console.error("Failed to load inventory for product", e);
+      } catch (error) {
+        console.error("Failed to load inventory for product", error);
       } finally {
         setInventoryLoaders((prev) => ({ ...prev, [productId]: false }));
       }
@@ -169,8 +228,8 @@ export default function ProductsPage() {
       const inv = await api.getProductInventory(receivingProduct.id);
       setInventoryCache((prev) => ({ ...prev, [receivingProduct.id]: inv }));
       showToast(t("products.receive_success", { qty, sku: receivingProduct.sku }));
-    } catch (err: any) {
-      showToast(err.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     }
   }
 
@@ -190,8 +249,8 @@ export default function ProductsPage() {
       setTargetStoreId("");
       setDispatchQty("1");
       showToast(t("inventory.dispatch_success"), "success");
-    } catch (e: any) {
-      showToast(e.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     }
   };
 
@@ -209,23 +268,29 @@ export default function ProductsPage() {
       setIsOrderModalOpen(false);
       setOrderItem(null);
       setDispatchQty("1");
-    } catch (e: any) {
-      showToast(e.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     }
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await api.createProduct({ sku: form.sku, price: Number(form.price) });
-      setForm({ sku: "", price: "" });
+      await api.createProduct({ sku: form.sku, brand: form.brand, price: Number(form.price) });
+      setForm({ sku: "", brand: "", price: "" });
       setAdding(false);
-      await fetchProducts();
-    } catch (e: any) { 
-      if (e.message === "Product with this SKU already exists") {
+      setSearch("");
+      setSelectedBrand("");
+      setShowInactive(false);
+      setPage(1);
+      await fetchProducts({ search: "", page: 1, showInactive: false });
+      await fetchBrandOptions();
+    } catch (error) { 
+      const message = getErrorMessage(error, t("common.error"));
+      if (message === "Product with this SKU already exists") {
         showToast(t("products.sku_exists") || "Товар с таким артикулом (SKU) уже существует", "error");
       } else {
-        showToast(e.message, "error"); 
+        showToast(message, "error"); 
       }
     }
   }
@@ -233,7 +298,6 @@ export default function ProductsPage() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImportParsing(true);
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
@@ -241,7 +305,7 @@ export default function ProductsPage() {
         const wb = XLSX.read(bstr, { type: "binary" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
         const grouped = new Map<string, { sku: string; total: number; priceSum: number; priceCount: number }>();
         const errors: string[] = [];
         
@@ -301,14 +365,16 @@ export default function ProductsPage() {
           sku: item.sku,
           total: Math.round(item.total),
           price: item.priceCount > 0 ? item.priceSum / item.priceCount : 0,
+          brand: "",
         }));
 
         if (errors.length) {
           showToast(`Import warnings: ${errors.slice(0, 3).join("; ")}`, "error");
         }
         setImportData(parsedItems);
-      } catch (err) { showToast(t("products.import_error"), "error"); }
-      finally { setImportParsing(false); }
+      } catch {
+        showToast(t("products.import_error"), "error");
+      }
     };
     reader.readAsBinaryString(file);
   };
@@ -317,17 +383,39 @@ export default function ProductsPage() {
     if (importData.length === 0) return;
     setImporting(true);
     try {
-      const res = await api.bulkReceiveStock(importData.map(d => ({
-        sku: d.sku,
-        quantity: Math.round(d.total),
-        price: d.price > 0 ? d.price : undefined
-      })));
+      const res = await api.bulkReceiveStock({
+        items: importData.map(d => ({
+          sku: d.sku,
+          quantity: Math.round(d.total),
+          price: d.price > 0 ? d.price : undefined,
+          brand: d.brand || undefined,
+        })),
+        replace_quantity: importReplaceQty,
+      });
       showToast(t("products.import_success", { processed: res.processed, created: res.created }));
       setImportModalOpen(false);
       setImportData([]);
-      await fetchProducts();
-    } catch (err: any) { showToast(err.message, "error"); }
+      setImportFillBrand("");
+      setImportReplaceQty(true);
+      setSelectedBrand("");
+      setSearch("");
+      setPage(1);
+      await fetchBrandOptions();
+      await fetchProducts({ page: 1, search: "", showInactive: false });
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    }
     finally { setImporting(false); }
+  };
+
+  // Fill all rows with selected brand
+  const handleFillAllBrand = (brandName: string) => {
+    setImportFillBrand(brandName);
+    setImportData(prev => prev.map(d => ({ ...d, brand: brandName })));
+  };
+
+  const handleItemBrandChange = (idx: number, brandName: string) => {
+    setImportData(prev => prev.map((d, i) => i === idx ? { ...d, brand: brandName } : d));
   };
 
   return (
@@ -341,7 +429,7 @@ export default function ProductsPage() {
               {t("products.title")}
             </h1>
             <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
-              {t("products.found", { count: total })}
+              {t("products.found", { count: selectedBrand ? filteredProducts.length : total })}
             </p>
           </div>
           {isWarehouse && (
@@ -364,6 +452,17 @@ export default function ProductsPage() {
                 <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>{t("products.col_sku")}</label>
                 <input className="input" placeholder={t("products.sku_ph")} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required />
               </div>
+              <div style={{ flex: "1 1 160px" }}>
+                <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>{t("products.col_brand")}</label>
+                <select className="input" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} required style={{ width: "100%" }}>
+                  <option value="">{t("products.brand_select")}</option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.name}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div style={{ flex: "1 1 150px" }}>
                 <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>{t("products.price_tjs")}</label>
                 <input className="input" type="number" placeholder="1500" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required style={{ width: "100%" }} />
@@ -379,6 +478,49 @@ export default function ProductsPage() {
         <div style={{ position: "relative", marginBottom: 16 }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
           <input className="input" style={{ paddingLeft: 36, width: "100%" }} placeholder={t("products.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div
+            style={{
+              maxWidth: 340,
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              background: "var(--bg-card)",
+              padding: 10,
+            }}
+          >
+            <label
+              style={{
+                display: "block",
+                fontSize: 11,
+                color: "var(--text-muted)",
+                marginBottom: 6,
+                textTransform: "uppercase",
+                letterSpacing: 0.4,
+              }}
+            >
+              {t("products.col_brand")}
+            </label>
+            <select
+              className="input"
+              style={{
+                width: "100%",
+                fontSize: 13,
+                height: 38,
+                borderRadius: 10,
+                background: "var(--bg-elevated)",
+              }}
+              value={selectedBrand}
+              onChange={(e) => setSelectedBrand(e.target.value)}
+            >
+              <option value="">{t("products.brand_all")}</option>
+              {visibleBrands.map((brand) => (
+                <option key={brand.name} value={normalizeBrandName(brand.name)}>
+                  {brand.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--text-secondary)", fontSize: 13, cursor: "pointer" }}>
@@ -404,24 +546,32 @@ export default function ProductsPage() {
               <table>
                 <thead>
                   <tr>
+                    <th style={{ width: 40, textAlign: "center", color: "var(--text-muted)" }}>#</th>
                     <th>{t("products.col_sku")}</th>
+                    <th>{t("products.col_brand")}</th>
                     <th style={{ textAlign: "right" }}>{t("products.col_price")}</th>
                     <th style={{ textAlign: "center" }}>{t("common.status")}</th>
                     {isWarehouse && <th style={{ textAlign: "center" }}>{t("common.actions")}</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((p) => (
+                  {filteredProducts.map((p, idx) => (
                     <Fragment key={p.id}>
                       <tr 
                         style={{ cursor: "pointer", background: expandedRow === p.id ? "var(--bg-hover)" : "transparent", transition: "background 0.2s", opacity: p.is_active ? 1 : 0.55 }}
                         onClick={() => handleToggleExpand(p.id)}
                       >
+                        <td style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)", fontWeight: 500 }}>
+                          {(page - 1) * 50 + idx + 1}
+                        </td>
                         <td data-label={t("products.col_sku")} style={{ fontWeight: 700, color: "var(--accent)", fontSize: 13 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             {expandedRow === p.id ? <ChevronDown size={14} color="var(--text-muted)" /> : <ChevronRight size={14} color="var(--text-muted)" />}
                             {p.sku}
                           </div>
+                        </td>
+                        <td data-label={t("products.col_brand")} style={{ fontSize: 12, fontWeight: 600 }}>
+                          {normalizeBrandName(p.brand) === "UNKNOWN" ? "-" : normalizeBrandName(p.brand)}
                         </td>
                         <td data-label={t("products.col_price")} style={{ textAlign: "right", fontWeight: 600 }}>{fmt(Number(p.price))} TJS</td>
                         <td data-label={t("common.status")} style={{ textAlign: "center" }}>
@@ -451,26 +601,14 @@ export default function ProductsPage() {
                               >
                                 {p.is_active ? "X" : t("products.btn_restore")}
                               </button>
-                              {!p.is_active && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPendingDeleteProduct(p);
-                                  }}
-                                  className="btn btn-danger"
-                                  style={{ padding: "4px 10px", fontSize: 12 }}
-                                  title={t("products.btn_hard_delete")}
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              )}
+
                             </div>
                           </td>
                         )}
                       </tr>
                       {expandedRow === p.id && (
                         <tr style={{ background: "var(--bg-hover)" }}>
-                          <td colSpan={isWarehouse ? 4 : 3} style={{ padding: 0 }}>
+                          <td colSpan={isWarehouse ? 5 : 4} style={{ padding: 0 }}>
                             <div style={{ padding: "16px 20px 24px 38px", borderTop: "1px dashed rgba(139,143,168,0.2)" }}>
                               <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
                                 <StoreIcon size={14} /> {t("products.availability")}
@@ -510,19 +648,36 @@ export default function ProductsPage() {
                       )}
                     </Fragment>
                   ))}
+                  {filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan={isWarehouse ? 5 : 4} style={{ textAlign: "center", color: "var(--text-secondary)", padding: "22px 12px" }}>
+                        {t("common.no_results")}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           )}
         </div>
 
-        {!loading && totalPages > 1 && (
+        {!loading && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 40 }}>
-            <button className="btn btn-ghost" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
               <ChevronLeft size={16} /> {t("common.back")}
             </button>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{page} / {totalPages}</div>
-            <button className="btn btn-ghost" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{page} / {Math.max(totalPages, 1)}</div>
+            <button
+              className="btn btn-ghost"
+              onClick={() => setPage(p => Math.min(Math.max(totalPages, 1), p + 1))}
+              disabled={page >= Math.max(totalPages, 1)}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
               {t("common.next")} <ChevronRight size={16} />
             </button>
           </div>
@@ -583,14 +738,46 @@ export default function ProductsPage() {
 
       {mounted && importModalOpen && createPortal((
         <div className="modal-overlay">
-          <div className="modal-card" style={{ maxWidth: 850, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-              <h3>{t("products.import_title")}</h3>
-              <button onClick={() => setImportModalOpen(false)} style={{ background: "transparent", border: "none" }}><X size={24} /></button>
+          <div className="modal-card" style={{ maxWidth: 960, maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0 }}>{t("products.import_title")}</h3>
+              <button onClick={() => { setImportModalOpen(false); setImportData([]); setImportFillBrand(""); setImportReplaceQty(true); }} style={{ background: "transparent", border: "none", cursor: "pointer" }}><X size={24} /></button>
             </div>
+
+            {/* Controls bar (shown only after file loaded) */}
+            {importData.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, padding: "10px 14px", background: "var(--bg-secondary)", borderRadius: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>{t("products.import_fill_all")}</span>
+                <select
+                  className="input"
+                  style={{ padding: "4px 10px", fontSize: 13, height: "auto", minWidth: 160 }}
+                  value={importFillBrand}
+                  onChange={e => handleFillAllBrand(e.target.value)}
+                >
+                  <option value="">{t("products.import_select_placeholder")}</option>
+                  {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                </select>
+                <div style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer",
+                  color: importReplaceQty ? "var(--accent)" : "var(--text-secondary)",
+                  padding: "4px 10px", borderRadius: 8, border: "1px solid var(--border)",
+                  background: importReplaceQty ? "var(--accent-muted, rgba(99,102,241,.1))" : "transparent" }}>
+                  <input type="checkbox" checked={importReplaceQty} onChange={e => setImportReplaceQty(e.target.checked)} style={{ margin: 0 }} />
+                  {t("products.import_replace_qty")}
+                </label>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-muted)" }}>
+                  {importData.filter(d => !d.brand).length > 0
+                    ? t("products.import_warn_no_brand", { count: importData.filter(d => !d.brand).length })
+                    : t("products.import_all_brands_ok")}
+                </span>
+              </div>
+            )}
+
+            {/* Body */}
             <div style={{ overflowY: "auto", flex: 1 }}>
               {importData.length === 0 ? (
-                <div style={{ border: "2px dashed var(--border)", padding: 40, textAlign: "center" }}>
+                <div style={{ border: "2px dashed var(--border)", padding: 40, textAlign: "center", borderRadius: 10 }}>
                   <FileUp size={48} color="var(--text-muted)" style={{ marginBottom: 16 }} />
                   <label className="btn btn-primary" style={{ cursor: "pointer" }}>
                     {t("products.import_select_file")}
@@ -605,14 +792,27 @@ export default function ProductsPage() {
                         <th>{t("products.col_sku")}</th>
                         <th style={{ textAlign: "center" }}>{t("products.import_col_total")}</th>
                         <th style={{ textAlign: "right" }}>{t("products.import_col_price")}</th>
+                        <th style={{ minWidth: 160 }}>{t("products.col_brand")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {importData.map((d, i) => (
-                        <tr key={i}>
-                          <td>{d.sku}</td>
+                        <tr key={i} style={{ background: !d.brand ? "rgba(239,68,68,.04)" : undefined }}>
+                          <td style={{ fontWeight: 500 }}>{d.sku}</td>
                           <td style={{ textAlign: "center" }}>{d.total}</td>
                           <td style={{ textAlign: "right" }}>{fmt(d.price)}</td>
+                          <td>
+                            <select
+                              className="input"
+                              style={{ padding: "3px 8px", fontSize: 12, height: "auto", width: "100%",
+                                borderColor: !d.brand ? "var(--red, #ef4444)" : undefined }}
+                              value={d.brand}
+                              onChange={e => handleItemBrandChange(i, e.target.value)}
+                            >
+                              <option value="">{t("products.import_brand_placeholder")}</option>
+                              {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                            </select>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -620,9 +820,21 @@ export default function ProductsPage() {
                 </div>
               )}
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
-              <button className="btn btn-ghost" onClick={() => setImportModalOpen(false)}>{t("common.cancel")}</button>
-              {importData.length > 0 && <button className="btn btn-primary" onClick={handleProcessImport} disabled={importing}>{importing ? "..." : t("products.import_process")}</button>}
+
+            {/* Footer */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 16 }}>
+              <button className="btn btn-ghost" onClick={() => { setImportModalOpen(false); setImportData([]); setImportFillBrand(""); }}>{t("common.cancel")}</button>
+              {importData.length > 0 && (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleProcessImport}
+                  disabled={importing || importData.some(d => !d.brand)}
+                  title={importData.some(d => !d.brand) ? t("products.import_btn_warn") : undefined}
+                  style={{ opacity: importData.some(d => !d.brand) ? 0.6 : 1, cursor: importData.some(d => !d.brand) ? "not-allowed" : "pointer" }}
+                >
+                  {importing ? "..." : t("products.import_process")}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +17,10 @@ from app.models.enums import UserRole
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 час
 REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 дней
+ACCESS_COOKIE_NAME = "wh_access_token"
+REFRESH_COOKIE_NAME = "wh_refresh_token"
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -38,12 +40,6 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 def create_access_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": str(user_id), "type": "access", "exp": expire}
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
-
-
-def create_refresh_token(user_id: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": str(user_id), "type": "refresh", "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -74,9 +70,17 @@ def decode_token(token: str, expected_type: str = "access") -> int:
 # Current user dependency
 # ──────────────────────────────────────────────────────────────────────────────
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     session: SessionDep,
 ) -> User:
+    token = credentials.credentials if credentials else request.cookies.get(ACCESS_COOKIE_NAME)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user_id = decode_token(token)
     user = await session.get(User, user_id)
     if user is None or not user.is_active:
@@ -111,4 +115,3 @@ AdminUser = Annotated[User, Depends(RoleChecker([UserRole.ADMIN, UserRole.OWNER]
 OwnerUser = Annotated[User, Depends(RoleChecker([UserRole.OWNER]))]
 WarehouseUser = Annotated[User, Depends(RoleChecker([UserRole.WAREHOUSE, UserRole.OWNER]))]
 SellerUser = Annotated[User, Depends(RoleChecker([UserRole.SELLER, UserRole.OWNER]))]
-

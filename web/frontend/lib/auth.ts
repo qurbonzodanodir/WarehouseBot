@@ -1,33 +1,43 @@
-import { UserMe } from "./api";
+import type { UserMe } from "./api";
 
-const TOKEN_KEY = "wh_token";
-const REFRESH_KEY = "wh_refresh_token";
 const USER_KEY = "wh_user";
+const AUTH_EXPIRED_EVENT = "wh:auth-expired";
 
-export function saveAuth(token: string, refreshToken: string, user: UserMe) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(REFRESH_KEY, refreshToken);
+export function saveAuth(user: UserMe) {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
-export function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_KEY);
 }
 
 export function getStoredUser(): UserMe | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as UserMe;
+  } catch {
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
 }
 
 export function clearAuth() {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(USER_KEY);
 }
 
 export function isAuthenticated(): boolean {
-  return !!localStorage.getItem(TOKEN_KEY);
+  if (typeof window === "undefined") return false;
+  return !!localStorage.getItem(USER_KEY);
+}
+
+export function notifyAuthExpired() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
+
+export function onAuthExpired(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(AUTH_EXPIRED_EVENT, listener);
+  return () => {
+    window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
+  };
 }

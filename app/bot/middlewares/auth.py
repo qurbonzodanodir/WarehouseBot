@@ -11,6 +11,7 @@ from app.services import UserService
 
 logger = logging.getLogger(__name__)
 
+
 class AuthMiddleware(BaseMiddleware):
     async def __call__(
         self,
@@ -43,12 +44,13 @@ def _extract_telegram_id(event: Any) -> int | None:
     user = getattr(event, "from_user", None)
     if user:
         return user.id
-    
+
     # Fallback for complex Update objects
     if isinstance(event, Update):
-        if event.message: return event.message.from_user.id
-        if event.callback_query: return event.callback_query.from_user.id
-        if event.inline_query: return event.inline_query.from_user.id
-        if event.my_chat_member: return event.my_chat_member.from_user.id
-    
+        for sub in (event.message, event.callback_query, event.inline_query, event.my_chat_member):
+            if sub is not None:
+                fu = getattr(sub, "from_user", None)
+                if fu is not None:
+                    return fu.id
+
     return None

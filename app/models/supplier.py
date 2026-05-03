@@ -1,9 +1,8 @@
 from __future__ import annotations
 from datetime import datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, DateTime, Numeric, Text, func
+from sqlalchemy import String, Boolean, DateTime, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -11,6 +10,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.supplier_invoice import SupplierInvoice
     from app.models.supplier_payment import SupplierPayment
+    from app.models.supplier_return import SupplierReturn
 
 
 class Supplier(Base):
@@ -30,6 +30,9 @@ class Supplier(Base):
         back_populates="supplier", cascade="all, delete-orphan"
     )
     payments: Mapped[list[SupplierPayment]] = relationship(
+        back_populates="supplier", cascade="all, delete-orphan"
+    )
+    returns: Mapped[list[SupplierReturn]] = relationship(
         back_populates="supplier", cascade="all, delete-orphan"
     )
 

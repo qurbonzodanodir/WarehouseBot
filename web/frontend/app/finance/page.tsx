@@ -17,10 +17,19 @@ import {
   AlertCircle,
   CheckCircle2,
   History,
-  TrendingDown,
-  ChevronDown,
-  Check
 } from "lucide-react";
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+async function requestFinanceData() {
+  const [debtData, histData] = await Promise.all([
+    api.getDebtors(),
+    api.getFinanceHistory(30),
+  ]);
+  return { debtData, histData };
+}
 
 export default function FinancePage() {
   const router = useRouter();
@@ -34,32 +43,55 @@ export default function FinancePage() {
   // Form State
   const [selectedStoreId, setSelectedStoreId] = useState<number | "">("");
   const [amount, setAmount] = useState<string>("");
-  const [errorText, setErrorText] = useState("");
-  const [successText, setSuccessText] = useState("");
+  const errorText = "";
+  const successText = "";
+
+  async function fetchData() {
+    try {
+      setLoading(true);
+      const { debtData, histData } = await requestFinanceData();
+      setDebtors(debtData);
+      setHistory(histData);
+    } catch (error) {
+      showToast(`${t("common.error")} : ${getErrorMessage(error, t("common.error"))}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push("/login");
       return;
     }
-    fetchData();
-  }, []);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [debtData, histData] = await Promise.all([
-        api.getDebtors(),
-        api.getFinanceHistory(30),
-      ]);
-      setDebtors(debtData);
-      setHistory(histData);
-    } catch (e: any) {
-      showToast(t("common.error") + " : " + e.message, "error");
-    } finally {
-      setLoading(false);
+    let isActive = true;
+
+    async function loadFinance() {
+      try {
+        setLoading(true);
+        const { debtData, histData } = await requestFinanceData();
+        if (isActive) {
+          setDebtors(debtData);
+          setHistory(histData);
+        }
+      } catch (error) {
+        if (isActive) {
+          showToast(`${t("common.error")} : ${getErrorMessage(error, t("common.error"))}`, "error");
+        }
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
     }
-  };
+
+    void loadFinance();
+
+    return () => {
+      isActive = false;
+    };
+  }, [router, showToast, t]);
 
   const selectedStore = debtors.find((d) => d.store_id === Number(selectedStoreId));
   const totalDebt = debtors.reduce((acc, curr) => acc + Number(curr.current_debt), 0);
@@ -89,8 +121,8 @@ export default function FinancePage() {
       setSelectedStoreId("");
       setAmount("");
       await fetchData(); // Refresh data
-    } catch (e: any) {
-      showToast(e.message || t("finance.err_collect"), "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("finance.err_collect")), "error");
     } finally {
       setSubmitting(false);
     }

@@ -5,6 +5,7 @@ from sqlalchemy import BigInteger, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
+    from app.models.refresh_session import RefreshSession
     from app.models.store import Store
     from app.models.sale import Sale
     from app.models.financial_transaction import FinancialTransaction
@@ -39,6 +40,10 @@ class User(Base):
     sales: Mapped[list[Sale]] = relationship(back_populates="user")
     financial_transactions: Mapped[list[FinancialTransaction]] = relationship(
         back_populates="user"
+    )
+    refresh_sessions: Mapped[list[RefreshSession]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

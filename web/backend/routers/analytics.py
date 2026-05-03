@@ -12,6 +12,7 @@ from app.models.store import Store
 from app.models.supplier import Supplier
 from app.models.supplier_invoice import SupplierInvoice
 from app.models.supplier_payment import SupplierPayment
+from app.models.supplier_return import SupplierReturn
 from web.backend.dependencies import CurrentUser, SessionDep
 from web.backend.schemas.analytics import (
     DashboardResponse,
@@ -97,15 +98,17 @@ async def get_dashboard(
     # ── 4B. Долги по оптовикам ────────────────────────────────────────────────
     inv_subq = select(SupplierInvoice.supplier_id, func.sum(SupplierInvoice.total_amount).label('tot')).group_by(SupplierInvoice.supplier_id).subquery()
     pay_subq = select(SupplierPayment.supplier_id, func.sum(SupplierPayment.amount).label('tot')).group_by(SupplierPayment.supplier_id).subquery()
+    ret_subq = select(SupplierReturn.supplier_id, func.sum(SupplierReturn.total_amount).label('tot')).group_by(SupplierReturn.supplier_id).subquery()
     
     sup_stmt = (
         select(
             Supplier.id, 
             Supplier.name, 
-            func.coalesce(inv_subq.c.tot, 0) - func.coalesce(pay_subq.c.tot, 0)
+            func.coalesce(inv_subq.c.tot, 0) - func.coalesce(pay_subq.c.tot, 0) - func.coalesce(ret_subq.c.tot, 0)
         )
         .outerjoin(inv_subq, Supplier.id == inv_subq.c.supplier_id)
         .outerjoin(pay_subq, Supplier.id == pay_subq.c.supplier_id)
+        .outerjoin(ret_subq, Supplier.id == ret_subq.c.supplier_id)
         .where(Supplier.is_active.is_(True))
     )
     sup_res = await session.execute(sup_stmt)

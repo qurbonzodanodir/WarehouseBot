@@ -1,26 +1,27 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { isAuthenticated } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useTheme } from "next-themes";
-import { Sun, Moon, Globe, Palette, ChevronRight, Monitor, Settings } from "lucide-react";
+import { Sun, Moon, Globe, Palette, Monitor, Settings } from "lucide-react";
+
+function subscribe() {
+  return () => {};
+}
 
 export default function SettingsPage() {
   const router = useRouter();
   const { t, lang, setLang } = useTranslation();
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
   useEffect(() => {
-    setMounted(true);
     if (!isAuthenticated()) { router.push("/login"); return; }
-  }, []);
+  }, [router]);
 
   if (!mounted) return null;
-
-  const isDark = theme === "dark";
 
   const themeOptions = [
     {

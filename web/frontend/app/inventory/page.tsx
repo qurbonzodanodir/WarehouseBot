@@ -6,7 +6,7 @@ import { api, Store, InventoryItem, StoreCatalogCard } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Package, Search, Store as StoreIcon, DollarSign, Boxes, Warehouse } from "lucide-react";
+import { Package, Search, Store as StoreIcon, DollarSign, Boxes, Warehouse, Database } from "lucide-react";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
@@ -41,7 +41,7 @@ export default function InventoryPage() {
         setSelectedStore(null);
       }
     });
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     setLoading(true);
@@ -87,8 +87,6 @@ export default function InventoryPage() {
 
   const totalItems = selectedStore ? filtered.reduce((s, i) => s + i.quantity, 0) : catalog.reduce((s, c) => s + c.total_items, 0);
 
-  const isWarehouse = stores.find(s => s.id === selectedStore)?.store_type === "warehouse";
-
   return (
     <div style={{ display: "flex" }}>
       <Sidebar />
@@ -103,7 +101,46 @@ export default function InventoryPage() {
               {t("inventory.found", { count: totalItems })}
             </p>
           </div>
+          {userRole !== "seller" && (
+            <div style={{ display: "flex", gap: 10 }}>
+              <input 
+                type="file" 
+                id="csv-upload" 
+                hidden 
+                accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    setLoading(true);
+                    const res = await api.importInventoryCSV(selectedStore, file);
+                    showToast(`✅ Загружено успешно! Новых: ${res.created}, Обновлено: ${res.updated}, Добавлено шт: ${res.added_qty}`, "success");
+                    // reload
+                    if (!selectedStore) {
+                      api.getStoreCatalog().then(setCatalog);
+                    } else {
+                      api.getInventory(selectedStore).then(setItems);
+                    }
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : "Неизвестная ошибка";
+                    showToast(`❌ Ошибка импорта: ${message}`, "error");
+                  } finally {
+                    setLoading(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+              <button 
+                className="btn"
+                style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)", height: "fit-content", padding: "10px 16px" }}
+                onClick={() => document.getElementById("csv-upload")?.click()}
+              >
+                <Database size={16} /> Загрузить Excel (CSV)
+              </button>
+            </div>
+          )}
         </div>
+
 
         {/* Store selector */}
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>

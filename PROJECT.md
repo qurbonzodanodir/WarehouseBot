@@ -198,5 +198,8 @@ OWNER_TELEGRAM_ID=6018112126
 
 ## Запуск
 ```bash
-uv run python main.py  # Запуск polling + FastAPI на порту 8000
+uv run python main.py  # Канонический запуск: polling + FastAPI на порту 8030
 ```
+
+- Каноническое FastAPI приложение: `app.api.app:app`
+- `web/backend/main.py` сохранён только как совместимый алиас для старых импортов

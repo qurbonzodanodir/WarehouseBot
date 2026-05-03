@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { saveAuth } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
-import { BoxIcon, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function LoginPage() {
         return;
       }
 
-      saveAuth(res.access_token, res.refresh_token, res.user);
+      saveAuth(res.user);
 
       // Warehouse → сразу на заказы, Admin/Owner → дашборд
       if (res.user.role === "warehouse") {
@@ -35,8 +35,9 @@ export default function LoginPage() {
       } else {
         router.push("/dashboard");
       }
-    } catch (err: any) {
-      setError(err.message || t("login.err_auth"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("login.err_auth");
+      setError(message || t("login.err_auth"));
     } finally {
       setLoading(false);
     }

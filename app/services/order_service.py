@@ -239,12 +239,16 @@ class OrderService:
         missing = []
 
         from app.models.enums import OrderStatus
+        inventory_map = await self._get_inventory_map(
+            warehouse_store_id,
+            [order.product_id for order in orders],
+        )
         for order in orders:
             # We must check availability for both PENDING (initial warehouse check) 
             # and PARTIAL_APPROVAL_PENDING (seller verifying before creating new batch)
             if order.status in (OrderStatus.PENDING, OrderStatus.PARTIAL_APPROVAL_PENDING):
-                inv = await self._get_or_create_inventory(warehouse_store_id, order.product_id)
-                if inv.quantity < order.quantity:
+                available_qty = inventory_map.get(order.product_id, 0)
+                if available_qty < order.quantity:
                     # Treat partial stock as completely missing (seller doesn't want less than requested)
                     missing.append({"order": order, "available_qty": 0})
                 else:
@@ -563,3 +567,20 @@ class OrderService:
                 result = await self.session.execute(stmt)
                 inv = result.scalar_one()
         return inv
+
+    async def _get_inventory_map(
+        self,
+        store_id: int,
+        product_ids: list[int],
+    ) -> dict[int, int]:
+        unique_ids = list(set(product_ids))
+        if not unique_ids:
+            return {}
+
+        result = await self.session.execute(
+            select(Inventory.product_id, Inventory.quantity).where(
+                Inventory.store_id == store_id,
+                Inventory.product_id.in_(unique_ids),
+            )
+        )
+        return {product_id: quantity for product_id, quantity in result.all()}

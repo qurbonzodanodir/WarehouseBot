@@ -1,21 +1,40 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useSyncExternalStore } from "react";
 import { ru } from "./ru";
 import { tj } from "./tj";
 
 type LangType = "ru" | "tj";
 
-type Translations = typeof ru;
+type TranslationValue = string | Record<string, TranslationValue>;
 
-const getNestedValue = (obj: any, path: string) => {
-  return path.split(".").reduce((acc, part) => acc && acc[part], obj);
-};
+function subscribe() {
+  return () => {};
+}
+
+function getStoredLanguage(): LangType {
+  if (typeof window === "undefined") return "ru";
+  const saved = localStorage.getItem("wh_lang");
+  return saved === "ru" || saved === "tj" ? saved : "ru";
+}
+
+function getNestedValue(obj: TranslationValue, path: string): string | undefined {
+  let current: TranslationValue | undefined = obj;
+
+  for (const part of path.split(".")) {
+    if (!current || typeof current === "string") {
+      return undefined;
+    }
+    current = current[part];
+  }
+
+  return typeof current === "string" ? current : undefined;
+}
 
 interface LanguageContextProps {
   lang: LangType;
-  setLang: (l: LangType) => void;
-  t: (key: string, variables?: Record<string, any>) => string;
+  setLang: (lang: LangType) => void;
+  t: (key: string, variables?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextProps>({
@@ -25,36 +44,28 @@ const LanguageContext = createContext<LanguageContextProps>({
 });
 
 export const LanguageProvider = ({ children }: { children: React.ReactNode }) => {
-  const [lang, setLangState] = useState<LangType>("ru");
-  const [mounted, setMounted] = useState(false);
+  const [lang, setLangState] = useState<LangType>(getStoredLanguage);
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("wh_lang") as LangType;
-    if (saved === "ru" || saved === "tj") {
-      setLangState(saved);
-    }
-    setMounted(true);
-  }, []);
-
-  const setLang = (l: LangType) => {
-    setLangState(l);
-    localStorage.setItem("wh_lang", l);
+  const setLang = (nextLang: LangType) => {
+    setLangState(nextLang);
+    localStorage.setItem("wh_lang", nextLang);
   };
 
-  const t = (key: string, variables?: Record<string, any>): string => {
+  const t = (key: string, variables?: Record<string, string | number>): string => {
     const dict = lang === "tj" ? tj : ru;
     let template = getNestedValue(dict, key);
     if (!template) {
       // Fallback
       template = getNestedValue(ru, key) || key;
     }
-    
+
     if (typeof template === "string" && variables) {
       return Object.keys(variables).reduce((str, varName) => {
-        return str.replace(new RegExp(`{${varName}}`, "g"), variables[varName]);
+        return str.replace(new RegExp(`{${varName}}`, "g"), String(variables[varName]));
       }, template);
     }
-    
+
     return template;
   };
 

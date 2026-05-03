@@ -101,6 +101,15 @@ h3 { font-size: 1rem; font-weight: 600; }
   padding: 20px;
 }
 
+.modal-grid-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ── Button ──────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
@@ -517,6 +526,12 @@ select.input { cursor: pointer; }
   .modal-card {
     border-radius: 20px 20px 0 0;
     padding: 24px 20px 40px;
+  }
+
+  .modal-grid-split {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr 1fr;
+    overflow: hidden;
   }
 
   /* Floating avatar button: hide on mobile (user info is in sidebar) */

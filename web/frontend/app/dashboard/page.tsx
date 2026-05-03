@@ -13,8 +13,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -29,17 +27,18 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 
-const PERIODS = [
-  { key: "today", label: "dashboard.period_today" },
-  { key: "yesterday", label: "dashboard.period_yesterday" },
-  { key: "week", label: "dashboard.period_7d" },
-  { key: "month", label: "dashboard.period_30d" },
-];
-
 const COLORS = ["#6c63ff", "#22c55e", "#f59e0b", "#3b82f6", "#ef4444", "#a78bfa"];
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+async function requestDashboard(period: "today" | "week" | "month" | "year") {
+  return api.getDashboard(period);
 }
 
 export default function DashboardPage() {
@@ -57,23 +56,48 @@ export default function DashboardPage() {
     { key: "year", label: t("dashboard.period_year") },
   ] as const;
 
-  useEffect(() => {
-    if (!isAuthenticated()) { router.push("/login"); return; }
-    fetchData();
-  }, [period]);
-
-  async function fetchData() {
+  async function refreshDashboard() {
     setLoading(true);
     setError("");
     try {
-      const d = await api.getDashboard(period);
+      const d = await requestDashboard(period);
       setData(d);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (error) {
+      setError(getErrorMessage(error, t("common.error")));
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!isAuthenticated()) { router.push("/login"); return; }
+    let isActive = true;
+
+    async function loadDashboard() {
+      setLoading(true);
+      setError("");
+      try {
+        const nextData = await requestDashboard(period);
+        if (isActive) {
+          setData(nextData);
+        }
+      } catch (error) {
+        if (isActive) {
+          setError(getErrorMessage(error, t("common.error")));
+        }
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+
+    return () => {
+      isActive = false;
+    };
+  }, [period, router, t]);
 
   return (
     <div style={{ display: "flex" }}>
@@ -109,11 +133,11 @@ export default function DashboardPage() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {t(p.label)}
+                  {p.label}
                 </button>
               ))}
             </div>
-            <button className="btn btn-ghost refresh-btn" onClick={fetchData} style={{ flexShrink: 0 }}>
+            <button className="btn btn-ghost refresh-btn" onClick={() => void refreshDashboard()} style={{ flexShrink: 0 }}>
               <RefreshCw size={14} />
             </button>
           </div>
@@ -209,7 +233,7 @@ export default function DashboardPage() {
                           <Tooltip
                             contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8 }}
                             labelStyle={{ color: "var(--text-primary)" }}
-                            formatter={(v: any) => [`${fmt(Number(v))} TJS`, t("dashboard.revenue")]}
+                            formatter={(value) => [`${fmt(Number(value ?? 0))} TJS`, t("dashboard.revenue")]}
                           />
                           <Bar dataKey="total_revenue" fill="var(--accent)" radius={[4, 4, 0, 0]} />
                         </BarChart>
@@ -246,9 +270,9 @@ export default function DashboardPage() {
                         </Pie>
                         <Tooltip
                           contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8 }}
-                          formatter={(v: any, name: any) => {
-                            const statusKey = String(name).toLowerCase();
-                            return [v, t(`statuses.${statusKey}`)];
+                          formatter={(value, name) => {
+                            const statusKey = String(name ?? "").toLowerCase();
+                            return [String(value ?? ""), t(`statuses.${statusKey}`)];
                           }}
                         />
                       </PieChart>

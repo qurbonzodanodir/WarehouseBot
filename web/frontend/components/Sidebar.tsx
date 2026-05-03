@@ -11,15 +11,13 @@ import {
   Settings,
   Users,
   LogOut,
-  BoxIcon,
   Menu,
   X,
   Truck,
 } from "lucide-react";
-import { clearAuth, getStoredUser } from "@/lib/auth";
-import { UserMe } from "@/lib/api";
+import { clearAuth, getStoredUser, onAuthExpired } from "@/lib/auth";
+import { api, UserMe } from "@/lib/api";
 import { useEffect, useState } from "react";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 const ownerNav = [
   { href: "/dashboard", icon: LayoutDashboard, label: "sidebar.dashboard" },
@@ -45,7 +43,9 @@ function getNav(role: string) {
   return []; // seller не имеет доступа к веб-панели
 }
 
-function roleBadge(role: string, t: any) {
+type Translator = ReturnType<typeof useTranslation>["t"];
+
+function roleBadge(role: string, t: Translator) {
   const map: Record<string, string> = {
     owner: t("sidebar.owner"),
     warehouse: t("sidebar.warehouse"),
@@ -56,24 +56,55 @@ function roleBadge(role: string, t: any) {
 }
 
 export default function Sidebar() {
-  const { t, lang, setLang } = useTranslation();
+  const { t } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<UserMe | null>(null);
+  const [user, setUser] = useState<UserMe | null>(() => getStoredUser());
   const [isOpen, setIsOpen] = useState(false);
 
-  // Close sidebar on navigation (path changes)
   useEffect(() => {
-    setIsOpen(false);
-  }, [pathname]);
+    let isMounted = true;
 
-  useEffect(() => {
-    setUser(getStoredUser());
+    api.getMe()
+      .then((freshUser) => {
+        if (!isMounted) return;
+        localStorage.setItem("wh_user", JSON.stringify(freshUser));
+        setUser(freshUser);
+      })
+      .catch(() => {
+        return;
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  function handleLogout() {
+  useEffect(() => {
+    return onAuthExpired(() => {
+      clearAuth();
+      router.push("/login");
+    });
+  }, [router]);
+
+  async function handleLogout() {
+    setIsOpen(false);
+    try {
+      await api.logout();
+    } catch {
+      // If the session is already gone, local cleanup is still enough.
+    }
     clearAuth();
     router.push("/login");
+  }
+
+  function handleNavClick() {
+    setIsOpen(false);
+  }
+
+  function handleRefreshClick() {
+    setIsOpen(false);
+    router.refresh();
   }
 
   const nav = getNav(user?.role || "seller");
@@ -84,7 +115,7 @@ export default function Sidebar() {
       <div className="mobile-header">
         <div 
           style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
-          onClick={() => window.location.reload()}
+          onClick={handleRefreshClick}
           title="Обновить страницу"
         >
           <div style={{ fontWeight: 700, fontSize: 18 }}>Yasham</div>
@@ -107,7 +138,7 @@ export default function Sidebar() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
             <div 
               style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
-              onClick={() => window.location.reload()}
+              onClick={handleRefreshClick}
               title="Обновить страницу"
             >
               <div>
@@ -135,6 +166,7 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`nav-item ${active ? "active" : ""}`}
+              onClick={handleNavClick}
             >
               <Icon className="icon" />
               {t(item.label)}

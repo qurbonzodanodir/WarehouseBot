@@ -1,12 +1,21 @@
 import type { NextConfig } from "next";
 
+const allowedRevalidateHeaderKeys = (process.env.NEXT_ALLOWED_REVALIDATE_KEYS ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "localhost")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
   devIndicators: false,
   experimental: {
-    allowedRevalidateHeaderKeys: ["192.168.0.153"],
+    allowedRevalidateHeaderKeys,
   },
-  // @ts-ignore
-  allowedDevOrigins: ["192.168.0.153", "192.168.1.153", "192.168.0.198", "localhost"],
+  allowedDevOrigins,
 };
 
 export default nextConfig;

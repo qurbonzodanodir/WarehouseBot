@@ -29,3 +29,6 @@ Thumbs.db
 
 # Alembic
 alembic/versions/__pycache__/
+
+# Logs
+server.log

@@ -16,6 +16,14 @@ class ProductService:
         """Remove spaces and dashes, lowercase a DB column for comparison."""
         return func.replace(func.replace(func.lower(col), ' ', ''), '-', '')
 
+    @staticmethod
+    def infer_brand_from_sku(sku: str) -> str:
+        raw = (sku or "").strip()
+        if not raw:
+            return "UNKNOWN"
+        token = raw.split()[0] if raw.split() else raw
+        return token.upper()
+
     async def search_catalog(
         self,
         query: str,
@@ -108,9 +116,11 @@ class ProductService:
         inventories = list(result.scalars().all())
         products = [inv.product for inv in inventories]
         return None, products, None
-    async def create_product(self, sku: str, price: Decimal = Decimal(0)) -> Product:
+    async def create_product(self, sku: str, price: Decimal = Decimal(0), brand: str | None = None) -> Product:
+        brand_value = (brand or "").strip() or self.infer_brand_from_sku(sku)
         product = Product(
             sku=sku,
+            brand=brand_value,
             price=price,
             is_active=True,
         )

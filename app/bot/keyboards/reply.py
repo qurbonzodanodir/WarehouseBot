@@ -29,7 +29,7 @@ def get_seller_more_menu(_) -> ReplyKeyboardMarkup:
                 KeyboardButton(text=_("btn_make_return")),
             ],
             [
-                KeyboardButton(text="🔙 Назад"),
+                KeyboardButton(text=_("btn_back")),
             ],
         ],
         resize_keyboard=True,

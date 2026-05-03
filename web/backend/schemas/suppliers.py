@@ -71,6 +71,34 @@ class SupplierPaymentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SupplierReturnLineItemOut(BaseModel):
+    product_id: int
+    sku: str
+    quantity: int
+    price_per_unit: Decimal
+    line_total: Decimal
+
+    model_config = {"from_attributes": True}
+
+
+class SupplierReturnCreate(BaseModel):
+    items: list[SupplierInvoiceLineItemIn] = Field(..., min_length=1)  # Reuse input item schema
+    notes: str | None = None
+
+
+class SupplierReturnOut(BaseModel):
+    id: int
+    supplier_id: int
+    total_amount: Decimal
+    notes: str | None
+    created_at: datetime
+    user_name: str | None = None
+    items: list[SupplierReturnLineItemOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+
 class SupplierDetailOut(BaseModel):
     id: int
     name: str
@@ -82,7 +110,9 @@ class SupplierDetailOut(BaseModel):
     current_debt: Decimal
     total_invoiced: Decimal
     total_paid: Decimal
+    total_returned: Decimal
     invoices: list[SupplierInvoiceOut]
     payments: list[SupplierPaymentOut]
+    returns: list[SupplierReturnOut]
 
     model_config = {"from_attributes": True}

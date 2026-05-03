@@ -1,57 +1,10 @@
-import sys
-import os
+"""Совместимый алиас для канонического FastAPI приложения.
 
-# Allow imports from project root (app/, web/)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+Каноническая точка входа проекта находится в `app.api.app`.
+Этот модуль оставлен только для обратной совместимости со старыми
+командами запуска и импортами.
+"""
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+from app.api.app import app as app
 
-from app.bot.bot import bot
-from web.backend.routers import auth, orders, products, inventory, analytics, stores, finance, invites
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Initialize bot session if needed (Aiogram Bot usually handles its own session)
-    yield
-    # Close bot session
-    await bot.session.close()
-
-app = FastAPI(
-    title="Warehouse ERP — Web API",
-    description=(
-        "REST API для веб-интерфейса Warehouse ERP. "
-        "Авторизация: POST /api/auth/login → Bearer token."
-    ),
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    lifespan=lifespan,
-)
-
-# ── CORS ────────────────────────────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ── Routers ──────────────────────────────────────────────────────────────────
-API_PREFIX = "/api"
-
-app.include_router(auth.router, prefix=API_PREFIX)
-app.include_router(orders.router, prefix=API_PREFIX)
-app.include_router(products.router, prefix=API_PREFIX)
-app.include_router(inventory.router, prefix=API_PREFIX)
-app.include_router(analytics.router, prefix=API_PREFIX)
-app.include_router(stores.router, prefix=API_PREFIX)
-app.include_router(finance.router, prefix=API_PREFIX)
-app.include_router(invites.router, prefix=API_PREFIX)
-
-
-@app.get("/health", tags=["System"])
-async def health() -> dict:
-    return {"status": "ok", "service": "warehouse-web-api"}
+__all__ = ["app"]

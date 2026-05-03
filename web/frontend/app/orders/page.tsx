@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
-import { api, Order } from "@/lib/api";
+import { api, Order, Store, UserMe } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
@@ -23,6 +23,24 @@ function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+async function requestOrders(
+  statusFilter: string,
+  storeFilter: number | "",
+  page: number,
+  pageSize: number,
+) {
+  return api.getOrders({
+    status: statusFilter || undefined,
+    store_id: storeFilter || undefined,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  });
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,11 +54,11 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [search, setSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user] = useState<UserMe | null>(() => getStoredUser());
   const [storeFilter, setStoreFilter] = useState<number | "">("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
 
   const STATUSES = [
     { key: "", label: t("orders.status_all") },
@@ -54,79 +72,98 @@ export default function OrdersPage() {
     { key: "rejected", label: t("orders.status_rejected") },
   ];
 
-  useEffect(() => {
-    const usr = getStoredUser();
-    setUser(usr);
-    if (!isAuthenticated()) { router.push("/login"); return; }
-    
-    if (usr && usr.role !== "seller") {
-      api.getStores().then(setStores).catch(console.error);
-    }
-  }, [router]);
-
-  useEffect(() => {
-    if (user) {
-      setPage(1);
-    }
-  }, [statusFilter, storeFilter, search]);
-
-  useEffect(() => {
-    if (user) {
-      fetchOrders();
-    }
-  }, [user, statusFilter, storeFilter, page]);
-
-  async function fetchOrders() {
+  async function refreshOrders() {
     setLoading(true);
     try {
-      const data = await api.getOrders({
-        status: statusFilter || undefined,
-        store_id: storeFilter || undefined,
-        limit: PAGE_SIZE,
-        offset: (page - 1) * PAGE_SIZE,
-      });
+      const data = await requestOrders(statusFilter, storeFilter, page, PAGE_SIZE);
       setOrders(data);
-    } catch (e: any) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
     } finally {
       setLoading(false);
     }
   }
 
+  useEffect(() => {
+    if (!isAuthenticated()) { router.push("/login"); return; }
+    
+    if (user && user.role !== "seller") {
+      api.getStores().then(setStores).catch((error) => {
+        console.error(error);
+      });
+    }
+  }, [router, user]);
+
+  useEffect(() => {
+    if (user) {
+      setPage(1);
+    }
+  }, [user, statusFilter, storeFilter, search]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let isActive = true;
+
+    async function loadOrders() {
+      setLoading(true);
+      try {
+        const data = await requestOrders(statusFilter, storeFilter, page, PAGE_SIZE);
+        if (isActive) {
+          setOrders(data);
+        }
+      } catch (error) {
+        if (isActive) {
+          console.error(error);
+        }
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadOrders();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user, statusFilter, storeFilter, page]);
+
   async function handleDispatch(id: number) {
     setActionLoading(id);
-    try { await api.dispatchOrder(id); await fetchOrders(); showToast(t("orders.dispatch_success"), "success"); }
-    catch (e: any) { showToast(e.message, "error"); }
+    try { await api.dispatchOrder(id); await refreshOrders(); showToast(t("orders.dispatch_success"), "success"); }
+    catch (error) { showToast(getErrorMessage(error, t("common.error")), "error"); }
     finally { setActionLoading(null); }
   }
 
   async function handleReject(id: number) {
     if (!confirm(t("common.reject_confirm"))) return;
     setActionLoading(id);
-    try { await api.rejectOrder(id); await fetchOrders(); showToast(t("orders.reject_success"), "success"); }
-    catch (e: any) { showToast(e.message, "error"); }
+    try { await api.rejectOrder(id); await refreshOrders(); showToast(t("orders.reject_success"), "success"); }
+    catch (error) { showToast(getErrorMessage(error, t("common.error")), "error"); }
     finally { setActionLoading(null); }
   }
 
   async function handleDeliver(id: number) {
     setActionLoading(id);
-    try { await api.deliverOrder(id); await fetchOrders(); }
-    catch (e: any) { showToast(e.message, "error"); }
+    try { await api.deliverOrder(id); await refreshOrders(); }
+    catch (error) { showToast(getErrorMessage(error, t("common.error")), "error"); }
     finally { setActionLoading(null); }
   }
 
   async function handleApproveReturn(id: number) {
     setActionLoading(id);
-    try { await api.approveReturn(id); await fetchOrders(); showToast(t("orders.return_approved"), "success"); }
-    catch (e: any) { showToast(e.message, "error"); }
+    try { await api.approveReturn(id); await refreshOrders(); showToast(t("orders.return_approved"), "success"); }
+    catch (error) { showToast(getErrorMessage(error, t("common.error")), "error"); }
     finally { setActionLoading(null); }
   }
 
   async function handleRejectReturn(id: number) {
      if (!confirm(t("common.reject_confirm"))) return;
      setActionLoading(id);
-     try { await api.rejectReturn(id); await fetchOrders(); showToast(t("orders.return_rejected"), "success"); }
-     catch (e: any) { showToast(e.message, "error"); }
+     try { await api.rejectReturn(id); await refreshOrders(); showToast(t("orders.return_rejected"), "success"); }
+     catch (error) { showToast(getErrorMessage(error, t("common.error")), "error"); }
      finally { setActionLoading(null); }
   }
 
@@ -155,7 +192,7 @@ export default function OrdersPage() {
               {t("orders.found", { count: orders.length })}
             </p>
           </div>
-          <button className="btn btn-ghost" onClick={fetchOrders}>
+          <button className="btn btn-ghost" onClick={() => void refreshOrders()}>
             <RefreshCw size={14} />
             {t("common.refresh")}
           </button>

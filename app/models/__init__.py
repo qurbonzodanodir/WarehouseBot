@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.store import Store
 from app.models.product import Product
+from app.models.brand import Brand
 from app.models.inventory import Inventory
 from app.models.display_inventory import DisplayInventory
 from app.models.order import Order
@@ -10,15 +11,19 @@ from app.models.financial_transaction import FinancialTransaction
 from app.models.debt_ledger import DebtLedger
 from app.models.invite_code import InviteCode
 from app.models.order_notification import OrderNotification
+from app.models.refresh_session import RefreshSession
 from app.models.supplier import Supplier
 from app.models.supplier_invoice import SupplierInvoice
 from app.models.supplier_payment import SupplierPayment
 from app.models.supplier_invoice_item import SupplierInvoiceLineItem
+from app.models.supplier_return import SupplierReturn
+from app.models.supplier_return_item import SupplierReturnLineItem
 
 __all__ = [
     "User",
     "Store",
     "Product",
+    "Brand",
     "Inventory",
     "DisplayInventory",
     "Order",
@@ -28,8 +33,11 @@ __all__ = [
     "DebtLedger",
     "InviteCode",
     "OrderNotification",
+    "RefreshSession",
     "Supplier",
     "SupplierInvoice",
     "SupplierPayment",
     "SupplierInvoiceLineItem",
+    "SupplierReturn",
+    "SupplierReturnLineItem",
 ]

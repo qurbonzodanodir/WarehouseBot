@@ -1,13 +1,151 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
+from sqlalchemy import func, select
 
+from app.models.brand import Brand
 from app.models.product import Product
 from app.models.enums import UserRole
 from web.backend.dependencies import CurrentUser, SessionDep
-from web.backend.schemas.products import ProductCreate, ProductOut, ProductUpdate, ProductInventoryOut, ProductPaginationOut
+from web.backend.schemas.brands import BrandCreate, BrandOut, BrandUpdate
+from web.backend.schemas.products import (
+    BrandStatOut,
+    ProductCreate,
+    ProductInventoryOut,
+    ProductOut,
+    ProductPaginationOut,
+    ProductPickerOut,
+    ProductUpdate,
+)
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+
+@router.post(
+    "/brands",
+    response_model=BrandOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Создать фирму",
+)
+async def create_brand(
+    body: BrandCreate,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> BrandOut:
+    if current_user.role != UserRole.OWNER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
+
+    name = body.name.strip()
+    existing = await session.execute(select(Brand).where(Brand.name == name))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Brand already exists")
+
+    brand = Brand(name=name)
+    session.add(brand)
+    await session.commit()
+    await session.refresh(brand)
+    return brand
+
+
+@router.get(
+    "/brands",
+    response_model=list[BrandOut],
+    summary="Справочник фирм",
+)
+async def list_brands(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[BrandOut]:
+    result = await session.execute(select(Brand).order_by(Brand.name))
+    return list(result.scalars().all())
+
+
+@router.get(
+    "/brands/stats",
+    response_model=list[BrandStatOut],
+    summary="Статистика по фирмам",
+)
+async def list_brand_stats(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[BrandStatOut]:
+    result = await session.execute(
+        select(
+            Brand.id,
+            Brand.name,
+            select(func.count(Product.id))
+            .where(Product.brand == Brand.name)
+            .scalar_subquery()
+            .label("product_count"),
+        )
+        .order_by(Brand.name)
+    )
+    return [
+        BrandStatOut(
+            id=row.id,
+            name=row.name,
+            product_count=int(row.product_count or 0),
+        )
+        for row in result.all()
+    ]
+
+
+@router.patch(
+    "/brands/{brand_id}",
+    response_model=BrandOut,
+    summary="Переименовать фирму",
+)
+async def update_brand(
+    brand_id: int,
+    body: BrandUpdate,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> BrandOut:
+    if current_user.role != UserRole.OWNER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
+
+    brand = await session.get(Brand, brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    new_name = body.name.strip()
+    existing = await session.execute(select(Brand).where(Brand.name == new_name, Brand.id != brand_id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Brand already exists")
+
+    old_name = brand.name
+    brand.name = new_name
+    products = await session.execute(select(Product).where(Product.brand == old_name))
+    for product in products.scalars().all():
+        product.brand = new_name
+
+    await session.commit()
+    await session.refresh(brand)
+    return brand
+
+
+@router.delete(
+    "/brands/{brand_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить фирму",
+)
+async def delete_brand(
+    brand_id: int,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    if current_user.role != UserRole.OWNER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
+
+    brand = await session.get(Brand, brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    in_use = await session.execute(select(Product.id).where(Product.brand == brand.name).limit(1))
+    if in_use.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=400, detail="Brand is used by products")
+
+    await session.delete(brand)
+    await session.commit()
 
 
 @router.get(
@@ -24,7 +162,7 @@ async def list_products(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=10000),
 ) -> ProductPaginationOut:
-    stmt = select(Product).order_by(Product.sku)
+    stmt = select(Product).order_by(Product.id.desc())
 
     if only_inactive:
         stmt = stmt.where(Product.is_active.is_(False))
@@ -34,7 +172,9 @@ async def list_products(
     if search:
         pattern = f"%{search.lower()}%"
         from sqlalchemy import func
-        stmt = stmt.where(func.lower(Product.sku).like(pattern))
+        stmt = stmt.where(
+            func.lower(Product.sku).like(pattern) | func.lower(Product.brand).like(pattern)
+        )
 
     # Total count for pagination
     from sqlalchemy import func
@@ -58,7 +198,47 @@ async def list_products(
 
 
 @router.get(
-    "/{product_id}",
+    "/options",
+    response_model=list[ProductPickerOut],
+    summary="Короткий список товаров для выбора",
+)
+async def list_product_options(
+    session: SessionDep,
+    current_user: CurrentUser,
+    search: str | None = Query(None),
+    product_ids: str | None = Query(None),
+    include_inactive: bool = Query(False),
+    limit: int = Query(50, ge=1, le=100),
+) -> list[ProductPickerOut]:
+    stmt = select(Product)
+
+    if not include_inactive:
+        stmt = stmt.where(Product.is_active.is_(True))
+
+    if product_ids:
+        parsed_ids = [
+            int(raw_id)
+            for raw_id in product_ids.split(",")
+            if raw_id.strip().isdigit()
+        ]
+        if parsed_ids:
+            stmt = stmt.where(Product.id.in_(parsed_ids))
+        else:
+            return []
+
+    if search:
+        pattern = f"%{search.lower()}%"
+        stmt = stmt.where(
+            func.lower(Product.sku).like(pattern) | func.lower(Product.brand).like(pattern)
+        )
+
+    stmt = stmt.order_by(Product.id.desc()).limit(limit)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+@router.get(
+    "/{product_id:int}",
     response_model=ProductOut,
     summary="Детали товара",
 )
@@ -74,7 +254,7 @@ async def get_product(
 
 
 @router.get(
-    "/{product_id}/inventory",
+    "/{product_id:int}/inventory",
     response_model=list[ProductInventoryOut],
     summary="Остатки товара по магазинам",
 )
@@ -153,26 +333,43 @@ async def create_product(
     if current_user.role != UserRole.OWNER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
 
+    brand_exists = await session.execute(select(Brand).where(Brand.name == body.brand.strip()))
+    if not brand_exists.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Brand not found")
+
+    existing_res = await session.execute(select(Product).where(Product.sku == body.sku))
+    existing_product = existing_res.scalar_one_or_none()
+
+    if existing_product:
+        if existing_product.is_active:
+            raise HTTPException(status_code=400, detail="Product with this SKU already exists")
+        else:
+            existing_product.is_active = True
+            existing_product.brand = body.brand.strip()
+            existing_product.price = body.price
+            session.add(existing_product)
+            await session.commit()
+            await session.refresh(existing_product)
+            return existing_product
+
+    product = Product(
+        sku=body.sku,
+        brand=body.brand.strip(),
+        price=body.price,
+        is_active=True,
+    )
+    session.add(product)
     try:
-        product = Product(
-            sku=body.sku,
-            price=body.price,
-            is_active=True,
-        )
-        session.add(product)
         await session.commit()
         await session.refresh(product)
         return product
     except IntegrityError:
         await session.rollback()
         raise HTTPException(status_code=400, detail="Product with this SKU already exists")
-    except Exception:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.patch(
-    "/{product_id}",
+    "/{product_id:int}",
     response_model=ProductOut,
     summary="Обновить товар (только Owner)",
 )
@@ -191,6 +388,13 @@ async def update_product(
 
     if body.price is not None:
         product.price = body.price
+    if body.brand is not None:
+        cleaned_brand = body.brand.strip()
+        if cleaned_brand:
+            brand_exists = await session.execute(select(Brand).where(Brand.name == cleaned_brand))
+            if not brand_exists.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Brand not found")
+            product.brand = cleaned_brand
     if body.is_active is not None:
         product.is_active = body.is_active
 
@@ -199,7 +403,7 @@ async def update_product(
     return product
 
 @router.delete(
-    "/{product_id}",
+    "/{product_id:int}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Удалить товар (только Owner)",
 )
@@ -220,7 +424,6 @@ async def delete_product(
         await session.commit()
     except IntegrityError:
         await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="cant_delete_used"
-        )
+        product.is_active = False
+        session.add(product)
+        await session.commit()

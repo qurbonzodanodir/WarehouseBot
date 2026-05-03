@@ -1,29 +1,29 @@
+import logging
+import uuid
+from typing import Any
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-import uuid
-import logging
-
-logger = logging.getLogger(__name__)
-
 from app.bot.keyboards.inline import (
+    batch_delivery_accepted_kb,
+    batch_order_action_kb,
+    cart_action_kb,
     catalog_kb,
     delivery_accepted_kb,
     delivery_confirm_kb,
-    cart_action_kb,
-    batch_order_action_kb,
-    batch_delivery_accepted_kb,
 )
+from app.bot.routers.seller.common import MENU_TEXTS
 from app.bot.states.states import OrderFlow
-from app.models.product import Product
-from typing import Any
 from app.models.order import Order
+from app.models.product import Product
 from app.models.user import User
 from app.services import NotificationService, OrderService
-from app.bot.routers.seller.common import MENU_TEXTS
+
+logger = logging.getLogger(__name__)
+
 router = Router(name="seller.order")
 
 
@@ -549,9 +549,7 @@ async def partial_reject(
             return
         
         order_svc = OrderService(session)
-        order = await order_svc.reject_partial_dispatch(
-            order_id, warehouse_store_id=warehouse_id
-        )
+        await order_svc.reject_partial_dispatch(order_id, warehouse_store_id=warehouse_id)
         
         # COMMIT BEFORE NOTIFICATION
         await session.commit()
@@ -570,7 +568,7 @@ async def partial_reject(
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in partial_reject: {e}")
+        logger.exception("Error in partial_reject: %s", e)
     finally:
         await callback.answer()
 
@@ -590,76 +588,65 @@ async def partial_accept_batch(
             return
             
         order_svc = OrderService(session)
-        
-        # 1. Fetch available again to ensure nothing changed
-        avail = await order_svc.check_batch_availability(batch_id, warehouse_id)
-        if not avail["orders"]:
+
+        # 1. Load orders and validate ownership/status
+        orders = await order_svc.get_batch_orders(batch_id)
+        if not orders or any(o.store_id != user.store_id for o in orders):
             await callback.message.edit_text(_("batch_empty_or_processed"))
             await callback.answer()
             return
-        if any(o.store_id != user.store_id for o in avail["orders"]):
-            await callback.message.edit_text(_("batch_empty_or_processed"))
-            await callback.answer()
-            return
-            
-        # Check if the proposal is still valid
+
         from app.models.enums import OrderStatus
-        for order in avail["orders"]:
-            if order.status != OrderStatus.PARTIAL_APPROVAL_PENDING:
-                await callback.message.edit_text(_("batch_already_processed"))
-                await callback.answer()
-                return
-
-        # If literally NOTHING is available, we cannot create an adjusted batch!
-        if not avail["available"]:
-            for order in avail["orders"]:
-                order.status = OrderStatus.REJECTED
-            await session.commit()
-            
-            items_text = "\n".join([_("cart_item", sku=o.product.sku, qty=o.quantity) for o in avail["orders"]])
-            await callback.message.edit_text(_("batch_no_available_cancelled"))
-            
-            notif_svc = NotificationService(callback.bot, session)
-            store_name = user.store.name if user.store else str(user.store_id)
-            await notif_svc.notify_warehouse(
-                text=lambda _t: _t("batch_cancelled_no_stock_wh", store=store_name, items=items_text),
-                reply_markup=None
-            )
+        # Inventory was already reserved when warehouse proposed the partial.
+        # Split orders into reserved (PARTIAL_APPROVAL_PENDING) — these go to dispatch,
+        # and missing (anything else active) — these get rejected.
+        reserved = [o for o in orders if o.status == OrderStatus.PARTIAL_APPROVAL_PENDING]
+        if not reserved:
+            await callback.message.edit_text(_("batch_already_processed"))
             await callback.answer()
             return
 
-        # 2. Adjust batch
-        import logging
-        logging.getLogger("uvicorn.error").warning(f"PARTIAL_ACCEPT: old batch={batch_id}, calling create_adjusted_batch...")
-        new_batch_id = await order_svc.create_adjusted_batch(batch_id, avail)
+        # 2. Dispatch reserved orders directly (inventory already deducted)
+        import uuid
+        new_batch_id = uuid.uuid4().hex[:12]
+        from app.services.transaction_service import TransactionService
+        from app.models.enums import StockMovementType
+        txn_svc = TransactionService(session)
+        for o in reserved:
+            o.status = OrderStatus.DISPATCHED
+            o.batch_id = new_batch_id
+            await txn_svc.record_stock_movement(
+                product_id=o.product_id, quantity=o.quantity,
+                movement_type=StockMovementType.DISPATCH_TO_STORE,
+                from_store_id=warehouse_id, to_store_id=o.store_id,
+            )
+
         await session.commit()
-        logging.getLogger("uvicorn.error").warning(f"PARTIAL_ACCEPT: new batch={new_batch_id}, committed!")
-        
+
         # 3. Notify seller & warehouse
         await callback.message.edit_text(_("batch_adjusted_sent"))
-        
+
         notif_svc = NotificationService(callback.bot, session)
         store_name = user.store.name if user.store else str(user.store_id)
-        
-        new_orders = await order_svc.get_batch_orders(new_batch_id)
-        logging.getLogger("uvicorn.error").warning(f"PARTIAL_ACCEPT: fetched {len(new_orders)} orders for new batch {new_batch_id}")
-        
-        items_text = "\n".join([_("cart_item", sku=o.product.sku, qty=o.quantity) for o in new_orders])
-        
+        items_text = "\n".join([_("cart_item", sku=o.product.sku, qty=o.quantity) for o in reserved])
+
+        from app.bot.keyboards.inline import batch_delivery_confirm_kb
         cm_ids = await notif_svc.notify_warehouse(
-            text=lambda _t: _t("order_batch_notif_new", store=store_name, items=items_text),
-            reply_markup=lambda _t: batch_order_action_kb(new_batch_id, _=_t)
+            text=lambda _t: _t("batch_dispatched_wh", batch_id=new_batch_id),
+            reply_markup=None,
         )
-        await notif_svc.save_order_notifications([o.id for o in new_orders], cm_ids)
+        await notif_svc.notify_sellers(
+            store_id=orders[0].store_id,
+            text=lambda _t: _t("order_batch_accepted_seller", items=items_text),
+            reply_markup=lambda _t: batch_delivery_confirm_kb(new_batch_id, _=_t),
+        )
         await session.commit()
         
     except ValueError as e:
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        import traceback
-        traceback.print_exc()
-        print(f"Error in partial_accept_batch: {e}")
+        logger.exception("Error in partial_accept_batch: %s", e)
     finally:
         await callback.answer()
 
@@ -677,18 +664,33 @@ async def partial_reject_batch(
             await callback.answer()
             return
         
+        from app.services import StoreService
+        store_svc = StoreService(session)
+        warehouse_id = await store_svc.get_main_warehouse_id()
+        if not warehouse_id:
+            await callback.message.edit_text(_("wh_not_found"))
+            await callback.answer()
+            return
+
         from app.models.enums import OrderStatus
+        from app.services.transaction_service import TransactionService
+        txn_svc = TransactionService(session)
+        cancellable = {OrderStatus.PARTIAL_APPROVAL_PENDING, OrderStatus.PENDING}
         valid = False
         for order in orders:
-            if order.status == OrderStatus.PARTIAL_APPROVAL_PENDING:
-                order.status = OrderStatus.REJECTED
+            if order.status in cancellable:
                 valid = True
-                
+                if order.status == OrderStatus.PARTIAL_APPROVAL_PENDING:
+                    # Return reserved inventory back to warehouse
+                    inv = await txn_svc._get_or_create_inventory(warehouse_id, order.product_id, lock=True)
+                    inv.quantity += order.quantity
+                order.status = OrderStatus.REJECTED
+
         if not valid:
             await callback.message.edit_text(_("batch_already_processed"))
             await callback.answer()
             return
-            
+
         await session.commit()
         
         items_text = "\n".join([_("cart_item", sku=o.product.sku, qty=o.quantity) for o in orders])
@@ -705,6 +707,6 @@ async def partial_reject_batch(
         await callback.message.edit_text(_("sale_error", error=str(e)))
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
-        print(f"Error in partial_reject_batch: {e}")
+        logger.exception("Error in partial_reject_batch: %s", e)
     finally:
         await callback.answer()

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 class ProductOut(BaseModel):
     id: int
     sku: str
+    brand: str
     price: Decimal
     is_active: bool
 
@@ -13,10 +14,12 @@ class ProductOut(BaseModel):
 
 class ProductCreate(BaseModel):
     sku: str = Field(..., min_length=1, max_length=100)
+    brand: str = Field(..., min_length=1, max_length=120)
     price: Decimal = Field(..., gt=0)
 
 
 class ProductUpdate(BaseModel):
+    brand: str | None = Field(None, min_length=1, max_length=120)
     price: Decimal | None = Field(None, gt=0)
     is_active: bool | None = None
 
@@ -34,3 +37,18 @@ class ProductPaginationOut(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class ProductPickerOut(BaseModel):
+    id: int
+    sku: str
+    brand: str
+    price: Decimal
+
+    model_config = {"from_attributes": True}
+
+
+class BrandStatOut(BaseModel):
+    id: int
+    name: str
+    product_count: int

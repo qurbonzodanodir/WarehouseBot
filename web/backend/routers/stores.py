@@ -144,13 +144,18 @@ async def get_store_employees(
     store_id: int,
     session: SessionDep,
     current_user: CurrentUser,
+    include_inactive: bool = Query(False),
 ) -> list[dict]:
     if current_user.role != UserRole.OWNER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
 
-    result = await session.execute(
-        select(User).where(User.store_id == store_id, User.is_active.is_(True))
-    )
+    stmt = select(User).where(User.store_id == store_id)
+    if include_inactive:
+        stmt = stmt.where(User.is_active.is_(False))
+    else:
+        stmt = stmt.where(User.is_active.is_(True))
+    
+    result = await session.execute(stmt)
     users = result.scalars().all()
     return [
         {
@@ -210,16 +215,11 @@ async def update_employee(
         
     if body.name is not None:
         user.name = body.name
-    if body.email is not None:
-        user.email = body.email
     if body.role is not None:
         try:
             user.role = UserRole(body.role)
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
-    if body.password is not None and body.password.strip():
-        from app.core.security import get_password_hash
-        user.password_hash = get_password_hash(body.password)
         
     await session.commit()
     await session.refresh(user)
@@ -233,6 +233,47 @@ async def update_employee(
         "is_active": user.is_active,
     }
 
+@router.delete(
+    "/employees/{employee_id}",
+    summary="Удалить сотрудника (Owner only)",
+)
+async def delete_employee(
+    employee_id: int,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> dict:
+    if current_user.role != UserRole.OWNER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
+    
+    user = await session.get(User, employee_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+        
+    user.is_active = False
+    await session.commit()
+    
+    return {"status": "success", "message": "Сотрудник удален"}
+
+@router.post(
+    "/employees/{employee_id}/restore",
+    summary="Восстановить сотрудника (Owner only)",
+)
+async def restore_employee(
+    employee_id: int,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> dict:
+    if current_user.role != UserRole.OWNER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
+    
+    user = await session.get(User, employee_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+        
+    user.is_active = True
+    await session.commit()
+    
+    return {"status": "success", "message": "Сотрудник восстановлен"}
 
 @router.post(
     "/{store_id}/employees",
@@ -246,8 +287,6 @@ async def create_employee(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> dict:
-    import bcrypt
-
     if current_user.role != UserRole.OWNER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner only")
 
@@ -256,24 +295,15 @@ async def create_employee(
     if store is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store not found")
 
-    # Check email uniqueness
-    existing = await session.execute(
-        select(User).where(User.email == body.email.lower())
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email уже используется")
-
     # Validate role
     try:
         role = UserRole(body.role)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Неизвестная роль: {body.role}")
 
-    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
-
     user = User(
-        email=body.email.lower(),
-        password_hash=password_hash,
+        email=None,
+        password_hash=None,
         name=body.name,
         role=role,
         store_id=store_id,

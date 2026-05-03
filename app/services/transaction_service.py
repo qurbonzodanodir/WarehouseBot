@@ -391,6 +391,26 @@ class TransactionService:
         await self.session.flush()
         return inv
 
+    async def receive_from_wholesaler(
+        self,
+        warehouse_store_id: int,
+        product_id: int,
+        quantity: int,
+        user_id: int,
+    ) -> Inventory:
+        """Add stock back to warehouse when goods are returned from a wholesaler."""
+        inv = await self._get_or_create_inventory(warehouse_store_id, product_id, lock=True)
+        inv.quantity += quantity
+        await self.record_stock_movement(
+            product_id=product_id,
+            quantity=quantity,
+            movement_type=StockMovementType.RETURN_FROM_WHOLESALER,
+            to_store_id=warehouse_store_id,
+            user_id=user_id,
+        )
+        await self.session.flush()
+        return inv
+
     async def dispatch_display_items(
         self,
         warehouse_store_id: int,

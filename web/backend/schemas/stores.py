@@ -37,8 +37,6 @@ class InventoryItemOut(BaseModel):
 
 
 class EmployeeCreate(BaseModel):
-    email: str = Field(..., min_length=3, max_length=255)
-    password: str = Field(..., min_length=4, max_length=255)
     name: str = Field(..., min_length=1, max_length=255)
     role: str = Field(..., description="seller | warehouse")
 
@@ -48,9 +46,7 @@ class StoreUpdate(BaseModel):
 
 class EmployeeUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    email: Optional[str] = Field(None, min_length=3, max_length=255)
     role: Optional[str] = Field(None, description="seller | warehouse")
-    password: Optional[str] = Field(None, min_length=4, max_length=255)
 
 class ReceiveStockInput(BaseModel):
     product_id: int
@@ -61,10 +57,13 @@ class BulkReceiveItem(BaseModel):
     sku: str = Field(..., min_length=1, max_length=255)
     quantity: int = Field(..., gt=0)
     price: Optional[Decimal] = Field(None, description="New price of the product if applicable")
+    brand: Optional[str] = Field(None, description="Brand/firm for this specific item")
 
 
 class BulkReceiveInput(BaseModel):
     items: list[BulkReceiveItem]
+    default_brand: Optional[str] = None
+    replace_quantity: bool = Field(False, description="If True, replaces existing quantity instead of adding")
 
 
 class DispatchDisplayInput(BaseModel):

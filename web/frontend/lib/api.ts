@@ -1,25 +1,91 @@
+import { clearAuth, notifyAuthExpired } from "./auth";
+
 const getApiBase = () => {
-  if (typeof window !== "undefined") {
-    return `http://${window.location.hostname}:8030/api`;
+  const explicitBase = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (explicitBase) {
+    return explicitBase.replace(/\/$/, "");
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8030/api";
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8030/api`;
+  }
+  return "http://127.0.0.1:8030/api";
 };
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("wh_token");
-}
+type ApiErrorItem = {
+  msg?: string;
+};
+
+type ApiErrorPayload = {
+  detail?: unknown;
+  message?: unknown;
+};
 
 let isRefreshing = false;
-let refreshSubscribers: ((t: string) => void)[] = [];
+let refreshSubscribers: Array<(ok: boolean) => void> = [];
 
-function subscribeTokenRefresh(cb: (t: string) => void) {
+function subscribeTokenRefresh(cb: (ok: boolean) => void) {
   refreshSubscribers.push(cb);
 }
 
-function onRefreshed(token: string) {
-  refreshSubscribers.forEach(cb => cb(token));
+function onRefreshed(ok: boolean) {
+  refreshSubscribers.forEach(cb => cb(ok));
   refreshSubscribers = [];
+}
+
+function handleAuthExpired() {
+  clearAuth();
+  notifyAuthExpired();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function extractErrorMessage(payload: unknown, fallback: string): string {
+  const normalizedPayload: ApiErrorPayload | null = isRecord(payload)
+    ? payload as ApiErrorPayload
+    : null;
+  const detail = normalizedPayload?.detail;
+
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const messages = detail
+      .map((item): string => {
+        if (typeof item === "string") return item;
+        if (isRecord(item) && typeof (item as ApiErrorItem).msg === "string") {
+          return (item as ApiErrorItem).msg ?? "";
+        }
+        return "";
+      })
+      .filter(Boolean);
+
+    if (messages.length > 0) {
+      return messages.join("; ");
+    }
+  }
+
+  if (isRecord(detail)) {
+    if (typeof detail.message === "string" && detail.message.trim()) {
+      return detail.message;
+    }
+    const firstEntry = Object.values(detail).find(v => typeof v === "string" && v.trim());
+    if (typeof firstEntry === "string") {
+      return firstEntry;
+    }
+  }
+
+  if (
+    normalizedPayload &&
+    typeof normalizedPayload.message === "string" &&
+    normalizedPayload.message.trim()
+  ) {
+    return normalizedPayload.message;
+  }
+
+  return fallback;
 }
 
 async function request<T>(
@@ -27,52 +93,68 @@ async function request<T>(
   options: RequestInit = {},
   retried = false
 ): Promise<T> {
-  const token = getToken();
   const res = await fetch(`${getApiBase()}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
 
   if (!res.ok) {
-    if (res.status === 401 && !retried && !path.startsWith("/auth/")) {
-      const refreshToken = typeof window !== "undefined" ? localStorage.getItem("wh_refresh_token") : null;
-      if (refreshToken) {
+    if (res.status === 401 && !path.startsWith("/auth/")) {
+      if (!retried) {
         if (!isRefreshing) {
           isRefreshing = true;
           try {
             const refreshRes = await fetch(`${getApiBase()}/auth/refresh`, {
               method: "POST",
+              credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ refresh_token: refreshToken })
             });
 
-            if (!refreshRes.ok) throw new Error("Session expired");
+            if (!refreshRes.ok) {
+              throw new Error("Session expired");
+            }
 
             const data = await refreshRes.json();
-            localStorage.setItem("wh_token", data.access_token);
-            localStorage.setItem("wh_refresh_token", data.refresh_token);
+            if (typeof window !== "undefined" && data.user) {
+              localStorage.setItem("wh_user", JSON.stringify(data.user));
+            }
             isRefreshing = false;
-            onRefreshed(data.access_token);
+            onRefreshed(true);
           } catch (e) {
             isRefreshing = false;
-            localStorage.removeItem("wh_token");
-            localStorage.removeItem("wh_refresh_token");
-            localStorage.removeItem("wh_user");
-            window.location.href = "/login";
+            handleAuthExpired();
+            onRefreshed(false);
             throw e;
           }
         }
-        return new Promise(resolve => {
-          subscribeTokenRefresh(() => resolve(request<T>(path, options, true)));
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh((ok) => {
+            if (!ok) {
+              reject(new Error("Session expired"));
+              return;
+            }
+            void request<T>(path, options, true).then(resolve).catch(reject);
+          });
         });
       }
+      
+      handleAuthExpired();
     }
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || "Request failed");
+    throw new Error(extractErrorMessage(error, "Request failed"));
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const contentLength = res.headers.get("content-length");
+  if (contentLength === "0") {
+    return undefined as T;
   }
 
   return res.json();
@@ -81,10 +163,12 @@ async function request<T>(
 export const api = {
   // Auth
   login: (email: string, password: string) =>
-    request<{ access_token: string; refresh_token: string; user: UserMe }>("/auth/login", {
+    request<{ user: UserMe }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
+  getMe: () => request<UserMe>("/auth/me"),
 
   // Analytics
   getDashboard: (period = "today") =>
@@ -126,9 +210,26 @@ export const api = {
     const q = qs.toString();
     return request<PaginatedResponse<Product>>(`/products${q ? `?${q}` : ""}`);
   },
+  getProductOptions: (params?: { search?: string; productIds?: number[]; include_inactive?: boolean; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.set("search", params.search);
+    if (params?.productIds?.length) qs.set("product_ids", params.productIds.join(","));
+    if (params?.include_inactive) qs.set("include_inactive", "true");
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const q = qs.toString();
+    return request<ProductPicker[]>(`/products/options${q ? `?${q}` : ""}`);
+  },
   getProductInventory: (id: number) =>
     request<ProductInventoryOut[]>(`/products/${id}/inventory`),
-  createProduct: (data: { sku: string; price: number }) =>
+  getBrands: () => request<Brand[]>("/products/brands"),
+  getBrandStats: () => request<BrandStat[]>("/products/brands/stats"),
+  createBrand: (data: { name: string }) =>
+    request<Brand>("/products/brands", { method: "POST", body: JSON.stringify(data) }),
+  updateBrand: (id: number, data: { name: string }) =>
+    request<Brand>(`/products/brands/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteBrand: (id: number) =>
+    request(`/products/brands/${id}`, { method: "DELETE" }),
+  createProduct: (data: { sku: string; price: number; brand: string }) =>
     request<Product>("/products", { method: "POST", body: JSON.stringify(data) }),
   updateProduct: (id: number, data: Partial<Product>) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -141,8 +242,24 @@ export const api = {
   getAllInventory: () => request<Record<string, StoreInventory>>("/inventory"),
   receiveStock: (data: { product_id: number; quantity: number }) =>
     request<{success: boolean; product_id: number; new_quantity: number}>("/inventory/receive", { method: "POST", body: JSON.stringify(data) }),
-  bulkReceiveStock: (items: { sku: string; quantity: number; price?: number }[]) =>
-    request<{success: boolean; processed: number; created: number}>("/inventory/bulk-receive", { method: "POST", body: JSON.stringify({ items }) }),
+  bulkReceiveStock: (data: { items: { sku: string; quantity: number; price?: number; brand?: string }[], replace_quantity?: boolean }) =>
+    request<{success: boolean; processed: number; created: number}>("/inventory/bulk-receive", { method: "POST", body: JSON.stringify(data) }),
+  importInventoryCSV: async (store_id: number | null, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (store_id !== null) formData.append("store_id", store_id.toString());
+    
+    const res = await fetch(`${getApiBase()}/inventory/import-csv`, { 
+      method: "POST", 
+      body: formData,
+      credentials: "include"
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({}));
+      throw new Error(err.detail || "Upload failed");
+    }
+    return res.json() as Promise<{success: boolean; store: string; created: number; updated: number; added_qty: number}>;
+  },
 
   // Stores
   getStores: () => request<Store[]>("/stores"),
@@ -151,11 +268,15 @@ export const api = {
     request<Store>("/stores", { method: "POST", body: JSON.stringify(data) }),
   updateStore: (id: number, data: { name?: string; address?: string }) =>
     request<Store>(`/stores/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  getStoreEmployees: (store_id: number) =>
-    request<Employee[]>(`/stores/${store_id}/employees`),
-  updateEmployee: (id: number, data: Partial<Employee> & { password?: string }) =>
+  getStoreEmployees: (store_id: number, include_inactive = false) =>
+    request<Employee[]>(`/stores/${store_id}/employees?include_inactive=${include_inactive}&_t=${Date.now()}`),
+  updateEmployee: (id: number, data: Partial<Employee>) =>
     request<Employee>(`/stores/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  createEmployee: (store_id: number, data: { email: string; password: string; name: string; role: string }) =>
+  deleteEmployee: (id: number) =>
+    request<{status: string; message: string}>(`/stores/employees/${id}`, { method: "DELETE" }),
+  restoreEmployee: (id: number) =>
+    request<{status: string; message: string}>(`/stores/employees/${id}/restore`, { method: "POST" }),
+  createEmployee: (store_id: number, data: { name: string; role: string }) =>
     request<Employee>(`/stores/${store_id}/employees`, { method: "POST", body: JSON.stringify(data) }),
 
   // Finance
@@ -198,6 +319,8 @@ export const api = {
     request<SupplierInvoiceItem>(`/suppliers/${id}/invoices`, { method: "POST", body: JSON.stringify(data) }),
   addSupplierPayment: (id: number, data: { amount: number; notes?: string | null }) =>
     request<SupplierPaymentItem>(`/suppliers/${id}/payments`, { method: "POST", body: JSON.stringify(data) }),
+  addSupplierReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+    request<SupplierReturnItem>(`/suppliers/${id}/returns`, { method: "POST", body: JSON.stringify(data) }),
 };
 
 export interface PaginatedResponse<T> {
@@ -248,8 +371,27 @@ export interface Order {
 export interface Product {
   id: number;
   sku: string;
+  brand: string;
   price: number;
   is_active: boolean;
+}
+
+export interface ProductPicker {
+  id: number;
+  sku: string;
+  brand: string;
+  price: number;
+}
+
+export interface Brand {
+  id: number;
+  name: string;
+}
+
+export interface BrandStat {
+  id: number;
+  name: string;
+  product_count: number;
 }
 
 export interface ProductCreate {
@@ -369,9 +511,21 @@ export interface SupplierPaymentItem {
   user_name: string | null;
 }
 
+export interface SupplierReturnItem {
+  id: number;
+  supplier_id: number;
+  total_amount: number;
+  notes: string | null;
+  created_at: string;
+  user_name: string | null;
+  items?: SupplierInvoiceLineItem[]; // Reuse line item interface
+}
+
 export interface SupplierDetail extends Supplier {
   total_invoiced: number;
   total_paid: number;
+  total_returned: number;
   invoices: SupplierInvoiceItem[];
   payments: SupplierPaymentItem[];
+  returns: SupplierReturnItem[];
 }

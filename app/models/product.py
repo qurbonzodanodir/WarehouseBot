@@ -11,6 +11,7 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     sku: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    brand: Mapped[str] = mapped_column(String(120), index=True)
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     is_active: Mapped[bool] = mapped_column(default=True)
 

@@ -1,4 +1,7 @@
 from typing import Dict
+from app.core.config import settings
+
+WEB_PANEL_LINK = settings.frontend_url
 
 TRANSLATIONS: Dict[str, Dict[str, str]] = {
     "ru": {
@@ -35,6 +38,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_more": "Ещё 🔽",
         "btn_report": "📊 Отчет",
         "btn_make_return": "↩️ Сделать возврат",
+        "btn_back": "🔙 Назад",
         "btn_wh_requests": "🔔 Запросы",
         "btn_wh_stock": "📦 Остатки",
         "btn_language": "🌐 Язык / Забон",
@@ -46,7 +50,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "auth_enter_code": "📋 Введите код приглашения:",
         "login_success": "✅ Аккаунт привязан!\n\nДобро пожаловать, {name}!\n🏢 Магазин: {store}\n\nТеперь бот работает для вас.",
         "invalid_code": "❌ Рамз нодуруст ё мӯҳлаташ гузаштааст.\nБарои рамзи нав ба роҳбарият муроҷиат кунед.\n\nРамзро аз нав ворид кунед:",
-        "owner_use_web": "👋 Привет, босс!\n\nДля управления бизнесом (статистика, сотрудники, склады) перейдите в <b>веб-панель</b>.\n\n🔗 <a href='http://localhost:3001'>Открыть панель управления</a>",
+        "owner_use_web": f"👋 Привет, босс!\n\nДля управления бизнесом (статистика, сотрудники, склады) перейдите в <b>веб-панель</b>.\n\n🔗 <a href='{WEB_PANEL_LINK}'>Открыть панель управления</a>",
         
         # Roles & Others
         "role_seller": "🛒 Продавец",
@@ -228,6 +232,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_more": "Боз 🔽",
         "btn_report": "📊 Ҳисобот",
         "btn_make_return": "↩️ Бозгашти мол",
+        "btn_back": "🔙 Ба қафо",
         "btn_wh_requests": "🔔 Дархостҳо",
         "btn_wh_stock": "📦 Боқимонда",
         "btn_language": "🌐 Забон / Язык",
@@ -239,7 +244,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "auth_enter_code": "📋 Рамзи даъватро ворид кунед:",
         "login_success": "✅ Аккаунт вобаста шуд!\n\nХуш омадед, {name}!\n🏢 Мағоза: {store}\n\nАкнун бот барои шумо кор мекунад.",
         "invalid_code": "❌ Рамз нодуруст ё мӯҳлаташ гузаштааст.\nБарои рамзи нав ба роҳбарият муроҷиат кунед.\n\nРамзро аз нав ворид кунед:",
-        "owner_use_web": "👋 Салом, роҳбар!\n\nБарои идоракунии тиҷорат (статистика, кормандон, анборҳо) ба <b>веб-панел</b> гузаред.\n\n🔗 <a href='http://localhost:3001'>Кушодани панели идоракунӣ</a>",
+        "owner_use_web": f"👋 Салом, роҳбар!\n\nБарои идоракунии тиҷорат (статистика, кормандон, анборҳо) ба <b>веб-панел</b> гузаред.\n\n🔗 <a href='{WEB_PANEL_LINK}'>Кушодани панели идоракунӣ</a>",
 
         # Roles & Others
         "role_seller": "🛒 Фурӯшанда",
@@ -313,8 +318,6 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_confirm_msg_goods": "✅ Маҳсулот барои бозгашт фиристода шуд!\nМаҳсулот аз витрина хориҷ шуд. Тасдиқро аз анбор интизор шавед, пас аз он қарзи шумо кам мешавад.",
         "return_type_samples": "БОЗГАШТИ НАМУНАҲО",
         "return_type_goods": "БОЗГАШТ",
-        "return_debt_note": "\nМаҳсулотро қабул кунед ва тугмаи 'Қабули бозгашт'-ро пахш кунед, то қарзи мағоза кам карда шавад.",
-
         # Seller - Display Flow
         "display_received_seller": "✅ <b>Намунаҳо қабул шуданд!</b>\n\nSKU: {sku}\nМиқдор: {qty} дона ба витринаи шумо илова шуд.",
         "display_rejected_seller": "❌ <b>Шумо намунаҳоро рад кард!</b>\n\nSKU: {sku}\nМиқдор: {qty} дона.\nМаҳсулот ба баланси анбор баргардонида шуд.",
@@ -345,12 +348,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "order_dispatch_success": "🚚 Дархости #{id} — хаткашон фиристода шуд!\nМол: {qty} шт (статус: Дар роҳ)",
         "order_dispatch_notif_seller": "📬 Хаткашон баромад!\nДархости #{id}: {qty} шт",
         "order_rejected_wh": "❌ Дархости #{id} рад карда шуд.",
-        "return_approved_wh": "✅ Бозгашти {type} аз рӯи дархости #{id} қабул шуд!\nМол ба Анбори Марказӣ ворид карда шуд.",
         "return_approved_seller_notif": "✅ <b>Анбор бозгашти {type}-и шуморо қабул кард (Дархости #{id})!</b>",
         "return_rejected_wh_msg": "❌ Шумо бозгашти дархости #{id}-ро рад кардед.\nМол ба витринаи мағоза баргардонида шуд.",
         "return_rejected_seller_notif": "❌ <b>Анбор бозгашти шуморо РАД КАРД (Дархости #{id})!</b>\nМол ба витринаи шумо баргардонида шуд, қарз кам нашуд.",
-        "return_type_samples_label": "намунаҳо",
-        "return_type_goods_label": "мол",
 
         "stock_empty": "Анбор холӣ аст.",
         "stock_title": "📦 Боқимондаи анбор (сах. {page}):",

@@ -2,8 +2,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
-import { isAuthenticated, getStoredUser } from "@/lib/auth";
-import { api, Supplier, SupplierDetail, Product } from "@/lib/api";
+import { isAuthenticated } from "@/lib/auth";
+import { api, ProductPicker, Supplier, SupplierDetail } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
 import { createPortal } from "react-dom";
@@ -17,8 +17,12 @@ function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 interface CartItem {
-  product: Product;
+  product: ProductPicker;
   quantity: number;
 }
 
@@ -27,7 +31,6 @@ export default function SuppliersPage() {
   const { t } = useTranslation();
   const { showToast } = useToast();
 
-  const [user, setUser] = useState<any>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -44,7 +47,8 @@ export default function SuppliersPage() {
   const [invoiceModal, setInvoiceModal] = useState<Supplier | null>(null);
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [savingInvoice, setSavingInvoice] = useState(false);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [productOptions, setProductOptions] = useState<ProductPicker[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
 
@@ -54,23 +58,26 @@ export default function SuppliersPage() {
   const [paymentNotes, setPaymentNotes] = useState("");
   const [savingPayment, setSavingPayment] = useState(false);
 
+  // Return modal
+  const [returnModal, setReturnModal] = useState<Supplier | null>(null);
+  const [returnNotes, setReturnNotes] = useState("");
+  const [savingReturn, setSavingReturn] = useState(false);
+
   const fetchSuppliers = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.getSuppliers();
       setSuppliers(data);
-    } catch (e: any) {
-      showToast(e.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   useEffect(() => {
-    const usr = getStoredUser();
-    setUser(usr);
     if (!isAuthenticated()) { router.push("/login"); return; }
-    fetchSuppliers();
+    void fetchSuppliers();
     setMounted(true);
   }, [router, fetchSuppliers]);
 
@@ -82,8 +89,8 @@ export default function SuppliersPage() {
       try {
         const detail = await api.getSupplierDetail(id);
         setDetailCache(prev => ({ ...prev, [id]: detail }));
-      } catch (e: any) {
-        showToast(e.message, "error");
+      } catch (error) {
+        showToast(getErrorMessage(error, t("common.error")), "error");
       } finally {
         setDetailLoading(prev => ({ ...prev, [id]: false }));
       }
@@ -100,29 +107,42 @@ export default function SuppliersPage() {
       setSupplierForm({ name: "", contact_info: "", address: "", notes: "" });
       await fetchSuppliers();
       showToast(t("suppliers.created_success"), "success");
-    } catch (e: any) {
-      showToast(e.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     } finally {
       setSavingSupplier(false);
     }
   };
 
-  const openInvoiceModal = async (s: Supplier) => {
+  const openInvoiceModal = (s: Supplier) => {
     setInvoiceModal(s);
     setCart([]);
     setInvoiceNotes("");
     setProductSearch("");
-    if (allProducts.length === 0) {
-      try {
-        const resp = await api.getProducts({ page_size: 1000 });
-        setAllProducts(resp.items ?? []);
-      } catch (e: any) {
-        showToast(e.message, "error");
-      }
-    }
   };
 
-  const addToCart = (product: Product) => {
+  const openReturnModal = async (s: Supplier) => {
+    setReturnModal(s);
+    setCart([]);
+    setReturnNotes("");
+    setProductSearch("");
+    
+    // Ensure we have details to filter products by previous shipments
+    if (!detailCache[s.id]) {
+      setDetailLoading(prev => ({ ...prev, [s.id]: true }));
+      try {
+        const detail = await api.getSupplierDetail(s.id);
+        setDetailCache(prev => ({ ...prev, [s.id]: detail }));
+      } catch (error) {
+        showToast(getErrorMessage(error, t("common.error")), "error");
+      } finally {
+        setDetailLoading(prev => ({ ...prev, [s.id]: false }));
+      }
+    }
+
+  };
+
+  const addToCart = (product: ProductPicker) => {
     setCart(prev => {
       const existing = prev.find(c => c.product.id === product.id);
       if (existing) {
@@ -157,18 +177,122 @@ export default function SuppliersPage() {
       setDetailCache(prev => { const n = { ...prev }; delete n[invoiceModal.id]; return n; });
       await fetchSuppliers();
       showToast(t("suppliers.invoice_added"), "success");
-    } catch (e: any) {
-      showToast(e.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     } finally {
       setSavingInvoice(false);
     }
   };
 
-  const filteredProducts = useMemo(() =>
-    allProducts.filter(p =>
+  const filteredProducts = useMemo(() => {
+    let list = productOptions;
+    
+    // If it's a return, show ONLY products that were previously sent to this supplier
+    if (returnModal && detailCache[returnModal.id]) {
+      const detail = detailCache[returnModal.id];
+      const invoicedProductIds = new Set<number>();
+      detail.invoices.forEach(inv => {
+        inv.items?.forEach(item => {
+          invoicedProductIds.add(item.product_id);
+        });
+      });
+      list = list.filter(p => invoicedProductIds.has(p.id));
+    }
+
+    return list.filter(p =>
       p.sku.toLowerCase().includes(productSearch.toLowerCase())
-    ),
-  [allProducts, productSearch]);
+    );
+  }, [detailCache, productOptions, productSearch, returnModal]);
+
+  // Max returnable quantity per product (total invoiced - total already returned)
+  const returnableQtyMap = useMemo<Record<number, number>>(() => {
+    if (!returnModal || !detailCache[returnModal.id]) return {};
+    const detail = detailCache[returnModal.id];
+    const map: Record<number, number> = {};
+    // Sum up all invoiced quantities
+    detail.invoices.forEach(inv => {
+      inv.items?.forEach(item => {
+        map[item.product_id] = (map[item.product_id] || 0) + item.quantity;
+      });
+    });
+    // Subtract already returned quantities
+    detail.returns?.forEach(ret => {
+      ret.items?.forEach(item => {
+        map[item.product_id] = (map[item.product_id] || 0) - item.quantity;
+      });
+    });
+    // Remove entries where nothing left to return
+    return Object.fromEntries(Object.entries(map).filter(([, qty]) => qty > 0));
+  }, [returnModal, detailCache]);
+
+  useEffect(() => {
+    const activeModal = invoiceModal ?? returnModal;
+    if (!activeModal) {
+      setProductOptions([]);
+      return;
+    }
+    if (returnModal && !detailCache[returnModal.id]) {
+      setProductOptions([]);
+      return;
+    }
+
+    let isActive = true;
+    const productIds = returnModal ? Object.keys(returnableQtyMap).map(Number) : undefined;
+    if (returnModal && productIds && productIds.length === 0) {
+      setProductOptions([]);
+      return;
+    }
+
+    setProductsLoading(true);
+    api.getProductOptions({
+      search: productSearch,
+      productIds,
+      limit: 50,
+    })
+      .then((items) => {
+        if (isActive) {
+          setProductOptions(items);
+        }
+      })
+      .catch((error) => {
+        if (isActive) {
+          showToast(getErrorMessage(error, t("common.error")), "error");
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setProductsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [detailCache, invoiceModal, productSearch, returnModal, returnableQtyMap, showToast, t]);
+
+  // Override addToCart for return: don't exceed max
+  const addToReturnCart = (product: ProductPicker) => {
+    const max = returnableQtyMap[product.id] ?? 0;
+    if (max <= 0) return;
+    setCart(prev => {
+      const existing = prev.find(c => c.product.id === product.id);
+      if (existing) {
+        const newQty = Math.min(existing.quantity + 1, max);
+        return prev.map(c => c.product.id === product.id ? { ...c, quantity: newQty } : c);
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  const updateReturnCartQty = (productId: number, qty: number) => {
+    const max = returnableQtyMap[productId] ?? 0;
+    const clamped = Math.min(Math.max(qty, 0), max);
+    if (clamped <= 0) {
+      setCart(prev => prev.filter(c => c.product.id !== productId));
+    } else {
+      setCart(prev => prev.map(c => c.product.id === productId ? { ...c, quantity: clamped } : c));
+    }
+  };
 
 
   const handleAddPayment = async (e: React.FormEvent) => {
@@ -184,10 +308,32 @@ export default function SuppliersPage() {
       setDetailCache(prev => { const n = { ...prev }; delete n[paymentModal.id]; return n; });
       await fetchSuppliers();
       showToast(t("suppliers.payment_success"), "success");
-    } catch (e: any) {
-      showToast(e.message, "error");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     } finally {
       setSavingPayment(false);
+    }
+  };
+
+  const handleCreateReturn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!returnModal || cart.length === 0) return;
+    setSavingReturn(true);
+    try {
+      await api.addSupplierReturn(returnModal.id, {
+        items: cart.map(c => ({ product_id: c.product.id, quantity: c.quantity })),
+        notes: returnNotes || null,
+      });
+      setReturnModal(null);
+      setCart([]);
+      setReturnNotes("");
+      setDetailCache(prev => { const n = { ...prev }; delete n[returnModal.id]; return n; });
+      await fetchSuppliers();
+      showToast(t("suppliers.return_success"), "success");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    } finally {
+      setSavingReturn(false);
     }
   };
 
@@ -272,22 +418,28 @@ export default function SuppliersPage() {
                         </td>
                         <td data-label={t("common.actions")} style={{ textAlign: "center" }}>
                           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }} onClick={e => e.stopPropagation()}>
-                            <button
-                              className="btn btn-danger"
-                              style={{ padding: "4px 10px", fontSize: 12, display: "flex", gap: 4, alignItems: "center" }}
-                              onClick={() => { openInvoiceModal(s); }}
-                            >
-                              <ArrowDownCircle size={13} /> {t("suppliers.btn_invoice")}
-                            </button>
-                            {Number(s.current_debt) > 0 && (
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                               <button
-                                className="btn btn-primary"
-                                style={{ padding: "4px 10px", fontSize: 12, background: "var(--green)", display: "flex", gap: 4, alignItems: "center" }}
-                                onClick={() => { setPaymentModal(s); setPaymentAmount(""); setPaymentNotes(""); }}
+                                style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #ef4444", background: "rgba(239,68,68,0.08)", color: "#ef4444", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
+                                onClick={() => { openInvoiceModal(s); }}
                               >
-                                <ArrowUpCircle size={13} /> {t("suppliers.btn_pay")}
+                                <ArrowDownCircle size={13} /> {t("suppliers.btn_invoice")}
                               </button>
-                            )}
+                              {Number(s.current_debt) > 0 && (
+                                <button
+                                  style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #22c55e", background: "rgba(34,197,94,0.08)", color: "#22c55e", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
+                                  onClick={() => { setPaymentModal(s); setPaymentAmount(""); setPaymentNotes(""); }}
+                                >
+                                  <ArrowUpCircle size={13} /> {t("suppliers.btn_pay")}
+                                </button>
+                              )}
+                              <button
+                                style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #d97706", background: "rgba(217,119,6,0.08)", color: "#d97706", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
+                                onClick={() => { openReturnModal(s); }}
+                              >
+                                <History size={13} /> {t("suppliers.btn_return")}
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -334,6 +486,26 @@ export default function SuppliersPage() {
                                         <span style={{ color: "var(--green)", fontWeight: 600 }}>−{fmt(Number(pay.amount))} TJS</span>
                                       </div>
                                     ))}
+                                  </div>
+                                  {/* Returns */}
+                                  <div>
+                                    <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                                      <History size={13} /> {t("suppliers.returns_title")}
+                                    </h4>
+                                    {(detailCache[s.id].returns?.length || 0) === 0 ? (
+                                      <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("suppliers.no_returns")}</p>
+                                    ) : detailCache[s.id].returns?.slice(0, 5).map(ret => {
+                                      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+                                      return (
+                                        <div key={ret.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13, alignItems: "center" }}>
+                                          <span style={{ color: "var(--text-secondary)" }}>{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span>
+                                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                                            <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{totalQty > 0 ? `${totalQty} шт.` : "0 шт."}</span>
+                                            <span style={{ color: "var(--green)", fontWeight: 600, minWidth: 80, textAlign: "right" }}>−{fmt(Number(ret.total_amount))} TJS</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               ) : null}
@@ -397,7 +569,7 @@ export default function SuppliersPage() {
             </div>
 
             {/* Body: 2 columns */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, flex: 1, minHeight: 0, overflow: "hidden" }}>
+            <div className="modal-grid-split">
               {/* LEFT: Product search */}
               <div style={{ display: "flex", flexDirection: "column", gap: 10, overflow: "hidden" }}>
                 <div style={{ position: "relative" }}>
@@ -412,8 +584,14 @@ export default function SuppliersPage() {
                   />
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", borderRadius: 8, border: "1px solid var(--border)" }}>
-                  {filteredProducts.length === 0 ? (
-                    <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>Товары не найдены</div>
+                  {productsLoading ? (
+                    <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                      {t("common.loading")}
+                    </div>
+                  ) : filteredProducts.length === 0 ? (
+                    <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                      {productSearch ? t("common.no_results") : t("common.empty")}
+                    </div>
                   ) : filteredProducts.map(p => {
                     const inCart = cart.find(c => c.product.id === p.id);
                     return (
@@ -526,6 +704,140 @@ export default function SuppliersPage() {
                 <button type="submit" className="btn btn-primary" style={{ flex: 1, background: "var(--green)" }} disabled={savingPayment}>{savingPayment ? "..." : t("suppliers.btn_pay")}</button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* Return Modal — Product Cart (Reusing styles from Invoice Modal) */}
+      {mounted && returnModal && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: 780, width: "95vw", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div>
+                <h3 style={{ color: "var(--orange)", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+                  <History size={20} /> {t("suppliers.return_title")}
+                </h3>
+                <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>{returnModal.name}</p>
+              </div>
+              <button onClick={() => setReturnModal(null)} style={{ background: "transparent", border: "none" }}><X size={22} /></button>
+            </div>
+
+            {/* Body */}
+            <div className="modal-grid-split">
+              {/* Product List */}
+              <div style={{ display: "flex", flexDirection: "column", background: "var(--bg)", borderRadius: 12, border: "1px solid var(--border)" }}>
+                <div style={{ padding: 12, borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ position: "relative" }}>
+                    <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+                    <input
+                      className="input"
+                      style={{ paddingLeft: 32, fontSize: 13 }}
+                      placeholder={t("products.search")}
+                      value={productSearch}
+                      onChange={e => setProductSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+                  {productsLoading ? (
+                    <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                      {t("common.loading")}
+                    </div>
+                  ) : filteredProducts.length === 0 ? (
+                    <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                      {productSearch ? t("common.no_results") : t("suppliers.no_send_products")}
+                    </div>
+                  ) : filteredProducts.filter(p => (returnableQtyMap[p.id] ?? 0) > 0).map(p => {
+                    const maxQty = returnableQtyMap[p.id] ?? 0;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => addToReturnCart(p)}
+                        style={{ padding: "8px 12px", borderRadius: 8, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, background: "var(--bg-card)", border: "1px solid var(--border)" }}
+                      >
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</span>
+                          <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>макс. {maxQty} шт.</span>
+                        </div>
+                        <Plus size={14} color="var(--accent)" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Cart */}
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
+                  {cart.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 40, color: "var(--text-muted)" }}>
+                      <ShoppingCart size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
+                      <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("suppliers.no_send_products")}</p>
+                    </div>
+                  ) : (
+                    cart.map(c => {
+                      const max = returnableQtyMap[c.product.id] ?? 0;
+                      return (
+                        <div key={c.product.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--bg-card)", padding: 10, borderRadius: 10, marginBottom: 8, border: "1px solid var(--border)" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(c.product.price)} TJS · макс. {max} шт.</div>
+                          </div>
+                          <input
+                            type="number"
+                            className="input"
+                            min={1}
+                            max={max}
+                            style={{ width: 60, padding: "4px 8px", textAlign: "center" }}
+                            value={c.quantity}
+                            onChange={e => updateReturnCartQty(c.product.id, parseInt(e.target.value) || 0)}
+                          />
+                          <button onClick={() => updateReturnCartQty(c.product.id, 0)} style={{ border: "none", background: "transparent", color: "var(--red)" }}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                  <textarea
+                    className="input"
+                    style={{ width: "100%", height: 60, marginBottom: 12, resize: "none" }}
+                    placeholder={t("suppliers.notes_ph")}
+                    value={returnNotes}
+                    onChange={e => setReturnNotes(e.target.value)}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>{t("common.total")}:</span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: "#d97706" }}>{fmt(cartTotal)} TJS</span>
+                  </div>
+                  <button
+                    style={{
+                      width: "100%",
+                      height: 44,
+                      background: cart.length === 0 || savingReturn ? "rgba(217,119,6,0.4)" : "#d97706",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 10,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: cart.length === 0 || savingReturn ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                    disabled={cart.length === 0 || savingReturn}
+                    onClick={handleCreateReturn}
+                  >
+                    <History size={16} />
+                    {savingReturn ? "..." : t("suppliers.btn_return")}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>,
         document.body
