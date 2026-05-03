@@ -504,11 +504,9 @@ async def import_vitrina_endpoint(
                 )
                 session.add(inventory)
                 inventory_map[product.id] = inventory
-                qty_added += 1
             else:
-                if inventory.quantity == 0:
-                    inventory.quantity = 1
-                    qty_added += 1
+                inventory.quantity += 1
+            qty_added += 1
 
         await session.commit()
     except Exception as e:
