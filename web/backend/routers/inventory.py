@@ -392,6 +392,26 @@ async def dispatch_display(
     }
 
 
+@router.delete("/clear-all")
+async def clear_all_inventory(
+    session: AsyncSession = Depends(get_async_session),
+    current_user: Employee = Depends(get_current_user),
+):
+    """Clear all inventory and display inventory data"""
+    if current_user.role not in [UserRole.OWNER, UserRole.ADMIN]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Delete all display inventory
+    await session.execute(delete(DisplayInventory))
+    
+    # Delete all regular inventory
+    await session.execute(delete(Inventory))
+    
+    await session.commit()
+    
+    return {"message": "All inventory data cleared successfully"}
+
+
 @router.post(
     "/import-vitrina",
     response_model=dict,

@@ -1,3 +1,4 @@
+
 import { clearAuth, notifyAuthExpired } from "./auth";
 
 const getApiBase = () => {
@@ -254,6 +255,11 @@ export const api = {
     request<{success: boolean; store: string; created: number; updated: number; added_qty: number}>("/inventory/import-vitrina", {
       method: "POST",
       body: JSON.stringify({ store_id, items })
+    }),
+
+  clearInventory: () =>
+    request<{message: string}>("/inventory/clear-all", {
+      method: "DELETE"
     }),
 
   // Stores
