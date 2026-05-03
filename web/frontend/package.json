@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@next/swc-darwin-arm64": "^16.2.2",
     "@tanstack/react-query": "^5.95.2",
     "axios": "^1.14.0",
     "clsx": "^2.1.1",
