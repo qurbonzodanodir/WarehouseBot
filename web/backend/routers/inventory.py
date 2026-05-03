@@ -397,152 +397,55 @@ async def import_csv_endpoint(
 
     try:
         content = await file.read()
-        
-        headers = []
-        rows = []
-        
+        parsed_rows = []
+
         if file.filename and file.filename.lower().endswith(".xlsx"):
             import openpyxl
             wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-            # Read all sheets searching for a header
-            header_row_idx = -1
-            active_headers = []
-            active_rows = []
+            sheet = wb.active
             
-            for sheet_name in wb.sheetnames:
-                sheet = wb[sheet_name]
-                sheet_data = list(sheet.iter_rows(values_only=True))
-                if not sheet_data:
-                    continue
-                    
-                for i, row_data in enumerate(sheet_data):
-                    # Check if this row looks like a header (Sku, Артикул, Название, Наим, Кол, Цена, S/N)
-                    r_str = [str(cell).strip().lower() if cell is not None else "" for cell in row_data]
-                    keywords = ["sku", "артикул", "название", "наим", "кол", "цена", "price", "s/n", "serial"]
-                    
-                    if any(k in h for h in r_str for k in keywords):
-                        header_row_idx = i
-                        active_headers = r_str
-                        # Found it! Now collect the rest of the rows in this sheet
-                        for rd in sheet_data[i+1:]:
-                            if any(rd): # Skip totally empty rows
-                                active_rows.append([str(c).strip() if c is not None else "" for c in rd])
-                        break
-                
-                if header_row_idx != -1:
-                    headers = active_headers
-                    rows = active_rows
-                    logger.info("Found header in sheet '%s' at row %d: %s", sheet_name, header_row_idx, headers)
-                    break
+            sheet_data = list(sheet.iter_rows(values_only=True))
+            if not sheet_data:
+                raise HTTPException(status_code=400, detail="Таблица пуста")
             
-            if header_row_idx == -1:
-                first_sheet = wb.sheetnames[0]
-                sheet_0 = wb[first_sheet]
-                rows_0 = list(sheet_0.iter_rows(values_only=True))
-                first_row = [str(cell) for cell in rows_0[0]] if rows_0 else "empty"
-                raise HTTPException(status_code=400, detail=f"Не удалось найти таблицу. Проверьте названия колонок (Sku, Кол-во, Цена). Первая строка листа '{first_sheet}': {first_row}")
+            brands_row = sheet_data[0]
+            brands_map = {}
+            for col_idx, cell in enumerate(brands_row):
+                if cell is not None:
+                    brand_name = str(cell).strip()
+                    if brand_name:
+                        brands_map[col_idx] = brand_name
+            
+            if not brands_map:
+                raise HTTPException(status_code=400, detail="Не найдены названия брендов в первой строке таблицы.")
+            
+            for row in sheet_data[1:]:
+                for col_idx, cell in enumerate(row):
+                    if col_idx in brands_map and cell is not None:
+                        sku = str(cell).strip()
+                        if sku and "пример" not in sku.lower() and sku.lower() != "sku":
+                            parsed_rows.append({
+                                "sku": sku, 
+                                "brand": brands_map[col_idx], 
+                                "qty": 1, 
+                                "price": Decimal("0.00")
+                            })
+            logger.info("Found %d items in Excel", len(parsed_rows))
         else:
-            # Decode considering BOM for Excel CSV exports
-            try:
-                decoded_content = content.decode('utf-8-sig')
-            except UnicodeDecodeError:
-                try:
-                    decoded_content = content.decode('windows-1251')
-                except Exception:
-                    raise HTTPException(status_code=400, detail="Не удалось определить кодировку файла (попробуйте UTF-8 или Excel)")
-                
-            all_lines = [
-                line.strip() for line in decoded_content.splitlines() if line.strip()
-            ]
+            raise HTTPException(status_code=400, detail="Поддерживаются только файлы .xlsx (Excel)")
             
-            # Smart delimiter detection
-            delimiter = ";"
-            if all_lines:
-                # Try common delimiters and see which gives more columns in the first line
-                comma_cols = len(all_lines[0].split(","))
-                semicolon_cols = len(all_lines[0].split(";"))
-                if comma_cols > semicolon_cols:
-                    delimiter = ","
-                    logger.info("Detected comma delimiter (cols: %d)", comma_cols)
-            
-            reader = csv.reader(all_lines, delimiter=delimiter)
-            
-            header_found = False
-            for row_data in reader:
-                if not row_data:
-                    continue
-                row_str = [h.strip().lower() for h in row_data]
-                if not header_found:
-                    # Check for keywords
-                    keywords = ["sku", "артикул", "название", "наим", "кол", "цена", "price", "s/n", "serial"]
-                    if any(k in h for h in row_str for k in keywords):
-                        headers = row_str
-                        header_found = True
-                        logger.info("Found CSV header: %s", headers)
-                    continue
-                rows.append(row_data)
-                
-            if not header_found:
-                first_line = all_lines[0] if all_lines else "empty"
-                raise HTTPException(status_code=400, detail=f"Не найдена шапка в CSV. Первая строка: {first_line}. Проверьте заголовки: Sku, Кол-во, Цена")
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Import error")
         raise HTTPException(status_code=400, detail=f"Ошибка чтения файла: {str(e)}")
 
-    idx_sku, idx_qty, idx_price = -1, -1, -1
-    
-    # Smarter mapping: check for partial matches and exact matches
-    for i, h in enumerate(headers):
-        h_clean = h.strip().lower()
-        if h_clean in ["sku", "артикул", "код", "товар"]:
-            idx_sku = i
-        elif "sku" in h_clean or "артикул" in h_clean or "название" in h_clean:
-            if idx_sku == -1:
-                idx_sku = i
-            
-        if any(x in h_clean for x in ["kolichestva", "kolichestvo", "склад", "количество", "qty", "шт", "остаток"]):
-            idx_qty = i
-        elif any(x in h_clean for x in ["sena", "цена", "price", "cost", "сумма", "стоимость"]):
-            idx_price = i
-
-    if idx_sku == -1:
-        raise HTTPException(status_code=400, detail=f"В шапке таблицы не найдена колонка для SKU (артикула). Найденные колонки: {headers}")
-
-    def parse_qty(val: str):
-        try:
-            return int(float(val)) if val else 0
-        except Exception:
-            return 0
-            
-    def parse_price(val: str):
-        try:
-            val = val.replace(',', '.')
-            return Decimal(val) if val else Decimal("0.00")
-        except Exception:
-            return Decimal("0.00")
-
     products_to_add = 0
     products_updated = 0
     qty_added = 0
 
     try:
-        parsed_rows = []
-        skus: set[str] = set()
-        for row in rows:
-            if not row or len(row) <= idx_sku:
-                continue
-            
-            sku = str(row[idx_sku]).strip()
-            if not sku or "пример" in sku.lower() or sku.lower() == "sku":
-                continue
-            
-            qty = parse_qty(str(row[idx_qty])) if idx_qty != -1 and len(row) > idx_qty else 0
-            price = parse_price(str(row[idx_price])) if idx_price != -1 and len(row) > idx_price else Decimal("0.00")
-            parsed_rows.append({"sku": sku, "qty": qty, "price": price})
-            skus.add(sku)
-
+        skus: set[str] = {row["sku"] for row in parsed_rows}
         products_result = await session.execute(select(Product).where(Product.sku.in_(skus)))
         products_map: dict[str, Product] = {
             product.sku: product for product in products_result.scalars().all()
@@ -550,32 +453,25 @@ async def import_csv_endpoint(
 
         for row in parsed_rows:
             sku = row["sku"]
-            price = row["price"]
             product = products_map.get(sku)
             if not product:
                 product = Product(
                     sku=sku,
-                    brand=ProductService.infer_brand_from_sku(sku),
-                    price=price,
+                    brand=row["brand"],
+                    price=row["price"],
                     is_active=True,
                 )
                 session.add(product)
                 products_map[sku] = product
                 products_to_add += 1
             else:
-                if price > 0:
-                    product.price = price
                 products_updated += 1
 
         await session.flush()
 
         inventory_model = DisplayInventory if store.store_type == StoreType.STORE else Inventory
-        product_ids = list({
-            product.id for row in parsed_rows
-            if row["qty"] > 0
-            for product in [products_map[row["sku"]]]
-            if product.id is not None
-        })
+        product_ids = list({product.id for product in products_map.values() if product.id is not None})
+        
         inventory_map: dict[int, DisplayInventory | Inventory] = {}
         if product_ids:
             inventory_result = await session.execute(
@@ -590,10 +486,6 @@ async def import_csv_endpoint(
             }
 
         for row in parsed_rows:
-            qty = row["qty"]
-            if qty <= 0:
-                continue
-
             product = products_map[row["sku"]]
             inventory = inventory_map.get(product.id)
 
@@ -601,13 +493,16 @@ async def import_csv_endpoint(
                 inventory = inventory_model(
                     store_id=store.id,
                     product_id=product.id,
-                    quantity=qty,
+                    quantity=row["qty"],
                 )
                 session.add(inventory)
                 inventory_map[product.id] = inventory
+                qty_added += row["qty"]
             else:
-                inventory.quantity += qty
-            qty_added += qty
+                # If it already exists with 0 qty, set it to 1. If it's > 0, leave it alone.
+                if inventory.quantity == 0:
+                    inventory.quantity = 1
+                    qty_added += 1
 
         await session.commit()
     except Exception as e:
