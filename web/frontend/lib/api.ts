@@ -6,9 +6,9 @@ const getApiBase = () => {
     return explicitBase.replace(/\/$/, "");
   }
   if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:8030/api`;
+    return "/api";
   }
-  return "http://127.0.0.1:8030/api";
+  return "http://backend:8000/api";
 };
 
 type ApiErrorItem = {
