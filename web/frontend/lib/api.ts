@@ -244,22 +244,11 @@ export const api = {
     request<{success: boolean; product_id: number; new_quantity: number}>("/inventory/receive", { method: "POST", body: JSON.stringify(data) }),
   bulkReceiveStock: (data: { items: { sku: string; quantity: number; price?: number; brand?: string }[], replace_quantity?: boolean }) =>
     request<{success: boolean; processed: number; created: number}>("/inventory/bulk-receive", { method: "POST", body: JSON.stringify(data) }),
-  importInventoryCSV: async (store_id: number | null, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    if (store_id !== null) formData.append("store_id", store_id.toString());
-    
-    const res = await fetch(`${getApiBase()}/inventory/import-csv`, { 
-      method: "POST", 
-      body: formData,
-      credentials: "include"
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(()=>({}));
-      throw new Error(err.detail || "Upload failed");
-    }
-    return res.json() as Promise<{success: boolean; store: string; created: number; updated: number; added_qty: number}>;
-  },
+  importVitrina: (store_id: number, items: { sku: string; brand: string }[]) =>
+    request<{success: boolean; store: string; created: number; updated: number; added_qty: number}>("/inventory/import-vitrina", {
+      method: "POST",
+      body: JSON.stringify({ store_id, items })
+    }),
 
   // Stores
   getStores: () => request<Store[]>("/stores"),

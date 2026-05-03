@@ -12,7 +12,7 @@ from app.models.inventory import Inventory
 from app.models.enums import UserRole
 from app.models.store import Store
 from web.backend.dependencies import CurrentUser, SessionDep
-from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, BulkReceiveInput, DispatchDisplayInput
+from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, BulkReceiveInput, DispatchDisplayInput, BulkVitrinaInput
 from app.bot.bot import bot
 from app.services.notification_service import NotificationService
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -366,16 +366,15 @@ async def dispatch_display(
 
 
 @router.post(
-    "/import-csv",
+    "/import-vitrina",
     response_model=dict,
-    summary="Импорт товаров из CSV файла",
-    description="Загружает CSV файл, создает товары и добавляет остатки в указанный магазин.",
+    summary="Массовая загрузка товаров на витрину",
+    description="Принимает JSON со списком товаров и добавляет их в выбранный магазин (по 1 шт).",
 )
-async def import_csv_endpoint(
+async def import_vitrina_endpoint(
+    body: BulkVitrinaInput,
     session: SessionDep,
     current_user: CurrentUser,
-    file: UploadFile = File(...),
-    store_id: int = Form(None)
 ) -> dict:
     if current_user.role not in (UserRole.OWNER, UserRole.WAREHOUSE):
         raise HTTPException(status_code=403, detail="Access denied")
@@ -385,80 +384,29 @@ async def import_csv_endpoint(
     
     store_svc = StoreService(session)
     
-    if store_id:
-        store = await session.get(Store, store_id)
-        if not store:
-            raise HTTPException(status_code=404, detail="Указанный магазин/склад не найден")
-    else:
-        warehouse_id = await store_svc.get_main_warehouse_id()
-        if not warehouse_id:
-            raise HTTPException(status_code=404, detail="Главный склад не найден")
-        store = await session.get(Store, warehouse_id)
-
-    try:
-        content = await file.read()
-        parsed_rows = []
-
-        if file.filename and file.filename.lower().endswith(".xlsx"):
-            import openpyxl
-            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-            sheet = wb.active
-            
-            sheet_data = list(sheet.iter_rows(values_only=True))
-            if not sheet_data:
-                raise HTTPException(status_code=400, detail="Таблица пуста")
-            
-            brands_row = sheet_data[0]
-            brands_map = {}
-            for col_idx, cell in enumerate(brands_row):
-                if cell is not None:
-                    brand_name = str(cell).strip()
-                    if brand_name:
-                        brands_map[col_idx] = brand_name
-            
-            if not brands_map:
-                raise HTTPException(status_code=400, detail="Не найдены названия брендов в первой строке таблицы.")
-            
-            for row in sheet_data[1:]:
-                for col_idx, cell in enumerate(row):
-                    if col_idx in brands_map and cell is not None:
-                        sku = str(cell).strip()
-                        if sku and "пример" not in sku.lower() and sku.lower() != "sku":
-                            parsed_rows.append({
-                                "sku": sku, 
-                                "brand": brands_map[col_idx], 
-                                "qty": 1, 
-                                "price": Decimal("0.00")
-                            })
-            logger.info("Found %d items in Excel", len(parsed_rows))
-        else:
-            raise HTTPException(status_code=400, detail="Поддерживаются только файлы .xlsx (Excel)")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Import error")
-        raise HTTPException(status_code=400, detail=f"Ошибка чтения файла: {str(e)}")
+    store = await session.get(Store, body.store_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Указанный магазин/склад не найден")
 
     products_to_add = 0
     products_updated = 0
     qty_added = 0
 
     try:
-        skus: set[str] = {row["sku"] for row in parsed_rows}
+        skus: set[str] = {item.sku for item in body.items}
         products_result = await session.execute(select(Product).where(Product.sku.in_(skus)))
         products_map: dict[str, Product] = {
             product.sku: product for product in products_result.scalars().all()
         }
 
-        for row in parsed_rows:
-            sku = row["sku"]
+        for item in body.items:
+            sku = item.sku
             product = products_map.get(sku)
             if not product:
                 product = Product(
                     sku=sku,
-                    brand=row["brand"],
-                    price=row["price"],
+                    brand=item.brand,
+                    price=Decimal("0.00"),
                     is_active=True,
                 )
                 session.add(product)
@@ -485,21 +433,20 @@ async def import_csv_endpoint(
                 for inventory in inventory_result.scalars().all()
             }
 
-        for row in parsed_rows:
-            product = products_map[row["sku"]]
+        for item in body.items:
+            product = products_map[item.sku]
             inventory = inventory_map.get(product.id)
 
             if not inventory:
                 inventory = inventory_model(
                     store_id=store.id,
                     product_id=product.id,
-                    quantity=row["qty"],
+                    quantity=1,
                 )
                 session.add(inventory)
                 inventory_map[product.id] = inventory
-                qty_added += row["qty"]
+                qty_added += 1
             else:
-                # If it already exists with 0 qty, set it to 1. If it's > 0, leave it alone.
                 if inventory.quantity == 0:
                     inventory.quantity = 1
                     qty_added += 1

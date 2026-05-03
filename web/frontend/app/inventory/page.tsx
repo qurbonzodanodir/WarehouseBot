@@ -6,7 +6,8 @@ import { api, Store, InventoryItem, StoreCatalogCard } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Package, Search, Store as StoreIcon, DollarSign, Boxes, Warehouse, Database } from "lucide-react";
+import { Package, Search, Store as StoreIcon, DollarSign, Boxes, Warehouse, Database, X } from "lucide-react";
+import * as XLSX from "xlsx";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
@@ -24,6 +25,10 @@ export default function InventoryPage() {
 
   const [catalog, setCatalog] = useState<StoreCatalogCard[]>([]);
   const [userRole, setUserRole] = useState<string>("seller");
+
+  const [importData, setImportData] = useState<{sku: string, brand: string}[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const user = getStoredUser();
@@ -59,6 +64,22 @@ export default function InventoryPage() {
       setCatalog([]);
     }
   }, [selectedStore]);
+
+  const handleConfirmImport = async () => {
+    if (!selectedStore || importData.length === 0) return;
+    setImporting(true);
+    try {
+      const res = await api.importVitrina(selectedStore, importData);
+      showToast(`✅ Загружено успешно! Фирм: ${new Set(importData.map(d=>d.brand)).size}, Артикулов: ${importData.length}. Сохранено новых: ${res.created}, обновлено на витрине: ${res.added_qty}`, "success");
+      setIsImportModalOpen(false);
+      setImportData([]);
+      api.getInventory(selectedStore).then(setItems);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Ошибка сохранения", "error");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const mergedItems = useMemo(() => {
     const byProduct = new Map<number, InventoryItem>();
@@ -108,34 +129,64 @@ export default function InventoryPage() {
                 id="csv-upload" 
                 hidden 
                 accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                onChange={async (e) => {
+                onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  try {
-                    setLoading(true);
-                    const res = await api.importInventoryCSV(selectedStore, file);
-                    showToast(`✅ Загружено успешно! Новых: ${res.created}, Обновлено: ${res.updated}, Добавлено шт: ${res.added_qty}`, "success");
-                    // reload
-                    if (!selectedStore) {
-                      api.getStoreCatalog().then(setCatalog);
-                    } else {
-                      api.getInventory(selectedStore).then(setItems);
-                    }
-                  } catch (error) {
-                    const message = error instanceof Error ? error.message : "Неизвестная ошибка";
-                    showToast(`❌ Ошибка импорта: ${message}`, "error");
-                  } finally {
-                    setLoading(false);
+                  if (!selectedStore) {
+                    showToast("Сначала выберите магазин (витрину)!", "error");
                     e.target.value = "";
+                    return;
                   }
+                  const reader = new FileReader();
+                  reader.onload = (evt) => {
+                    try {
+                      const bstr = evt.target?.result;
+                      const wb = XLSX.read(bstr, { type: "binary" });
+                      const wsname = wb.SheetNames[0];
+                      const ws = wb.Sheets[wsname];
+                      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+                      if (data.length < 2) {
+                        showToast("Файл пустой или неверный формат", "error");
+                        return;
+                      }
+                      const brandsRow = data[0];
+                      const brandsMap: Record<number, string> = {};
+                      for (let i = 0; i < brandsRow.length; i++) {
+                        if (brandsRow[i]) brandsMap[i] = String(brandsRow[i]).trim();
+                      }
+                      const parsed: {sku: string, brand: string}[] = [];
+                      for (let r = 1; r < data.length; r++) {
+                        for (let c = 0; c < data[r].length; c++) {
+                          if (brandsMap[c] && data[r][c]) {
+                            const sku = String(data[r][c]).trim();
+                            if (sku && !sku.toLowerCase().includes("пример") && sku.toLowerCase() !== "sku") {
+                              parsed.push({ sku, brand: brandsMap[c] });
+                            }
+                          }
+                        }
+                      }
+                      setImportData(parsed);
+                      setIsImportModalOpen(true);
+                    } catch (err) {
+                      showToast("Ошибка чтения файла", "error");
+                    }
+                  };
+                  reader.readAsBinaryString(file);
+                  e.target.value = "";
                 }}
               />
               <button 
                 className="btn"
                 style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)", height: "fit-content", padding: "10px 16px" }}
-                onClick={() => document.getElementById("csv-upload")?.click()}
+                onClick={() => {
+                  if (!selectedStore) {
+                    showToast("Сначала выберите магазин!", "error");
+                    return;
+                  }
+                  document.getElementById("csv-upload")?.click();
+                }}
               >
-                <Database size={16} /> Загрузить Excel (CSV)
+                <Database size={16} /> Загрузить Excel
               </button>
             </div>
           )}
@@ -282,6 +333,60 @@ export default function InventoryPage() {
           </div>
         )}
       </main>
+
+      {isImportModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsImportModalOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: 600, width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Database size={20} /> Предпросмотр: Витрина
+              </h3>
+              <button className="btn-close" onClick={() => setIsImportModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ padding: "0 24px", color: "var(--text-secondary)", fontSize: 14 }}>
+              Будет загружено: <strong style={{color:"var(--text-primary)"}}>{importData.length}</strong> артикулов по 1 шт на выбранную витрину.
+            </div>
+
+            <div className="modal-body" style={{ flex: 1, overflowY: "auto", marginTop: 12 }}>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Бренд (Колонка)</th>
+                      <th>Артикул</th>
+                      <th style={{ textAlign: "center" }}>Кол-во</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importData.slice(0, 100).map((row, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{row.brand}</td>
+                        <td style={{ fontWeight: 700, fontFamily: "monospace", color: "var(--accent)" }}>{row.sku}</td>
+                        <td style={{ textAlign: "center", fontWeight: 700 }}>1 шт</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {importData.length > 100 && (
+                  <div style={{ padding: 16, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                    ... и еще {importData.length - 100} товаров.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: "1px solid var(--border)", paddingTop: 16, marginTop: 16 }}>
+              <button className="btn btn-ghost" onClick={() => setIsImportModalOpen(false)} disabled={importing}>Отмена</button>
+              <button className="btn btn-primary" onClick={handleConfirmImport} disabled={importing}>
+                {importing ? <div className="spinner" style={{width: 16, height: 16}} /> : "Подтвердить и загрузить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

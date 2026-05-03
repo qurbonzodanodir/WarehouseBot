@@ -70,3 +70,13 @@ class DispatchDisplayInput(BaseModel):
     product_id: int
     target_store_id: int
     quantity: int = Field(..., gt=0)
+
+
+class BulkVitrinaItem(BaseModel):
+    sku: str = Field(..., min_length=1)
+    brand: str = Field(..., min_length=1)
+
+
+class BulkVitrinaInput(BaseModel):
+    store_id: int
+    items: list[BulkVitrinaItem]
