@@ -4,7 +4,7 @@ from decimal import Decimal
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends
 import csv
 import io
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import joinedload
 
 from app.models.display_inventory import DisplayInventory
@@ -394,8 +394,8 @@ async def dispatch_display(
 
 @router.delete("/clear-all")
 async def clear_all_inventory(
-    session: AsyncSession = Depends(get_async_session),
-    current_user: Employee = Depends(get_current_user),
+    session: SessionDep,
+    current_user: CurrentUser,
 ):
     """Clear all inventory and display inventory data"""
     if current_user.role not in [UserRole.OWNER, UserRole.ADMIN]:
