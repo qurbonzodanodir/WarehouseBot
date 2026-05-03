@@ -195,7 +195,7 @@ export default function InventoryPage() {
             <option value="">{t("inventory.all_stores")}</option>
             {stores.map((store) => (
               <option key={store.id} value={store.id}>
-                {store.name} {store.total_items > 0 && `(${fmt(store.total_items)})`}
+                {store.name} {store.total_items && store.total_items > 0 && `(${fmt(store.total_items)})`}
               </option>
             ))}
           </select>
