@@ -159,8 +159,10 @@ export default function InventoryPage() {
                         for (let c = 0; c < data[r].length; c++) {
                           if (brandsMap[c] && data[r][c]) {
                             let sku = String(data[r][c]).trim();
-                            // Fix Excel removing leading zeros: pad numeric SKUs to 5 digits
-                            if (/^\d+$/.test(sku) && sku.length < 5) {
+                            // Fix Excel removing leading zeros: handle oo prefix and pad numeric SKUs
+                            if (sku.startsWith('oo') && /^\d+$/.test(sku.slice(2))) {
+                              sku = '00' + sku.slice(2);
+                            } else if (/^\d+$/.test(sku) && sku.length < 5) {
                               sku = sku.padStart(5, '0');
                             }
                             if (sku && !sku.toLowerCase().includes("пример") && sku.toLowerCase() !== "sku") {
