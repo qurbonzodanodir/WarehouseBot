@@ -10,7 +10,7 @@ import { Package, Search, Store as StoreIcon, DollarSign, Boxes, Warehouse, Data
 import * as XLSX from "xlsx";
 
 function fmt(n: number) {
-  return new Intl.NumberFormat("ru-RU").format(n);
+  return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
 }
 
 export default function InventoryPage() {
@@ -36,13 +36,20 @@ export default function InventoryPage() {
 
   useEffect(() => {
     const user = getStoredUser();
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
+    if (!isAuthenticated() || !user) { router.push("/login"); return; }
     setUserRole(user.role);
-    
-    api.getStores().then(setStores).catch(console.error);
+    api.getStores().then((data) => {
+      const visibleStores = user.role === "seller"
+        ? data.filter((s) => s.id === user.store_id)
+        : data;
+      setStores(visibleStores);
+      // For owner/warehouse default to all stores (null), for seller default to their store
+      if (user.role === "seller" && visibleStores.length > 0) {
+        setSelectedStore(visibleStores[0].id);
+      } else {
+        setSelectedStore(null);
+      }
+    });
   }, [router]);
 
   useEffect(() => {
@@ -174,92 +181,162 @@ export default function InventoryPage() {
               <button 
                 className="btn"
                 style={{ background: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)", height: "fit-content", padding: "10px 16px" }}
-                onClick={() => document.getElementById('csv-upload')?.click()}
+                onClick={() => {
+                  if (!selectedStore) {
+                    showToast("Сначала выберите магазин!", "error");
+                    return;
+                  }
+                  document.getElementById("csv-upload")?.click();
+                }}
               >
-                <Database size={18} style={{ marginRight: 8 }} />
-                Загрузить Excel
+                <Database size={16} /> Загрузить Excel
               </button>
             </div>
           )}
         </div>
 
-        <div className="page-filters">
-          <select 
-            className="select" 
-            value={selectedStore ?? ""} 
-            onChange={(e) => {
-              setSelectedStore(e.target.value ? Number(e.target.value) : null);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="">{t("inventory.all_stores")}</option>
-            {stores.map((store) => (
-              <option key={store.id} value={store.id}>
-                {store.name} {store.total_items > 0 && `(${fmt(store.total_items)})`}
-              </option>
+
+        {/* Store selector */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+            {userRole !== "seller" && (
+              <button
+                onClick={() => setSelectedStore(null)}
+                style={{
+                  padding: "9px 16px",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: selectedStore === null ? "var(--accent)" : "transparent",
+                  color: selectedStore === null ? "#fff" : "var(--text-secondary)",
+                  transition: "all 0.15s",
+                }}
+              >
+                {t("orders.all_stores")}
+              </button>
+            )}
+            {stores.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedStore(s.id)}
+                style={{
+                  padding: "9px 16px",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  background: selectedStore === s.id ? "var(--accent)" : "transparent",
+                  color: selectedStore === s.id ? "#fff" : "var(--text-secondary)",
+                  transition: "all 0.15s",
+                }}
+              >
+                {s.name}
+              </button>
             ))}
-          </select>
-          <div className="input-group" style={{ flex: 1, maxWidth: 400 }}>
-            <Search size={18} style={{ color: "var(--text-secondary)" }} />
+          </div>
+
+          <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+            <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
             <input
-              type="text"
               className="input"
-              placeholder={t("inventory.search_placeholder")}
+              style={{ paddingLeft: 36 }}
+              placeholder={t("inventory.search")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="page-content">
-          {loading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-              <div className="spinner" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="empty-state">
-              <Package size={40} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
-              {t("inventory.empty")}
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <React.Fragment>
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ width: "50px" }}>№</th>
-                    <th>{t("inventory.col_sku")}</th>
-                    <th style={{ textAlign: "center" }}>{t("inventory.col_qty")}</th>
-                    <th style={{ textAlign: "center" }}>{t("inventory.col_status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((item, index) => (
-                    <tr key={item.product_id}>
-                      <td data-label="№" style={{ textAlign: "center", fontWeight: 600, color: "var(--text-secondary)" }}>
-                        {index + 1}
-                      </td>
-                      <td data-label={t("inventory.col_sku")} style={{ fontWeight: 700, color: "var(--accent)", fontFamily: "monospace", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-                        {item.product_sku}
-                        {item.is_display && (
-                          <span className="badge badge-pending" style={{ fontSize: 10, padding: "2px 6px" }}>
-                            {t("inventory.is_display")}
-                          </span>
-                        )}
-                      </td>
-                      <td data-label={t("inventory.col_qty")} style={{ textAlign: "center", fontWeight: 700 }}>
-                        {item.quantity} шт
-                      </td>
-                      <td data-label={t("inventory.col_status")} style={{ textAlign: "center" }}>
-                        <span className={`badge ${item.quantity > 5 ? 'badge-delivered' : 'badge-pending'}`}>
-                          {item.quantity > 5 ? t("inventory.status_in_stock") : t("inventory.status_low")}
-                        </span>
-                      </td>
+        {selectedStore === null ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
+            {loading ? (
+              <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "center", padding: 60 }}>
+                <div className="spinner" />
+              </div>
+            ) : catalog.length === 0 ? (
+              <div className="card empty-state" style={{ gridColumn: "1 / -1" }}>
+                <StoreIcon size={40} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
+                {t("management.no_stores")}
+              </div>
+            ) : (
+              catalog.map((store) => (
+                <div key={store.id} className="card" style={{ padding: 20, cursor: "pointer", transition: "transform 0.2s" }} onClick={() => setSelectedStore(store.id)}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                    <StoreIcon size={24} style={{ color: "var(--accent)" }} />
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{store.name}</h3>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{store.address || "—"}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 16 }}>
+                    <div style={{ flex: 1, background: "var(--bg)", padding: "12px 14px", borderRadius: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>
+                        <Boxes size={14} /> {t("inventory.goods_label")}
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700 }}>{fmt(store.total_items)} {t("products.pcs")}</div>
+                    </div>
+                    <div style={{ flex: 1, background: "var(--bg)", padding: "12px 14px", borderRadius: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase", marginBottom: 4 }}>
+                        <DollarSign size={14} /> {t("inventory.assets_label")}
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "var(--accent)" }}>{fmt(store.total_value)} TJS</div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            {loading ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+                <div className="spinner" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="empty-state">
+                <Package size={40} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
+                {t("inventory.empty")}
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <React.Fragment>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{ width: "50px" }}>№</th>
+                      <th>{t("inventory.col_sku")}</th>
+                      <th style={{ textAlign: "center" }}>{t("inventory.col_qty")}</th>
+                      <th style={{ textAlign: "center" }}>{t("inventory.col_status")}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              </React.Fragment>
+                  </thead>
+                  <tbody>
+                    {filtered.map((item, index) => (
+                      <tr key={item.product_id}>
+                        <td data-label="№" style={{ textAlign: "center", fontWeight: 600, color: "var(--text-secondary)" }}>
+                          {index + 1}
+                        </td>
+                        <td data-label={t("inventory.col_sku")} style={{ fontWeight: 700, color: "var(--accent)", fontFamily: "monospace", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                          {item.product_sku}
+                          {item.is_display && (
+                            <span className="badge badge-pending" style={{ fontSize: 10, padding: "2px 6px" }}>
+                              {t("inventory.is_display")}
+                            </span>
+                          )}
+                        </td>
+                        <td data-label={t("inventory.col_qty")} style={{ textAlign: "center", fontWeight: 700 }}>
+                          {item.quantity} шт
+                        </td>
+                        <td data-label={t("inventory.col_status")} style={{ textAlign: "center" }}>
+                          <span className={`badge ${item.quantity > 5 ? 'badge-delivered' : 'badge-pending'}`}>
+                            {item.quantity > 5 ? t("inventory.status_in_stock") : t("inventory.status_low")}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               
               {totalPages > 1 && (
                 <div style={{ 
@@ -271,6 +348,7 @@ export default function InventoryPage() {
                   padding: "16px 0",
                   borderTop: "1px solid var(--border)"
                 }}>
+                  {/* Pagination controls */}
                   <button 
                     className="btn btn-ghost" 
                     onClick={() => setCurrentPage(1)}
@@ -315,9 +393,10 @@ export default function InventoryPage() {
                   </button>
                 </div>
               )}
-            </div>
-          )}
-        </div>
+              </React.Fragment>
+            )}
+          </div>
+        )}
       </main>
 
       {isImportModalOpen && (
