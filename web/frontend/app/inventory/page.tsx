@@ -308,14 +308,18 @@ export default function InventoryPage() {
                 <table>
                   <thead>
                     <tr>
+                      <th style={{ width: "50px" }}>№</th>
                       <th>{t("inventory.col_sku")}</th>
                       <th style={{ textAlign: "center" }}>{t("inventory.col_qty")}</th>
                       <th style={{ textAlign: "center" }}>{t("inventory.col_status")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((item) => (
+                    {filtered.map((item, index) => (
                       <tr key={item.product_id}>
+                        <td data-label="№" style={{ textAlign: "center", fontWeight: 600, color: "var(--text-secondary)" }}>
+                          {index + 1}
+                        </td>
                         <td data-label={t("inventory.col_sku")} style={{ fontWeight: 700, color: "var(--accent)", fontFamily: "monospace", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                           {item.product_sku}
                           {item.is_display && (
