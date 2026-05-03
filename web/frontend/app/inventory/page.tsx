@@ -179,13 +179,14 @@ export default function InventoryPage() {
                         for (let c = 0; c < data[r].length; c++) {
                           if (brandsMap[c] && data[r][c]) {
                             let sku = String(data[r][c]).trim();
-                            // Fix Excel removing leading zeros: handle o/oo prefix and pad numeric SKUs
-                            if (sku.startsWith('oo') && /^\d+$/.test(sku.slice(2))) {
-                              sku = '00' + sku.slice(2);
-                            } else if (sku.startsWith('o') && /^\d+$/.test(sku.slice(1))) {
-                              sku = '0' + sku.slice(1);
-                            } else if (/^\d+$/.test(sku) && sku.length < 5) {
-                              sku = sku.padStart(5, '0');
+                            // Fix Excel removing leading zeros: replace all o/O with 0 if result is numeric
+                            const replaced = sku.replace(/[oO]/g, '0');
+                            if (/^\d+$/.test(replaced)) {
+                              sku = replaced;
+                              // Pad short numeric SKUs to 5 digits
+                              if (sku.length < 5) {
+                                sku = sku.padStart(5, '0');
+                              }
                             }
                             if (sku && !sku.toLowerCase().includes("пример") && sku.toLowerCase() !== "sku") {
                               parsed.push({ sku, brand: brandsMap[c] });
