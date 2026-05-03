@@ -192,7 +192,8 @@ export const ru = {
   inventory: {
     title: "Остатки",
     found: "{count} единиц товара",
-    search: "Поиск по SKU...",
+    all_stores: "Все магазины",
+    search_placeholder: "Поиск по SKU...",
     col_sku: "SKU",
     col_qty: "Количество",
     col_status: "Статус",

@@ -189,7 +189,8 @@ export const tj = {
   inventory: {
     title: "Бақияи анбор",
     found: "{count} дона мол",
-    search: "Ҷустуҷӯ аз рӯи SKU...",
+    all_stores: "Ҳамаи мағозаҳо",
+    search_placeholder: "Ҷустуҷӯ аз рӯи SKU...",
     col_sku: "SKU",
     col_qty: "Миқдор",
     col_status: "Вазъият",
