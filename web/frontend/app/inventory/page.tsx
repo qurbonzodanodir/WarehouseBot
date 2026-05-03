@@ -181,7 +181,15 @@ export default function InventoryPage() {
                       const brandsRow = data[0];
                       const brandsMap: Record<number, string> = {};
                       for (let i = 0; i < brandsRow.length; i++) {
-                        if (brandsRow[i]) brandsMap[i] = String(brandsRow[i]).trim();
+                        if (brandsRow[i]) {
+                          let brandName = String(brandsRow[i]).trim();
+                          // Fix Excel removing leading zeros in brand headers (e.g. "o53" → "053")
+                          const replacedBrand = brandName.replace(/[oO]/g, '0');
+                          if (/^\d+$/.test(replacedBrand)) {
+                            brandName = replacedBrand;
+                          }
+                          brandsMap[i] = brandName;
+                        }
                       }
                       const parsed: {sku: string, brand: string}[] = [];
                       for (let r = 1; r < data.length; r++) {
