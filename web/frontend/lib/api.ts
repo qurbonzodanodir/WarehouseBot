@@ -432,6 +432,7 @@ export interface Store {
   store_type: string;
   current_debt: number;
   is_active: boolean;
+  total_items?: number;
 }
 
 export interface Employee {
