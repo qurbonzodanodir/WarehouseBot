@@ -397,9 +397,11 @@ async def clear_all_inventory(
     session: SessionDep,
     current_user: CurrentUser,
 ):
-    """Clear all inventory and display inventory data"""
+    """Clear all inventory, display inventory AND products catalog"""
     if current_user.role not in [UserRole.OWNER, UserRole.ADMIN]:
         raise HTTPException(status_code=403, detail="Access denied")
+    
+    from app.models.product import Product
     
     # Delete all display inventory
     await session.execute(delete(DisplayInventory))
@@ -407,9 +409,12 @@ async def clear_all_inventory(
     # Delete all regular inventory
     await session.execute(delete(Inventory))
     
+    # Delete all products from catalog
+    await session.execute(delete(Product))
+    
     await session.commit()
     
-    return {"message": "All inventory data cleared successfully"}
+    return {"message": "All inventory and products cleared successfully"}
 
 
 @router.post(
