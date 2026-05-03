@@ -337,7 +337,6 @@ export default function InventoryPage() {
                 </table>
               </div>
               
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div style={{ 
                   display: "flex", 
@@ -348,6 +347,7 @@ export default function InventoryPage() {
                   padding: "16px 0",
                   borderTop: "1px solid var(--border)"
                 }}>
+                  {/* Pagination controls */}
                   <button 
                     className="btn btn-ghost" 
                     onClick={() => setCurrentPage(1)}
