@@ -179,13 +179,11 @@ async def list_products(
 
     if search:
         pattern = f"%{search.lower()}%"
-        from sqlalchemy import func
         stmt = stmt.where(
             func.lower(Product.sku).like(pattern) | func.lower(Product.brand).like(pattern)
         )
 
     # Total count for pagination
-    from sqlalchemy import func
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total_res = await session.execute(count_stmt)
     total = total_res.scalar() or 0
