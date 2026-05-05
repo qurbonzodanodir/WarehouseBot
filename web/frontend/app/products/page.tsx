@@ -116,6 +116,41 @@ export default function ProductsPage() {
     () => brandOptions.filter((b) => b.name !== "UNKNOWN"),
     [brandOptions]
   );
+  // Return options: only non-warehouse stores with positive qty for selected product
+  const returnOptions = React.useMemo(() => {
+    if (!returnProduct) return [] as ProductInventoryOut[];
+    const inv = inventoryCache[returnProduct.id] || [];
+    return inv.filter(o => o.quantity > 0 && stores.find(s => s.id === o.store_id)?.store_type !== "warehouse");
+  }, [returnProduct, inventoryCache, stores]);
+  const selectedInv = React.useMemo(() => {
+    const sid = Number(returnStoreId || 0);
+    return returnOptions.find(o => o.store_id === sid);
+  }, [returnOptions, returnStoreId]);
+  const maxReturnQty = selectedInv?.quantity ?? 0;
+  // Sync modal state when product changes or modal opens
+  useEffect(() => {
+    if (isReturnModalOpen && returnProduct) {
+      const options = returnOptions;
+      const sid = Number(returnStoreId || 0);
+      // Ensure selected store is in valid options
+      const valid = options.find(o => o.store_id === sid);
+      if (!valid && options.length > 0) {
+        setReturnStoreId(String(options[0].store_id));
+      }
+      // Default preferDisplay based on selected inventory's is_display
+      if (valid) {
+        setPreferDisplay(valid.is_display);
+      } else if (options.length > 0) {
+        setPreferDisplay(options[0].is_display);
+      }
+      // Clamp quantity
+      const qty = Number(returnQty || 0);
+      const max = valid ? valid.quantity : (options.length > 0 ? options[0].quantity : 0);
+      if (qty < 1 || qty > max) {
+        setReturnQty(max > 0 ? "1" : "");
+      }
+    }
+  }, [isReturnModalOpen, returnProduct, returnStoreId, returnQty, returnOptions]);
   // Backend now filters by brand, so filteredProducts === products
   const filteredProducts = products;
 
@@ -777,12 +812,21 @@ export default function ProductsPage() {
               <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("dashboard.store")}</label>
               <select className="input" style={{ width: "100%" }} value={returnStoreId} onChange={(e) => setReturnStoreId(e.target.value)}>
                 <option value="">---</option>
-                {stores.filter(s => s.store_type !== "warehouse").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {returnOptions.map(o => {
+                  const s = stores.find(st => st.id === o.store_id);
+                  return s ? <option key={s.id} value={s.id}>{s.name} ({o.quantity} шт)</option> : null;
+                })}
               </select>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("inventory.col_qty")}</label>
-              <input type="number" min="1" className="input" style={{ width: "100%" }} value={returnQty} onChange={e => setReturnQty(e.target.value)} />
+              <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>
+                {t("inventory.col_qty")} {maxReturnQty > 0 && <span style={{ color: "var(--text-secondary)" }}>(макс: {maxReturnQty})</span>}
+              </label>
+              <input type="number" min="1" max={maxReturnQty} className="input" style={{ width: "100%" }} value={returnQty} onChange={e => {
+                const val = Number(e.target.value);
+                if (val >= 1 && val <= maxReturnQty) setReturnQty(e.target.value);
+                else if (val > maxReturnQty) setReturnQty(String(maxReturnQty));
+              }} />
             </div>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: preferDisplay ? "var(--accent)" : "var(--text-secondary)", marginBottom: 16 }}>
               <input type="checkbox" checked={preferDisplay} onChange={e => setPreferDisplay(e.target.checked)} />
@@ -790,7 +834,7 @@ export default function ProductsPage() {
             </label>
             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
               <button className="btn btn-ghost" onClick={() => setIsReturnModalOpen(false)}>{t("common.cancel")}</button>
-              <button className="btn btn-primary" onClick={handleCreateReturn}>{t("common.confirm")}</button>
+              <button className="btn btn-primary" onClick={handleCreateReturn} disabled={!returnQty || Number(returnQty) < 1 || Number(returnQty) > maxReturnQty}>{t("common.confirm")}</button>
             </div>
           </div>
         </div>
