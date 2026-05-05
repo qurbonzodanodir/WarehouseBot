@@ -78,6 +78,22 @@ h3 { font-size: 1rem; font-weight: 600; }
   padding: 20px;
 }
 
+/* Compact store cards */
+.store-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.store-card {
+  padding: 16px;
+  border-radius: 10px;
+  transition: all 0.15s;
+}
+.store-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
 /* ── Modal ───────────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
@@ -497,8 +513,20 @@ select.input { cursor: pointer; }
   }
   .store-chips-scroll button {
     flex-shrink: 0;
-    padding: 6px 10px !important;
-    font-size: 12px !important;
+    padding: 5px 8px !important;
+    font-size: 11px !important;
+  }
+  
+  /* Compact store cards on mobile */
+  .store-card-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+  .store-card {
+    padding: 12px !important;
+  }
+  .store-card h3 {
+    font-size: 14px !important;
   }
   
   /* Modals better adapt */

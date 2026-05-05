@@ -342,66 +342,42 @@ export default function InventoryPage() {
             </div>
           ) : !selectedStore ? (
             // Store cards view for "All stores"
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
+            <div className="store-card-grid">
               {catalog.map((store) => (
                 <div 
                   key={store.id}
-                  className="card"
-                  style={{ 
-                    padding: 20, 
-                    cursor: "pointer",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                    border: "1px solid var(--border)"
-                  }}
+                  className="card store-card"
+                  style={{ cursor: "pointer" }}
                   onClick={() => {
                     setSelectedStore(store.id);
                     setCurrentPage(1);
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                    <StoreIcon size={24} style={{ color: "var(--accent)" }} />
-                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <StoreIcon size={18} style={{ color: "var(--accent)" }} />
+                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
                       {store.name}
                     </h3>
                   </div>
                   
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+                      <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 2 }}>
                         Товаров
                       </div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text-primary)" }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)" }}>
                         {fmt(store.total_items)}
                       </div>
                     </div>
                     
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+                      <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 2 }}>
                         Стоимость
                       </div>
-                      <div style={{ fontSize: 20, fontWeight: 600, color: "var(--accent)" }}>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--accent)" }}>
                         {fmt(store.total_value)} TJS
                       </div>
                     </div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: "8px 12px", 
-                    background: "var(--bg-card)", 
-                    borderRadius: 6, 
-                    textAlign: "center",
-                    fontSize: 13,
-                    color: "var(--text-secondary)"
-                  }}>
-                    Нажмите для просмотра товаров →
                   </div>
                 </div>
               ))}
