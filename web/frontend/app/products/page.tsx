@@ -544,12 +544,12 @@ export default function ProductsPage() {
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: "35px", textAlign: "center", color: "var(--text-muted)" }}>#</th>
-                    <th style={{ width: "80px" }}>{t("products.col_sku")}</th>
-                    <th style={{ width: "auto" }}>{t("products.col_brand")}</th>
-                    <th style={{ width: "80px", textAlign: "right" }}>{t("products.col_price")}</th>
-                    <th style={{ width: "60px", textAlign: "center" }}>{t("common.status")}</th>
-                    {isWarehouse && <th style={{ width: "80px", textAlign: "center" }}>{t("common.actions")}</th>}
+                    <th style={{ width: "30px", textAlign: "center", color: "var(--text-muted)" }}>#</th>
+                    <th style={{ minWidth: "70px" }}>{t("products.col_sku")}</th>
+                    <th>{t("products.col_brand")}</th>
+                    <th style={{ textAlign: "right" }}>{t("products.col_price")}</th>
+                    <th style={{ textAlign: "center" }}>{t("common.status")}</th>
+                    {isWarehouse && <th style={{ textAlign: "center" }}>{t("common.actions")}</th>}
                   </tr>
                 </thead>
                 <tbody>
