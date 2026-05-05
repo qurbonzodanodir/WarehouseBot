@@ -74,6 +74,7 @@ async def get_store_inventory(
             merged[product_id] = InventoryItemOut(
                 product_id=inv.product_id,
                 product_sku=inv.product.sku,
+                product_brand=inv.product.brand or "",
                 quantity=inv.quantity,
                 is_display=False
             )
@@ -87,6 +88,7 @@ async def get_store_inventory(
             merged[product_id] = InventoryItemOut(
                 product_id=inv.product_id,
                 product_sku=inv.product.sku,
+                product_brand=inv.product.brand or "",
                 quantity=inv.quantity,
                 is_display=True
             )
@@ -95,11 +97,14 @@ async def get_store_inventory(
     items_list = list(merged.values())
     items_list.sort(key=lambda x: x.product_sku)
 
-    # Apply search filter (case-insensitive substring over SKU)
+    # Apply search filter (case-insensitive substring over SKU or brand)
     if search:
         q = search.strip().lower()
         if q:
-            items_list = [it for it in items_list if q in it.product_sku.lower()]
+            items_list = [
+                it for it in items_list
+                if q in it.product_sku.lower() or q in it.product_brand.lower()
+            ]
 
     # Apply pagination
     total = len(items_list)

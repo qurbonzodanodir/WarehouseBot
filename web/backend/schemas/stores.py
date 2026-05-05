@@ -32,6 +32,7 @@ class StoreCreate(BaseModel):
 class InventoryItemOut(BaseModel):
     product_id: int
     product_sku: str
+    product_brand: str = ""
     quantity: int
     is_display: bool = False
 

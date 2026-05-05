@@ -414,6 +414,7 @@ export interface ProductUpdate {
 export interface InventoryItem {
   product_id: number;
   product_sku: string;
+  product_brand?: string;
   quantity: number;
   is_display?: boolean;
 }

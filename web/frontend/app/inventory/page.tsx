@@ -418,6 +418,7 @@ export default function InventoryPage() {
                   <tr>
                     <th style={{ width: "50px" }}>№</th>
                     <th>{t("inventory.col_sku")}</th>
+                    <th>Фирма</th>
                     <th style={{ textAlign: "center" }}>{t("inventory.col_qty")}</th>
                     <th style={{ textAlign: "center" }}>{t("inventory.col_status")}</th>
                   </tr>
@@ -435,6 +436,9 @@ export default function InventoryPage() {
                             {t("inventory.is_display")}
                           </span>
                         )}
+                      </td>
+                      <td data-label="Фирма" style={{ fontWeight: 500, color: "var(--text-primary)" }}>
+                        {item.product_brand || "—"}
                       </td>
                       <td data-label={t("inventory.col_qty")} style={{ textAlign: "center", fontWeight: 700 }}>
                         {item.quantity} шт
