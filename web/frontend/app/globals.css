@@ -221,12 +221,12 @@ h3 { font-size: 1rem; font-weight: 600; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 thead th {
-  padding: 10px 14px;
+  padding: 10px 10px;
   text-align: left;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
@@ -236,7 +236,7 @@ tbody tr {
   transition: background 0.1s;
 }
 tbody tr:hover { background: var(--bg-hover); }
-tbody td { padding: 12px 14px; color: var(--text-primary); vertical-align: middle; }
+tbody td { padding: 10px 10px; color: var(--text-primary); vertical-align: middle; }
 tbody tr:last-child { border-bottom: none; }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
@@ -480,26 +480,35 @@ select.input { cursor: pointer; }
     margin-left: auto;
   }
 
-  /* Mobile Tables - horizontal scroll instead of cards */
+  /* Mobile Tables - compact, no horizontal scroll */
   .table-wrap {
-    overflow-x: auto;
+    overflow-x: hidden;
     background: var(--bg-card);
     border-radius: 12px;
     border: 1px solid var(--border);
-    -webkit-overflow-scrolling: touch;
   }
   .table-wrap table {
-    min-width: 500px;
+    min-width: auto;
+    width: 100%;
   }
   .table-wrap thead th {
-    font-size: 10px;
-    padding: 10px 10px;
-    white-space: nowrap;
+    font-size: 9px;
+    padding: 8px 6px;
+    white-space: normal;
+    line-height: 1.2;
   }
   .table-wrap tbody td {
-    padding: 10px 10px;
-    font-size: 13px;
-    white-space: nowrap;
+    padding: 8px 6px;
+    font-size: 12px;
+    white-space: normal;
+  }
+  .table-wrap th:first-child,
+  .table-wrap td:first-child {
+    padding-left: 10px;
+  }
+  .table-wrap th:last-child,
+  .table-wrap td:last-child {
+    padding-right: 10px;
   }
 
   /* Store chips - horizontal scroll on mobile */

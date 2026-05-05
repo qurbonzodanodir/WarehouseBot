@@ -343,11 +343,11 @@ export default function InventoryPage() {
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: "50px" }}>№</th>
-                    <th>{t("inventory.col_sku")}</th>
-                    <th>Фирма</th>
-                    <th style={{ textAlign: "center" }}>{t("inventory.col_qty")}</th>
-                    <th style={{ textAlign: "center" }}>{t("inventory.col_status")}</th>
+                    <th style={{ width: "40px" }}>№</th>
+                    <th style={{ width: "80px" }}>{t("inventory.col_sku")}</th>
+                    <th style={{ width: "auto" }}>Фирма</th>
+                    <th style={{ width: "70px", textAlign: "center" }}>{t("inventory.col_qty")}</th>
+                    <th style={{ width: "60px", textAlign: "center" }}>{t("inventory.col_status")}</th>
                   </tr>
                 </thead>
                 <tbody>
