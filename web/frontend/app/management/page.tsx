@@ -312,10 +312,10 @@ export default function ManagementPage() {
         )}
 
         {/* Main Content Split */}
-        <div className="mobile-stack" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+        <div className="mobile-stack management-split" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
           
           {/* LEFT: Stores Panel */}
-          <div className="mobile-full" style={{ 
+          <div className="mobile-full management-stores-panel" style={{ 
             flex: "0 0 340px", 
             background: "var(--bg-card)", 
             borderRadius: 16, 
@@ -361,6 +361,7 @@ export default function ManagementPage() {
                   return (
                     <div
                       key={s.id}
+                      className="management-store-item"
                       onClick={() => setSelectedStoreId(s.id)}
                       style={{
                         padding: "16px",
@@ -438,7 +439,7 @@ export default function ManagementPage() {
                       </button>
                     </div>
                   </form>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  <div className="management-brand-list" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                     {brands.map((brand) => (
                       <div key={brand.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 999, background: "var(--bg-hover)" }}>
                         <span style={{ fontSize: 13, fontWeight: 600 }}>{brand.name}</span>
@@ -526,7 +527,7 @@ export default function ManagementPage() {
                       {showInactiveEmployees ? "Удаленных сотрудников нет" : t("management.emp_no_emps")}
                     </div>
                   ) : (
-                    <div className="table-wrap" style={{ margin: 0, border: "none" }}>
+                    <div className="table-wrap management-emp-table" style={{ margin: 0, border: "none" }}>
                       <table style={{ margin: 0 }}>
                         <thead style={{ background: "transparent" }}>
                           <tr>
@@ -542,7 +543,7 @@ export default function ManagementPage() {
                               <td style={{ paddingLeft: 24, fontSize: 12, color: "var(--text-muted)" }}>#{emp.id}</td>
                               <td data-label={t("management.col_name")}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--accent-muted)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
+                                  <div className="emp-avatar" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--accent-muted)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
                                     {emp.name.charAt(0).toUpperCase()}
                                   </div>
                                   <div style={{ display: "flex", flexDirection: "column" }}>

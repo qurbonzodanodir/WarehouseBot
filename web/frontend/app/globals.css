@@ -536,6 +536,39 @@ select.input { cursor: pointer; }
   .store-card span {
     font-size: 12px !important;
   }
+
+  /* Management page mobile fixes */
+  .management-split {
+    flex-direction: column !important;
+  }
+  .management-stores-panel {
+    flex: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 300px !important;
+  }
+  .management-store-item {
+    padding: 12px !important;
+  }
+  .management-emp-table th,
+  .management-emp-table td {
+    padding: 8px 6px !important;
+    font-size: 12px;
+  }
+  .management-emp-table .emp-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 12px !important;
+  }
+  .management-brand-list {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .management-brand-list::-webkit-scrollbar {
+    display: none;
+  }
   
   /* Modals better adapt */
   .modal-overlay {
