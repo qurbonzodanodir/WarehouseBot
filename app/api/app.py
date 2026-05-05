@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
+    polling_task = None
     if settings.webhook_host:
         try:
             await asyncio.wait_for(
@@ -31,11 +32,11 @@ async def lifespan(app: FastAPI):
                 bot.delete_webhook(drop_pending_updates=True),
                 timeout=10,
             )
-            logger.info("No WEBHOOK_HOST set — starting long polling")
-            polling_task = asyncio.create_task(_start_polling())
+            logger.info("Webhook deleted successfully")
         except Exception as e:
-            logger.warning("Failed to delete webhook (Telegram unreachable?): %s. Skipping polling.", e)
-            polling_task = None
+            logger.warning("Failed to delete webhook (Telegram unreachable?): %s. Continuing with polling.", e)
+        logger.info("Starting long polling")
+        polling_task = asyncio.create_task(_start_polling())
 
     yield
 
