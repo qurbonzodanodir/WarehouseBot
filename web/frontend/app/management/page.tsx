@@ -39,6 +39,7 @@ export default function ManagementPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandForm, setBrandForm] = useState("");
   const [editingBrandId, setEditingBrandId] = useState<number | null>(null);
+  const [showAllStores, setShowAllStores] = useState(false);
 
   const [user, setUser] = useState<UserMe | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -356,43 +357,72 @@ export default function ManagementPage() {
               ) : stores.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontSize: 13 }}>{t("management.no_stores")}</div>
               ) : (
-                stores.filter(s => s.name.toLowerCase().includes(storeSearch.toLowerCase())).map((s) => {
-                  const isActive = selectedStoreId === s.id;
-                  return (
-                    <div
-                      key={s.id}
-                      className="management-store-item"
-                      onClick={() => setSelectedStoreId(s.id)}
-                      style={{
-                        padding: "16px",
-                        borderRadius: 12,
-                        cursor: "pointer",
-                        background: isActive ? "var(--accent)" : "transparent",
-                        border: isActive ? "1px solid var(--accent)" : "1px solid transparent",
-                        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                        color: isActive ? "#fff" : "var(--text-primary)",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) e.currentTarget.style.background = "var(--bg-hover)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{s.name} <span style={{ opacity: 0.6, fontSize: 12, fontWeight: 400 }}>(ID: {s.id})</span></div>
-                        {isActive && <ArrowRight size={16} color="rgba(255,255,255,0.7)" />}
-                      </div>
-                      <div style={{ 
-                        display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginTop: 8,
-                        color: isActive ? "rgba(255,255,255,0.8)" : "var(--text-muted)"
-                      }}>
-                        <MapPin size={12} />
-                        {s.address || t("management.no_address")}
-                      </div>
-                    </div>
-                  );
-                })
+                <>
+                  {(() => {
+                    const filteredStores = stores.filter(s => s.name.toLowerCase().includes(storeSearch.toLowerCase()));
+                    const displayStores = showAllStores ? filteredStores : filteredStores.slice(0, 3);
+                    const hasMore = filteredStores.length > 3;
+                    return (
+                      <>
+                        {displayStores.map((s) => {
+                          const isActive = selectedStoreId === s.id;
+                          return (
+                            <div
+                              key={s.id}
+                              className="management-store-item"
+                              onClick={() => setSelectedStoreId(s.id)}
+                              style={{
+                                padding: "16px",
+                                borderRadius: 12,
+                                cursor: "pointer",
+                                background: isActive ? "var(--accent)" : "transparent",
+                                border: isActive ? "1px solid var(--accent)" : "1px solid transparent",
+                                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                color: isActive ? "#fff" : "var(--text-primary)",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isActive) e.currentTarget.style.background = "var(--bg-hover)";
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isActive) e.currentTarget.style.background = "transparent";
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                <div style={{ fontWeight: 600, fontSize: 14 }}>{s.name} <span style={{ opacity: 0.6, fontSize: 12, fontWeight: 400 }}>(ID: {s.id})</span></div>
+                                {isActive && <ArrowRight size={16} color="rgba(255,255,255,0.7)" />}
+                              </div>
+                              <div style={{ 
+                                display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginTop: 8,
+                                color: isActive ? "rgba(255,255,255,0.8)" : "var(--text-muted)"
+                              }}>
+                                <MapPin size={12} />
+                                {s.address || t("management.no_address")}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {hasMore && !showAllStores && (
+                          <button
+                            onClick={() => setShowAllStores(true)}
+                            style={{
+                              padding: "12px",
+                              borderRadius: 12,
+                              border: "1px dashed var(--border)",
+                              background: "transparent",
+                              color: "var(--text-muted)",
+                              fontSize: 13,
+                              cursor: "pointer",
+                              textAlign: "center",
+                              width: "100%",
+                            }}
+                          >
+                            ... и ещё {filteredStores.length - 3} магазинов
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
               )}
             </div>
           </div>
