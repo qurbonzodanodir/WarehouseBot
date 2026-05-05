@@ -299,9 +299,9 @@ export const ru = {
   login: {
     subtitle: "Войдите в систему управления.",
     email: "Email",
-    email_ph: "admin@warehouse.com",
+    email_ph: "",
     password: "Пароль",
-    password_ph: "••••••••••••",
+    password_ph: "",
     btn: "Войти в систему",
     loading: "Вход...",
     hint: "Введите Email и пароль администратора или сотрудника.",

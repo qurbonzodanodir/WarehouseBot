@@ -296,9 +296,9 @@ export const tj = {
   login: {
     subtitle: "Ба системаи идоракунӣ ворид шавед",
     email: "Email",
-    email_ph: "admin@warehouse.com",
+    email_ph: "",
     password: "Рамз",
-    password_ph: "••••••••••••",
+    password_ph: "",
     btn: "Ворид шудан",
     loading: "Вуруд...",
     hint: "Email ва рамзи маъмур ё кормандро ворид кунед",

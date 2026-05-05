@@ -232,7 +232,7 @@ export default function InventoryPage() {
 
         <div className="page-filters" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
           {/* Store pill-chips */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div className="store-chips-scroll" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <button
               type="button"
               onClick={() => setSelectedStore(null)}
@@ -276,7 +276,9 @@ export default function InventoryPage() {
                   }}
                 >
                   <StoreIcon size={14} />
-                  {store.name}
+                  <span style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {store.name}
+                  </span>
                   {store.total_items && store.total_items > 0 ? (
                     <span
                       style={{

@@ -463,59 +463,42 @@ select.input { cursor: pointer; }
     margin-left: auto;
   }
 
-  /* Mobile Card Tables */
+  /* Mobile Tables - horizontal scroll instead of cards */
   .table-wrap {
-    overflow: visible;
-    background: transparent;
-  }
-  .table-wrap table, .table-wrap thead, .table-wrap tbody, .table-wrap th, .table-wrap td, .table-wrap tr {
-    display: block;
-    width: 100%;
-  }
-  .table-wrap thead {
-    display: none;
-  }
-  .table-wrap tbody tr {
+    overflow-x: auto;
     background: var(--bg-card);
+    border-radius: 12px;
     border: 1px solid var(--border);
-    border-radius: 16px;
-    margin-bottom: 20px;
-    padding: 16px 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    -webkit-overflow-scrolling: touch;
   }
-  .table-wrap tbody tr:hover {
-    background: var(--bg-card);
-    transform: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  .table-wrap table {
+    min-width: 500px;
+  }
+  .table-wrap thead th {
+    font-size: 10px;
+    padding: 10px 10px;
+    white-space: nowrap;
   }
   .table-wrap tbody td {
-    padding: 12px 0;
-    border: none;
-    border-bottom: 1px solid rgba(139, 143, 168, 0.1);
-    display: flex;
-    justify-content: flex-start !important;
-    align-items: center;
-    text-align: left !important;
+    padding: 10px 10px;
+    font-size: 13px;
+    white-space: nowrap;
   }
-  .table-wrap tbody td:last-child {
-    border-bottom: none;
-    margin-top: 12px;
-    padding-top: 16px;
-    justify-content: center;
+
+  /* Store chips - horizontal scroll on mobile */
+  .store-chips-scroll {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
   }
-  .table-wrap tbody td::before {
-    content: attr(data-label);
-    width: 35%;
-    min-width: 90px;
+  .store-chips-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .store-chips-scroll button {
     flex-shrink: 0;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--text-secondary);
-    opacity: 0.8;
-    text-align: left;
-    margin-right: 12px;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
   }
   
   /* Modals better adapt */
