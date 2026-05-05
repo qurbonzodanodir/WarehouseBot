@@ -481,7 +481,6 @@ export default function ProductsPage() {
         <div style={{ marginBottom: 16 }}>
           <div
             style={{
-              maxWidth: 340,
               border: "1px solid var(--border)",
               borderRadius: 12,
               background: "var(--bg-card)",

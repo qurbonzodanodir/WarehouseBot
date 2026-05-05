@@ -341,42 +341,32 @@ export default function InventoryPage() {
               <div className="spinner" />
             </div>
           ) : !selectedStore ? (
-            // Store cards view for "All stores"
-            <div className="store-card-grid">
+            // Store cards view for "All stores" - horizontal scroll
+            <div className="store-cards-scroll">
               {catalog.map((store) => (
                 <div 
                   key={store.id}
-                  className="card store-card"
-                  style={{ cursor: "pointer" }}
+                  className="card store-card-horizontal"
                   onClick={() => {
                     setSelectedStore(store.id);
                     setCurrentPage(1);
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                    <StoreIcon size={18} style={{ color: "var(--accent)" }} />
-                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <StoreIcon size={16} style={{ color: "var(--accent)" }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
                       {store.name}
-                    </h3>
+                    </span>
                   </div>
                   
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 16 }}>
                     <div>
-                      <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 2 }}>
-                        Товаров
-                      </div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)" }}>
-                        {fmt(store.total_items)}
-                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Товаров</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{fmt(store.total_items)}</div>
                     </div>
-                    
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 2 }}>
-                        Стоимость
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--accent)" }}>
-                        {fmt(store.total_value)} TJS
-                      </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Стоимость</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>{fmt(store.total_value)} TJS</div>
                     </div>
                   </div>
                 </div>
