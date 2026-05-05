@@ -200,6 +200,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Create return request from store back to warehouse
+  requestReturn: (data: { product_id: number; from_store_id: number; quantity: number; prefer_display?: boolean }) =>
+    request<Order>("/orders/returns", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   // Products
   getProducts: (params?: { search?: string; brand?: string; include_inactive?: boolean; only_inactive?: boolean; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams();

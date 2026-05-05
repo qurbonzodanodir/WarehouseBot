@@ -6,7 +6,7 @@ import { api, Brand, BrandStat, Product, ProductInventoryOut, Store, UserMe } fr
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, ShoppingCart, Trash2, Pencil } from "lucide-react";
+import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, ShoppingCart, Trash2, Pencil, History } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createPortal } from "react-dom";
 
@@ -96,6 +96,13 @@ export default function ProductsPage() {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [orderItem, setOrderItem] = useState<OrderModalItem | null>(null);
 
+  // Return request modal
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnProduct, setReturnProduct] = useState<Product | null>(null);
+  const [returnStoreId, setReturnStoreId] = useState<number | string>("");
+  const [returnQty, setReturnQty] = useState<string>("1");
+  const [preferDisplay, setPreferDisplay] = useState<boolean>(true);
+
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFillBrand, setImportFillBrand] = useState(""); // global fill-all brand
   const [importReplaceQty, setImportReplaceQty] = useState(true);
@@ -135,6 +142,31 @@ export default function ProductsPage() {
       setLoading(false);
     }
   }, [search, page, showInactive, selectedBrand, showToast]);
+
+  const openReturnModal = (p: Product, storeId: number) => {
+    setReturnProduct(p);
+    setReturnStoreId(storeId);
+    setReturnQty("1");
+    setPreferDisplay(true);
+    setIsReturnModalOpen(true);
+  };
+
+  const handleCreateReturn = async () => {
+    const qty = parseInt(returnQty);
+    if (!returnProduct || !returnStoreId || isNaN(qty) || qty <= 0) return;
+    try {
+      await api.requestReturn({ product_id: returnProduct.id, from_store_id: Number(returnStoreId), quantity: qty, prefer_display: preferDisplay });
+      showToast(t("products.return_success"), "success");
+      setIsReturnModalOpen(false);
+      setReturnProduct(null);
+      setReturnStoreId("");
+      setReturnQty("1");
+      const updated = await api.getProductInventory(returnProduct.id);
+      setInventoryCache((prev) => ({ ...prev, [returnProduct.id]: updated }));
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    }
+  };
 
   const fetchBrandOptions = useCallback(async () => {
     try {
@@ -655,7 +687,12 @@ export default function ProductsPage() {
                                         <div style={{ fontSize: 13, fontWeight: 600 }}>{inv.store_name}</div>
                                         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{inv.quantity} шт</div>
                                       </div>
-                                      <div style={{ marginLeft: "auto" }}>
+                                      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                                        {isWarehouse && inv.quantity > 0 && stores.find(s => s.id === inv.store_id)?.store_type !== "warehouse" && (
+                                          <button className="btn-sample-action" title={t("products.action_request_return")} onClick={() => openReturnModal(p, inv.store_id)}>
+                                            <History size={14} />
+                                          </button>
+                                        )}
                                         {isWarehouse && inv.quantity > 0 && !inv.is_display && stores.find(s => s.id === inv.store_id)?.store_type === "warehouse" && (
                                           <button className="btn-sample-action" onClick={() => { setDispatchProduct(p); setIsDispatchModalOpen(true); }}>
                                             <PackageOpen size={14} />
@@ -725,6 +762,36 @@ export default function ProductsPage() {
                 <button type="submit" className="btn btn-primary">{t("common.save")}</button>
               </div>
             </form>
+          </div>
+        </div>
+      ), document.body)}
+
+      {mounted && isReturnModalOpen && createPortal((
+        <div className="modal-overlay">
+          <div className="modal-card" style={{ maxWidth: 420 }}>
+            <h3 style={{ marginBottom: 8 }}>
+              {t("products.return_modal_title")}
+            </h3>
+            <p style={{ marginBottom: 12, fontSize: 14, color: "var(--text-secondary)" }}>{returnProduct?.sku}</p>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("dashboard.store")}</label>
+              <select className="input" style={{ width: "100%" }} value={returnStoreId} onChange={(e) => setReturnStoreId(e.target.value)}>
+                <option value="">---</option>
+                {stores.filter(s => s.store_type !== "warehouse").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("inventory.col_qty")}</label>
+              <input type="number" min="1" className="input" style={{ width: "100%" }} value={returnQty} onChange={e => setReturnQty(e.target.value)} />
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: preferDisplay ? "var(--accent)" : "var(--text-secondary)", marginBottom: 16 }}>
+              <input type="checkbox" checked={preferDisplay} onChange={e => setPreferDisplay(e.target.checked)} />
+              {t("products.prefer_display")}
+            </label>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button className="btn btn-ghost" onClick={() => setIsReturnModalOpen(false)}>{t("common.cancel")}</button>
+              <button className="btn btn-primary" onClick={handleCreateReturn}>{t("common.confirm")}</button>
+            </div>
           </div>
         </div>
       ), document.body)}
