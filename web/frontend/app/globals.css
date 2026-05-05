@@ -569,6 +569,19 @@ select.input { cursor: pointer; }
   .management-brand-list::-webkit-scrollbar {
     display: none;
   }
+
+  /* Dashboard debts mobile fix */
+  .dashboard-debts-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-debts-grid .card {
+    padding: 16px !important;
+  }
+  .dashboard-debts-grid th,
+  .dashboard-debts-grid td {
+    padding: 10px 8px !important;
+    font-size: 13px;
+  }
   
   /* Modals better adapt */
   .modal-overlay {

@@ -296,7 +296,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Debts section */}
-            <div className="dashboard-charts" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+            <div className="dashboard-charts dashboard-debts-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
               {/* Store debts */}
               <div className="card">
                 <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_store")}</h3>
