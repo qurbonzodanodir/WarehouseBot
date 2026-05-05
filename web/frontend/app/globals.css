@@ -95,6 +95,11 @@ h3 { font-size: 1rem; font-weight: 600; }
   transform: translateY(-1px);
 }
 
+/* Dashboard grids (desktop default) */
+.dashboard-charts {
+  grid-template-columns: 1fr 1fr;
+}
+
 /* ── Modal ───────────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
