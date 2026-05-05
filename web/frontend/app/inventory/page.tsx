@@ -231,71 +231,30 @@ export default function InventoryPage() {
         </div>
 
         <div className="page-filters" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
-          {/* Store pill-chips */}
-          <div className="store-chips-scroll" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {/* Back to all stores button (only when a store is selected) */}
+          {selectedStore && (
             <button
               type="button"
               onClick={() => setSelectedStore(null)}
               style={{
                 padding: "8px 14px",
                 borderRadius: 999,
-                border: selectedStore === null ? "1px solid var(--accent)" : "1px solid var(--border)",
-                background: selectedStore === null ? "var(--accent)" : "transparent",
-                color: selectedStore === null ? "#fff" : "var(--text-primary)",
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text-primary)",
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: "pointer",
                 transition: "all 0.15s",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
+                width: "fit-content",
               }}
             >
-              <Boxes size={14} /> {t("inventory.all_stores")}
+              <Boxes size={14} /> ← {t("inventory.all_stores")}
             </button>
-            {stores.map((store) => {
-              const active = selectedStore === store.id;
-              return (
-                <button
-                  key={store.id}
-                  type="button"
-                  onClick={() => setSelectedStore(store.id)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 999,
-                    border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
-                    background: active ? "var(--accent)" : "transparent",
-                    color: active ? "#fff" : "var(--text-primary)",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <StoreIcon size={14} />
-                  <span style={{ maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {store.name}
-                  </span>
-                  {store.total_items && store.total_items > 0 ? (
-                    <span
-                      style={{
-                        padding: "2px 7px",
-                        borderRadius: 999,
-                        background: active ? "rgba(255,255,255,0.25)" : "var(--bg-card)",
-                        fontSize: 11,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {fmt(store.total_items)}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
+          )}
 
           {/* Search input (only when a store is selected) */}
           {selectedStore && (
@@ -341,30 +300,30 @@ export default function InventoryPage() {
               <div className="spinner" />
             </div>
           ) : !selectedStore ? (
-            // Store cards view for "All stores" - horizontal scroll
-            <div className="store-cards-scroll">
+            // Store cards view for "All stores" - compact grid
+            <div className="store-card-grid">
               {catalog.map((store) => (
                 <div 
                   key={store.id}
-                  className="card store-card-horizontal"
+                  className="card store-card"
                   onClick={() => {
                     setSelectedStore(store.id);
                     setCurrentPage(1);
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                     <StoreIcon size={16} style={{ color: "var(--accent)" }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>
                       {store.name}
                     </span>
                   </div>
                   
-                  <div style={{ display: "flex", gap: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Товаров</div>
-                      <div style={{ fontSize: 18, fontWeight: 700 }}>{fmt(store.total_items)}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>{fmt(store.total_items)}</div>
                     </div>
-                    <div>
+                    <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Стоимость</div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>{fmt(store.total_value)} TJS</div>
                     </div>
