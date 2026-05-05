@@ -6,7 +6,7 @@ import { api, Brand, BrandStat, Product, ProductInventoryOut, Store, UserMe } fr
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, ShoppingCart, Trash2 } from "lucide-react";
+import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, ShoppingCart, Trash2, Pencil } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createPortal } from "react-dom";
 
@@ -73,6 +73,10 @@ export default function ProductsPage() {
   const [toggling, setToggling] = useState(false);
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editForm, setEditForm] = useState({ sku: "", brand: "", price: "" });
+  const [isEditModalOpen, setEditModalOpen] = useState(false);
 
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [inventoryLoaders, setInventoryLoaders] = useState<Record<number, boolean>>({});
@@ -291,6 +295,20 @@ export default function ProductsPage() {
       } else {
         showToast(message, "error"); 
       }
+    }
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingProduct) return;
+    try {
+      await api.updateProduct(editingProduct.id, { sku: editForm.sku, brand: editForm.brand, price: Number(editForm.price) });
+      showToast(t("products.edit_success"), "success");
+      setEditingProduct(null);
+      setEditModalOpen(false);
+      await fetchProducts({ search, page, brand: selectedBrand || undefined, showInactive });
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
     }
   }
 
@@ -585,6 +603,19 @@ export default function ProductsPage() {
                                   <PackageOpen size={13} style={{ opacity: 0.8 }} /> {t("products.btn_receive") || "Добавить"}
                                 </button>
                               )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingProduct(p);
+                                  setEditForm({ sku: p.sku, brand: p.brand, price: String(p.price) });
+                                  setEditModalOpen(true);
+                                }}
+                                className="btn btn-ghost"
+                                style={{ padding: "4px 10px", fontSize: 12 }}
+                                title={t("products.btn_edit")}
+                              >
+                                <Pencil size={14} />
+                              </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -898,6 +929,33 @@ export default function ProductsPage() {
           </div>
         </div>
       ), document.body)}
+
+      {mounted && isEditModalOpen && editingProduct && createPortal((
+        <div className="modal-overlay" onClick={() => setEditModalOpen(false)}>
+          <div className="modal-card" style={{ maxWidth: 400, width: "90%" }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 20 }}>{t("products.edit_title")}</h3>
+            <form onSubmit={handleEditSubmit}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_sku")}</label>
+                <input className="input" style={{ width: "100%" }} value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} required />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_brand")}</label>
+                <input className="input" style={{ width: "100%" }} value={editForm.brand} onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })} required />
+              </div>
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_price")}</label>
+                <input className="input" style={{ width: "100%" }} type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} required />
+              </div>
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setEditModalOpen(false)}>{t("common.cancel")}</button>
+                <button type="submit" className="btn btn-primary">{t("common.save")}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ), document.body)}
+
     </div>
   );
 }
