@@ -226,15 +226,15 @@ export default function InventoryPage() {
 
           {/* Search input (only when a store is selected) */}
           {selectedStore && (
-            <div className="input-group" style={{ maxWidth: 480, position: "relative" }}>
-              <Search size={18} style={{ color: "var(--text-secondary)" }} />
+            <div style={{ position: "relative", maxWidth: 480, width: "100%" }}>
+              <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
               <input
                 type="text"
                 className="input"
                 placeholder={t("inventory.search_placeholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ paddingRight: search ? 34 : undefined }}
+                style={{ paddingLeft: 36, paddingRight: search ? 34 : undefined, width: "100%" }}
               />
               {search && (
                 <button
@@ -339,8 +339,8 @@ export default function InventoryPage() {
                         {item.quantity} шт
                       </td>
                       <td data-label={t("inventory.col_status")} style={{ textAlign: "center" }}>
-                        <span className={`badge ${item.quantity > 5 ? 'badge-delivered' : 'badge-pending'}`}>
-                          {item.quantity > 5 ? t("inventory.status_in_stock") : t("inventory.status_low")}
+                        <span className="badge badge-delivered">
+                          {t("inventory.status_in_stock")}
                         </span>
                       </td>
                     </tr>
