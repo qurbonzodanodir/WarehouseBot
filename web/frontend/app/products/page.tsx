@@ -6,7 +6,7 @@ import { api, Brand, BrandStat, Product, ProductInventoryOut, Store, UserMe } fr
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, ShoppingCart, Trash2, Pencil, History } from "lucide-react";
+import { Search, Plus, StoreIcon, ChevronDown, ChevronRight, ChevronLeft, PackageOpen, Package, FileUp, X, ShoppingCart, Trash2, Pencil, History, MoreVertical, RotateCcw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createPortal } from "react-dom";
 
@@ -89,6 +89,20 @@ export default function ProductsPage() {
   const [isEditModalOpen, setEditModalOpen] = useState(false);
 
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  // Close action menu on outside click
+  useEffect(() => {
+    if (openMenuId === null) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.row-action-menu') && !target.closest('.row-action-trigger')) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [openMenuId]);
   const [inventoryLoaders, setInventoryLoaders] = useState<Record<number, boolean>>({});
   const [inventoryCache, setInventoryCache] = useState<Record<number, ProductInventoryOut[]>>({});
 
@@ -674,40 +688,46 @@ export default function ProductsPage() {
                         </td>
                         {isWarehouse && (
                           <td data-label={t("common.actions")} style={{ textAlign: "center" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                              {p.is_active && (
-                                <button onClick={(e) => { e.stopPropagation(); setReceivingProduct(p); }} className="btn btn-primary" style={{ padding: "4px 12px", fontSize: 12, display: "flex", gap: "4px", alignItems: "center" }}>
-                                  <PackageOpen size={13} style={{ opacity: 0.8 }} /> {t("products.btn_receive") || "Добавить"}
-                                </button>
+                            <div style={{ position: "relative", display: "inline-block" }}>
+                              <button
+                                className="row-action-trigger"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuId(openMenuId === p.id ? null : p.id);
+                                }}
+                                title={t("common.actions")}
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+                              {openMenuId === p.id && (
+                                <div className="row-action-menu" onClick={(e) => e.stopPropagation()}>
+                                  {p.is_active && (
+                                    <button
+                                      className="row-action-item"
+                                      onClick={() => { setReceivingProduct(p); setOpenMenuId(null); }}
+                                    >
+                                      <PackageOpen size={14} /> {t("products.btn_receive") || "Добавить"}
+                                    </button>
+                                  )}
+                                  <button
+                                    className="row-action-item"
+                                    onClick={() => {
+                                      setEditingProduct(p);
+                                      setEditForm({ sku: p.sku, brand: p.brand, price: String(p.price) });
+                                      setEditModalOpen(true);
+                                      setOpenMenuId(null);
+                                    }}
+                                  >
+                                    <Pencil size={14} /> {t("products.btn_edit") || "Редактировать"}
+                                  </button>
+                                  <button
+                                    className={`row-action-item ${p.is_active ? "danger" : ""}`}
+                                    onClick={() => { setPendingToggleProduct(p); setOpenMenuId(null); }}
+                                  >
+                                    {p.is_active ? <><Trash2 size={14} /> {t("products.btn_delete") || "Удалить"}</> : <><RotateCcw size={14} /> {t("products.btn_restore") || "Восстановить"}</>}
+                                  </button>
+                                </div>
                               )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingProduct(p);
-                                  setEditForm({ sku: p.sku, brand: p.brand, price: String(p.price) });
-                                  setEditModalOpen(true);
-                                }}
-                                className="btn btn-ghost"
-                                style={{ padding: "4px 10px", fontSize: 12 }}
-                                title={t("products.btn_edit")}
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPendingToggleProduct(p);
-                                }}
-                                className={p.is_active ? "btn btn-danger" : "btn btn-primary"}
-                                style={{
-                                  padding: "4px 12px",
-                                  fontSize: 12,
-                                  ...(p.is_active ? {} : { background: "var(--green)", color: "#fff" }),
-                                }}
-                              >
-                                {p.is_active ? "X" : t("products.btn_restore")}
-                              </button>
-
                             </div>
                           </td>
                         )}
