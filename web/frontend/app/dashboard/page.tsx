@@ -1,13 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { api, DashboardData } from "@/lib/api";
 import { isAuthenticated } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -21,13 +21,16 @@ import {
   TrendingUp,
   AlertCircle,
   Package,
-  DollarSign,
+  Wallet,
   ShoppingCart,
   RefreshCw,
   LayoutDashboard,
+  Store as StoreIcon,
+  Truck,
+  ArrowRight,
 } from "lucide-react";
 
-const COLORS = ["#6c63ff", "#22c55e", "#f59e0b", "#3b82f6", "#ef4444", "#a78bfa"];
+const PIE_COLORS = ["#6c63ff", "#22c55e", "#f59e0b", "#3b82f6", "#ef4444", "#a78bfa"];
 
 function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(n);
@@ -35,10 +38,6 @@ function fmt(n: number) {
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
-}
-
-async function requestDashboard(period: "today" | "week" | "month" | "year") {
-  return api.getDashboard(period);
 }
 
 export default function DashboardPage() {
@@ -56,14 +55,14 @@ export default function DashboardPage() {
     { key: "year", label: t("dashboard.period_year") },
   ] as const;
 
-  async function refreshDashboard() {
-    setLoading(true);
+  async function loadData(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     setError("");
     try {
-      const d = await requestDashboard(period);
+      const d = await api.getDashboard(period);
       setData(d);
-    } catch (error) {
-      setError(getErrorMessage(error, t("common.error")));
+    } catch (e) {
+      setError(getErrorMessage(e, t("common.error")));
     } finally {
       setLoading(false);
     }
@@ -71,80 +70,69 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push("/login"); return; }
-    let isActive = true;
+    void loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
 
-    async function loadDashboard() {
-      setLoading(true);
-      setError("");
-      try {
-        const nextData = await requestDashboard(period);
-        if (isActive) {
-          setData(nextData);
-        }
-      } catch (error) {
-        if (isActive) {
-          setError(getErrorMessage(error, t("common.error")));
-        }
-      } finally {
-        if (isActive) {
-          setLoading(false);
-        }
-      }
-    }
+  const topStores = useMemo(() => {
+    if (!data) return [];
+    return [...data.store_revenues]
+      .filter(r => Number(r.total_revenue) > 0)
+      .sort((a, b) => Number(b.total_revenue) - Number(a.total_revenue));
+  }, [data]);
+  const maxStoreRevenue = topStores[0]?.total_revenue || 0;
 
-    void loadDashboard();
+  const debtStores = useMemo(() => {
+    if (!data) return [];
+    return [...data.store_debts]
+      .filter(s => Number(s.current_debt) > 0)
+      .sort((a, b) => Number(b.current_debt) - Number(a.current_debt));
+  }, [data]);
+  const maxStoreDebt = debtStores[0]?.current_debt || 0;
 
-    return () => {
-      isActive = false;
-    };
-  }, [period, router, t]);
+  const supplierDebtsList = useMemo(() => {
+    if (!data?.supplier_debts) return [];
+    return [...data.supplier_debts]
+      .filter(s => Number(s.current_debt) > 0)
+      .sort((a, b) => Number(b.current_debt) - Number(a.current_debt));
+  }, [data]);
+  const maxSupplierDebt = supplierDebtsList[0]?.current_debt || 0;
 
   return (
     <div style={{ display: "flex" }}>
       <Sidebar />
       <main className="main-layout">
-        {/* Header */}
-        <div className="page-header" style={{ marginBottom: 24 }}>
-          <div>
-            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <LayoutDashboard size={32} style={{ color: "var(--accent)" }} />
-              {t("dashboard.title")}
-            </h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
-              {t("dashboard.subtitle")}
-            </p>
+        {/* Hero header */}
+        <div className="dash-header">
+          <div className="dash-title-block">
+            <div className="dash-icon-wrap">
+              <LayoutDashboard size={22} />
+            </div>
+            <div>
+              <h1 className="page-title" style={{ margin: 0 }}>{t("dashboard.title")}</h1>
+              <p className="dash-subtitle">{t("dashboard.subtitle")}</p>
+            </div>
           </div>
-          <div className="period-row" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {/* Period selector */}
-            <div className="period-selector" style={{ display: "flex", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+          <div className="dash-controls">
+            <div className="period-pills">
               {PERIODS.map((p) => (
                 <button
                   key={p.key}
                   onClick={() => setPeriod(p.key)}
-                  style={{
-                    padding: "8px 14px",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    border: "none",
-                    cursor: "pointer",
-                    background: period === p.key ? "var(--accent)" : "transparent",
-                    color: period === p.key ? "var(--bg)" : "var(--text-secondary)",
-                    transition: "all 0.15s",
-                    whiteSpace: "nowrap",
-                  }}
+                  className={`period-pill ${period === p.key ? "active" : ""}`}
                 >
                   {p.label}
                 </button>
               ))}
             </div>
-            <button className="btn btn-ghost refresh-btn" onClick={() => void refreshDashboard()} style={{ flexShrink: 0 }}>
-              <RefreshCw size={14} />
+            <button className="icon-btn" onClick={() => void loadData(false)} title="Refresh">
+              <RefreshCw size={15} />
             </button>
           </div>
         </div>
 
         {error && (
-          <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, padding: "12px 16px", color: "var(--red)", marginBottom: 20, display: "flex", gap: 8 }}>
+          <div className="dash-error">
             <AlertCircle size={16} /> {error}
           </div>
         )}
@@ -155,213 +143,207 @@ export default function DashboardPage() {
           </div>
         ) : data ? (
           <>
-            {/* KPI Cards */}
-            <div className="kpi-grid" style={{ marginBottom: 24 }}>
-              <div className="kpi-card">
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <TrendingUp size={24} style={{ color: "var(--accent)" }} />
-                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.revenue")}</div>
-                </div>
-                <div className="kpi-value" style={{ color: "var(--accent)", fontSize: 24 }}>
-                  {fmt(data.total_revenue_today)} <span style={{ fontSize: 14, fontWeight: 500 }}>TJS</span>
-                </div>
-              </div>
-
-              <div className="kpi-card">
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <ShoppingCart size={24} style={{ color: "var(--green)" }} />
-                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.sales")}</div>
-                </div>
-                <div className="kpi-value" style={{ color: "var(--green)", fontSize: 24 }}>
-                  {data.total_orders_today}
-                </div>
-              </div>
-
-              <div
-                className="kpi-card"
-                onClick={() => router.push("/finance")}
-                style={{ cursor: "pointer" }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <DollarSign size={24} style={{ color: "var(--red)" }} />
-                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.total_debt")}</div>
-                </div>
-                <div className="kpi-value" style={{ color: "var(--red)", fontSize: 24 }}>
-                  {fmt(data.total_debt)} <span style={{ fontSize: 14, fontWeight: 500 }}>TJS</span>
-                </div>
-              </div>
-
-              <div
-                className="kpi-card"
-                onClick={() => router.push("/suppliers")}
-                style={{ cursor: "pointer" }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <TrendingUp size={24} style={{ color: "var(--accent)" }} />
-                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.total_supplier_debt")}</div>
-                </div>
-                <div className="kpi-value" style={{ color: "var(--accent)", fontSize: 24 }}>
-                  {fmt(data.total_supplier_debt || 0)} <span style={{ fontSize: 14, fontWeight: 500 }}>TJS</span>
-                </div>
-              </div>
-
-              <div className="kpi-card" onClick={() => router.push("/orders?status=active")} style={{ cursor: "pointer" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <Package size={24} style={{ color: "var(--yellow)" }} />
-                  <div className="kpi-label" style={{ marginBottom: 0 }}>{t("dashboard.pending_orders")}</div>
-                </div>
-                <div className="kpi-value" style={{ color: "var(--yellow)", fontSize: 24 }}>
-                  {data.pending_orders}
-                </div>
-              </div>
+            {/* Hero KPI grid */}
+            <div className="dash-kpi-grid">
+              <KpiCard accent="#6c63ff" icon={<TrendingUp size={18} />} label={t("dashboard.revenue")} value={fmt(data.total_revenue_today)} suffix="TJS" />
+              <KpiCard accent="#22c55e" icon={<ShoppingCart size={18} />} label={t("dashboard.sales")} value={String(data.total_orders_today)} />
+              <KpiCard accent="#ef4444" icon={<Wallet size={18} />} label={t("dashboard.total_debt")} value={fmt(data.total_debt)} suffix="TJS" onClick={() => router.push("/finance")} />
+              <KpiCard accent="#3b82f6" icon={<Truck size={18} />} label={t("dashboard.total_supplier_debt")} value={fmt(data.total_supplier_debt || 0)} suffix="TJS" onClick={() => router.push("/suppliers")} />
+              <KpiCard accent="#f59e0b" icon={<Package size={18} />} label={t("dashboard.pending_orders")} value={String(data.pending_orders)} onClick={() => router.push("/orders?status=active")} />
             </div>
 
             {/* Charts row */}
-            <div className="dashboard-charts" style={{ display: "grid", gap: 16, marginBottom: 24 }}>
-              {/* Revenue by store */}
-              <div className="card">
-                <h3 style={{ marginBottom: 16 }}>{t("dashboard.revenue_by_store")}</h3>
-                {(() => {
-                  const activeRevenues = data.store_revenues.filter(r => Number(r.total_revenue) > 0);
-                  if (activeRevenues.length > 0) {
-                    return (
-                      <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={activeRevenues} barSize={32}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                          <XAxis dataKey="store_name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} />
-                          <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} />
-                          <Tooltip
-                            contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8 }}
-                            labelStyle={{ color: "var(--text-primary)" }}
-                            formatter={(value) => [`${fmt(Number(value ?? 0))} TJS`, t("dashboard.revenue")]}
-                          />
-                          <Bar dataKey="total_revenue" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    );
-                  }
-                  return (
-                    <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                      {t("common.empty")}
-                    </div>
-                  );
-                })()}
+            <div className="dash-charts">
+              <div className="dash-card">
+                <div className="dash-card-head">
+                  <h3>{t("dashboard.revenue_by_store")}</h3>
+                </div>
+                {topStores.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <AreaChart data={topStores}>
+                      <defs>
+                        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6c63ff" stopOpacity={0.6} />
+                          <stop offset="100%" stopColor="#6c63ff" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                      <XAxis dataKey="store_name" tick={{ fill: "var(--text-secondary)", fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
+                      <YAxis tick={{ fill: "var(--text-secondary)", fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 }}
+                        labelStyle={{ color: "var(--text-primary)", fontWeight: 600 }}
+                        formatter={(value) => [`${fmt(Number(value ?? 0))} TJS`, t("dashboard.revenue")]}
+                      />
+                      <Area type="monotone" dataKey="total_revenue" stroke="#6c63ff" strokeWidth={2} fill="url(#revGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState />
+                )}
               </div>
 
-              {/* Orders by status pie */}
-              <div className="card" style={{ flex: 1, minWidth: 280 }}>
-                <h3 style={{ marginBottom: 16 }}>{t("dashboard.order_status")}</h3>
+              <div className="dash-card">
+                <div className="dash-card-head">
+                  <h3>{t("dashboard.order_status")}</h3>
+                </div>
                 {data.orders_by_status.length > 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                    <ResponsiveContainer width={160} height={180}>
+                  <div className="pie-row">
+                    <ResponsiveContainer width={170} height={200}>
                       <PieChart>
-                        <Pie
-                          data={data.orders_by_status}
-                          dataKey="count"
-                          nameKey="status"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={45}
-                          outerRadius={75}
-                        >
+                        <Pie data={data.orders_by_status} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
                           {data.orders_by_status.map((_, i) => (
-                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="var(--bg-card)" strokeWidth={2} />
                           ))}
                         </Pie>
                         <Tooltip
-                          contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8 }}
-                          formatter={(value, name) => {
-                            const statusKey = String(name ?? "").toLowerCase();
-                            return [String(value ?? ""), t(`statuses.${statusKey}`)];
-                          }}
+                          contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12 }}
+                          formatter={(value, name) => [String(value ?? ""), t(`statuses.${String(name ?? "").toLowerCase()}`)]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
-                    <div style={{ flex: 1 }}>
+                    <div className="pie-legend">
                       {data.orders_by_status.map((s, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                          <div style={{ width: 10, height: 10, borderRadius: 2, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
-                          <span style={{ fontSize: 12, color: "var(--text-secondary)", flex: 1 }}>{t(`statuses.${s.status.toLowerCase()}`) || s.status}</span>
-                          <span style={{ fontSize: 13, fontWeight: 600 }}>{s.count}</span>
+                        <div key={i} className="pie-legend-row">
+                          <span className="pie-legend-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                          <span className="pie-legend-label">{t(`statuses.${s.status.toLowerCase()}`) || s.status}</span>
+                          <span className="pie-legend-value">{s.count}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                    {t("common.empty")}
-                  </div>
+                  <EmptyState />
                 )}
               </div>
             </div>
 
-            {/* Debts section */}
-            <div className="dashboard-charts dashboard-debts-grid" style={{ display: "grid", gap: 16, marginBottom: 24 }}>
-              {/* Store debts */}
-              <div className="card">
-                <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_store")}</h3>
-                {data.store_debts.length > 0 ? (
-                  <div className="table-wrap dashboard-debt-table-wrap">
-                  <table className="dashboard-debt-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: "left", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.store")}</th>
-                        <th style={{ textAlign: "right", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.debt")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.store_debts.map((s) => (
-                        <tr key={s.store_id} style={{ borderTop: "1px solid var(--border)" }}>
-                          <td className="dashboard-debt-name" style={{ padding: "12px 0", fontWeight: 500 }}>{s.store_name}</td>
-                          <td className="dashboard-debt-amount" style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: Number(s.current_debt) > 0 ? "var(--red)" : "var(--green)" }}>
-                            {fmt(Number(s.current_debt))} TJS
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {/* Lists row */}
+            <div className="dash-charts">
+              <div className="dash-card">
+                <div className="dash-card-head">
+                  <h3><StoreIcon size={16} /> {t("dashboard.revenue_by_store")}</h3>
+                </div>
+                {topStores.length > 0 ? (
+                  <div className="rank-list">
+                    {topStores.slice(0, 8).map((s, i) => (
+                      <div key={i} className="rank-row">
+                        <div className="rank-num">{i + 1}</div>
+                        <div className="rank-body">
+                          <div className="rank-line">
+                            <span className="rank-name">{s.store_name}</span>
+                            <span className="rank-value" style={{ color: "var(--accent)" }}>{fmt(Number(s.total_revenue))} TJS</span>
+                          </div>
+                          <div className="rank-bar">
+                            <div className="rank-bar-fill" style={{
+                              width: `${maxStoreRevenue ? (Number(s.total_revenue) / Number(maxStoreRevenue) * 100) : 0}%`,
+                              background: "linear-gradient(90deg, #6c63ff, #a78bfa)",
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                    {t("common.empty")}
-                  </div>
+                  <EmptyState />
                 )}
               </div>
 
-              {/* Supplier debts */}
-              <div className="card">
-                <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_supplier")}</h3>
-                {data.supplier_debts && data.supplier_debts.length > 0 ? (
-                  <div className="table-wrap dashboard-debt-table-wrap">
-                  <table className="dashboard-debt-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: "left", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Оптовик</th>
-                        <th style={{ textAlign: "right", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.debt")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.supplier_debts.map((s) => (
-                        <tr key={s.supplier_id} style={{ borderTop: "1px solid var(--border)" }}>
-                          <td className="dashboard-debt-name" style={{ padding: "12px 0", fontWeight: 500 }}>{s.supplier_name}</td>
-                          <td className="dashboard-debt-amount" style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: "var(--accent)" }}>
-                            {fmt(Number(s.current_debt))} TJS
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="dash-card">
+                <div className="dash-card-head">
+                  <h3><Wallet size={16} /> {t("dashboard.debt_by_store")}</h3>
+                  <button className="link-btn" onClick={() => router.push("/finance")}>
+                    Все <ArrowRight size={12} />
+                  </button>
+                </div>
+                {debtStores.length > 0 ? (
+                  <div className="rank-list">
+                    {debtStores.slice(0, 8).map((s, i) => (
+                      <div key={s.store_id} className="rank-row">
+                        <div className="rank-num" style={{ background: "rgba(239,68,68,0.12)", color: "var(--red)" }}>{i + 1}</div>
+                        <div className="rank-body">
+                          <div className="rank-line">
+                            <span className="rank-name">{s.store_name}</span>
+                            <span className="rank-value" style={{ color: "var(--red)" }}>{fmt(Number(s.current_debt))} TJS</span>
+                          </div>
+                          <div className="rank-bar">
+                            <div className="rank-bar-fill" style={{
+                              width: `${maxStoreDebt ? (Number(s.current_debt) / Number(maxStoreDebt) * 100) : 0}%`,
+                              background: "linear-gradient(90deg, #ef4444, #f59e0b)",
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                    {t("common.empty")}
-                  </div>
+                  <EmptyState text={t("common.empty")} ok />
                 )}
               </div>
             </div>
+
+            {/* Supplier debts */}
+            {supplierDebtsList.length > 0 && (
+              <div className="dash-card" style={{ marginBottom: 24 }}>
+                <div className="dash-card-head">
+                  <h3><Truck size={16} /> {t("dashboard.debt_by_supplier")}</h3>
+                  <button className="link-btn" onClick={() => router.push("/suppliers")}>
+                    Все <ArrowRight size={12} />
+                  </button>
+                </div>
+                <div className="rank-list">
+                  {supplierDebtsList.slice(0, 6).map((s, i) => (
+                    <div key={s.supplier_id} className="rank-row">
+                      <div className="rank-num" style={{ background: "rgba(59,130,246,0.12)", color: "var(--blue)" }}>{i + 1}</div>
+                      <div className="rank-body">
+                        <div className="rank-line">
+                          <span className="rank-name">{s.supplier_name}</span>
+                          <span className="rank-value" style={{ color: "var(--blue)" }}>{fmt(Number(s.current_debt))} TJS</span>
+                        </div>
+                        <div className="rank-bar">
+                          <div className="rank-bar-fill" style={{
+                            width: `${maxSupplierDebt ? (Number(s.current_debt) / Number(maxSupplierDebt) * 100) : 0}%`,
+                            background: "linear-gradient(90deg, #3b82f6, #6c63ff)",
+                          }} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         ) : null}
       </main>
+    </div>
+  );
+}
+
+function KpiCard({ accent, icon, label, value, suffix, onClick }: {
+  accent: string; icon: React.ReactNode; label: string; value: string; suffix?: string; onClick?: () => void;
+}) {
+  return (
+    <div className={`dash-kpi ${onClick ? "clickable" : ""}`} onClick={onClick} style={{ "--kpi-accent": accent } as React.CSSProperties}>
+      <div className="dash-kpi-strip" />
+      <div className="dash-kpi-head">
+        <div className="dash-kpi-icon">{icon}</div>
+        <div className="dash-kpi-label">{label}</div>
+      </div>
+      <div className="dash-kpi-value">
+        {value}
+        {suffix && <span className="dash-kpi-suffix">{suffix}</span>}
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ text, ok }: { text?: string; ok?: boolean } = {}) {
+  return (
+    <div className="dash-empty">
+      <div className="dash-empty-icon" style={{ color: ok ? "var(--green)" : "var(--text-muted)" }}>
+        {ok ? "✓" : "○"}
+      </div>
+      <div className="dash-empty-text">{text || "Нет данных"}</div>
     </div>
   );
 }
