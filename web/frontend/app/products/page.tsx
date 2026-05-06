@@ -18,6 +18,16 @@ function normalizeSku(raw: unknown): string {
   return String(raw ?? "").trim().toUpperCase();
 }
 
+// Clean SKU on import: strip leading/trailing letters and remove dashes
+// Examples: "HY6812-05" -> "681205", "31706L" -> "31706", "80029-31" -> "8002931"
+function cleanImportSku(raw: unknown): string {
+  let s = String(raw ?? "").trim().toUpperCase();
+  s = s.replace(/^[A-ZА-Я]+/, "");
+  s = s.replace(/[A-ZА-Я]+$/, "");
+  s = s.replace(/-/g, "");
+  return s;
+}
+
 function normalizeBrandName(brand: string | undefined): string {
   const normalized = String(brand || "").trim();
   if (normalized) return normalized.toUpperCase();
@@ -398,7 +408,7 @@ export default function ProductsPage() {
           if (!row || row.length < 6) continue;
           
           const skuRaw = String(row[2] || "").trim();
-          const sku = normalizeSku(skuRaw);
+          const sku = cleanImportSku(skuRaw);
           
           if (!sku) continue;
 
