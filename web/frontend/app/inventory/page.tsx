@@ -315,7 +315,6 @@ export default function InventoryPage() {
                     <th style={{ minWidth: "70px" }}>{t("inventory.col_sku")}</th>
                     <th>Фирма</th>
                     <th style={{ textAlign: "center" }}>{t("inventory.col_qty")}</th>
-                    <th style={{ textAlign: "center" }}>{t("inventory.col_status")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -337,11 +336,6 @@ export default function InventoryPage() {
                       </td>
                       <td data-label={t("inventory.col_qty")} style={{ textAlign: "center", fontWeight: 700 }}>
                         {item.quantity} шт
-                      </td>
-                      <td data-label={t("inventory.col_status")} style={{ textAlign: "center" }}>
-                        <span className="badge badge-delivered">
-                          {t("inventory.status_in_stock")}
-                        </span>
                       </td>
                     </tr>
                   ))}
