@@ -580,12 +580,49 @@ select.input { cursor: pointer; }
     grid-template-columns: 1fr !important;
   }
   .dashboard-debts-grid .card {
-    padding: 16px !important;
+    padding: 14px !important;
   }
-  .dashboard-debts-grid th,
-  .dashboard-debts-grid td {
-    padding: 10px 8px !important;
+  .dashboard-debt-table-wrap {
+    overflow: visible;
+    border-radius: 10px;
+  }
+  .dashboard-debt-table-wrap table {
+    min-width: 0;
+  }
+  .dashboard-debt-table thead {
+    display: none;
+  }
+  .dashboard-debt-table,
+  .dashboard-debt-table tbody,
+  .dashboard-debt-table tr,
+  .dashboard-debt-table td {
+    display: block;
+    width: 100%;
+  }
+  .dashboard-debt-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    border-top: 1px solid var(--border);
+    min-height: 52px;
+  }
+  .dashboard-debt-table tr:first-child {
+    border-top: none;
+  }
+  .dashboard-debt-table tbody td {
+    padding: 10px 0 !important;
     font-size: 13px;
+  }
+  .dashboard-debt-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+  .dashboard-debt-amount {
+    min-width: max-content;
+    text-align: right !important;
+    white-space: nowrap;
   }
   
   /* Modals better adapt */

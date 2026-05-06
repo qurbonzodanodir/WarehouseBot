@@ -301,8 +301,8 @@ export default function DashboardPage() {
               <div className="card">
                 <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_store")}</h3>
                 {data.store_debts.length > 0 ? (
-                  <div className="table-wrap">
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <div className="table-wrap dashboard-debt-table-wrap">
+                  <table className="dashboard-debt-table" style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
                         <th style={{ textAlign: "left", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("dashboard.store")}</th>
@@ -312,8 +312,8 @@ export default function DashboardPage() {
                     <tbody>
                       {data.store_debts.map((s) => (
                         <tr key={s.store_id} style={{ borderTop: "1px solid var(--border)" }}>
-                          <td style={{ padding: "12px 0", fontWeight: 500 }}>{s.store_name}</td>
-                          <td style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: Number(s.current_debt) > 0 ? "var(--red)" : "var(--green)" }}>
+                          <td className="dashboard-debt-name" style={{ padding: "12px 0", fontWeight: 500 }}>{s.store_name}</td>
+                          <td className="dashboard-debt-amount" style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: Number(s.current_debt) > 0 ? "var(--red)" : "var(--green)" }}>
                             {fmt(Number(s.current_debt))} TJS
                           </td>
                         </tr>
@@ -332,8 +332,8 @@ export default function DashboardPage() {
               <div className="card">
                 <h3 style={{ marginBottom: 16 }}>{t("dashboard.debt_by_supplier")}</h3>
                 {data.supplier_debts && data.supplier_debts.length > 0 ? (
-                  <div className="table-wrap">
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <div className="table-wrap dashboard-debt-table-wrap">
+                  <table className="dashboard-debt-table" style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
                         <th style={{ textAlign: "left", paddingBottom: 12, fontSize: 12, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Оптовик</th>
@@ -343,8 +343,8 @@ export default function DashboardPage() {
                     <tbody>
                       {data.supplier_debts.map((s) => (
                         <tr key={s.supplier_id} style={{ borderTop: "1px solid var(--border)" }}>
-                          <td style={{ padding: "12px 0", fontWeight: 500 }}>{s.supplier_name}</td>
-                          <td style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: "var(--accent)" }}>
+                          <td className="dashboard-debt-name" style={{ padding: "12px 0", fontWeight: 500 }}>{s.supplier_name}</td>
+                          <td className="dashboard-debt-amount" style={{ padding: "12px 0", textAlign: "right", fontWeight: 700, color: "var(--accent)" }}>
                             {fmt(Number(s.current_debt))} TJS
                           </td>
                         </tr>
