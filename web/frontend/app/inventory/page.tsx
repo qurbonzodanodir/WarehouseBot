@@ -121,38 +121,6 @@ export default function InventoryPage() {
           </div>
           {userRole !== "seller" && (
             <div style={{ display: "flex", gap: 10 }}>
-              <button 
-                className="btn"
-                style={{ 
-                  background: "#dc3545", 
-                  color: "white", 
-                  border: "none", 
-                  height: "fit-content", 
-                  padding: "10px 16px" 
-                }}
-                onClick={() => {
-                  if (confirm("⚠️ ВНИМАНИЕ! Это удалит ВСЕ товары из ВСЕХ магазинов! Восстановить будет невозможно. Продолжить?")) {
-                    api.clearInventory().then(() => {
-                      showToast("✅ Все товары удалены. Теперь можно загружать новые данные из Excel", "success");
-                      // Refresh data
-                      if (selectedStore) {
-                        api.getInventory(selectedStore, currentPage, pageSize).then((data) => {
-                          setItems(data.items);
-                          setTotalItems(data.total);
-                          setTotalPages(data.total_pages);
-                        });
-                      } else {
-                        api.getStoreCatalog().then(setCatalog);
-                      }
-                    }).catch((error) => {
-                      showToast(error instanceof Error ? error.message : "Ошибка при удалении товаров", "error");
-                    });
-                  }
-                }}
-              >
-                <Database size={18} style={{ marginRight: 8 }} />
-                Удалить все товары
-              </button>
               <input 
                 type="file" 
                 id="csv-upload" 

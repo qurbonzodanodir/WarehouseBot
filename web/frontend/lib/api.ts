@@ -270,11 +270,6 @@ export const api = {
       body: JSON.stringify({ store_id, items })
     }),
 
-  clearInventory: () =>
-    request<{message: string}>("/inventory/clear-all", {
-      method: "DELETE"
-    }),
-
   // Stores
   getStores: () => request<Store[]>("/stores"),
   getStoreCatalog: () => request<StoreCatalogCard[]>("/stores/catalog"),
