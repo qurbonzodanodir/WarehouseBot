@@ -13,19 +13,27 @@ from web.backend.routers import auth, orders, products, inventory, analytics, st
 logger = logging.getLogger(__name__)
 
 
+async def _set_webhook():
+    """Register Telegram webhook without blocking API startup."""
+    import asyncio
+
+    try:
+        await asyncio.wait_for(
+            bot.set_webhook(settings.webhook_url, drop_pending_updates=True),
+            timeout=10,
+        )
+        logger.info("Webhook set: %s", settings.webhook_url)
+    except Exception as e:
+        logger.warning("Failed to set webhook (Telegram unreachable?): %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
     polling_task = None
+    webhook_task = None
     if settings.webhook_host:
-        try:
-            await asyncio.wait_for(
-                bot.set_webhook(settings.webhook_url, drop_pending_updates=True),
-                timeout=10,
-            )
-            logger.info("Webhook set: %s", settings.webhook_url)
-        except Exception as e:
-            logger.warning("Failed to set webhook (Telegram unreachable?): %s", e)
+        webhook_task = asyncio.create_task(_set_webhook())
     else:
         try:
             await asyncio.wait_for(
@@ -40,14 +48,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    if settings.webhook_host:
-        try:
-            await asyncio.wait_for(bot.delete_webhook(), timeout=5)
-        except Exception:
-            pass
-    else:
+    if not settings.webhook_host:
         if polling_task:
             polling_task.cancel()
+    elif webhook_task:
+        webhook_task.cancel()
     try:
         await bot.session.close()
     except Exception:

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     )
 
     bot_token: str
+    telegram_proxy_url: str = ""
     webhook_host: str = ""
     webhook_path: str = "/bot/webhook"
     frontend_url: str = "http://localhost:3000"
