@@ -42,6 +42,16 @@ class OrderCreate(BaseModel):
     batch_id: str | None = None
 
 
+class WarehouseDispatchItem(BaseModel):
+    product_id: int
+    quantity: int
+
+
+class WarehouseDispatchCreate(BaseModel):
+    store_id: int
+    items: list[WarehouseDispatchItem]
+
+
 class OrderFilters(BaseModel):
     store_id: int | None = None
     status: OrderStatus | None = None

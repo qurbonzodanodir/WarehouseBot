@@ -537,6 +537,72 @@ class OrderService:
         return list(result.scalars().all())
 
     # ---------------------------------------------------------------------------
+    async def dispatch_from_warehouse(
+        self,
+        warehouse_store_id: int,
+        target_store_id: int,
+        items: list[dict],
+    ) -> list[Order]:
+        """
+        Warehouse-initiated push: create orders directly in DISPATCHED status,
+        deduct from warehouse inventory, record stock movements.
+        Items: [{"product_id": int, "quantity": int}, ...]
+        """
+        if warehouse_store_id == target_store_id:
+            raise ValueError("Cannot dispatch to the same warehouse.")
+        if not items:
+            raise ValueError("No items to dispatch.")
+
+        import uuid
+        from app.services.transaction_service import TransactionService
+        from app.models.enums import StockMovementType
+
+        batch_id = uuid.uuid4().hex[:12]
+        txn_service = TransactionService(self.session)
+        created: list[Order] = []
+
+        for item in items:
+            product_id = int(item["product_id"])
+            quantity = int(item["quantity"])
+            if quantity <= 0:
+                raise ValueError(f"Invalid quantity for product #{product_id}.")
+
+            product = await self.session.get(Product, product_id)
+            if product is None:
+                raise ValueError(f"Product #{product_id} not found.")
+
+            inv = await self._get_or_create_inventory(
+                warehouse_store_id, product_id, lock=True
+            )
+            if inv.quantity < quantity:
+                raise ValueError(
+                    f"Недостаточно товара {product.sku}: есть {inv.quantity}, нужно {quantity}."
+                )
+            inv.quantity -= quantity
+
+            await txn_service.record_stock_movement(
+                product_id=product_id,
+                quantity=quantity,
+                movement_type=StockMovementType.DISPATCH_TO_STORE,
+                from_store_id=warehouse_store_id,
+                to_store_id=target_store_id,
+            )
+
+            order = Order(
+                store_id=target_store_id,
+                product_id=product_id,
+                quantity=quantity,
+                price_per_item=product.price,
+                total_price=product.price * quantity,
+                status=OrderStatus.DISPATCHED,
+                batch_id=batch_id,
+            )
+            self.session.add(order)
+            created.append(order)
+
+        await self.session.flush()
+        return created
+
     # Helpers
     # ---------------------------------------------------------------------------
 

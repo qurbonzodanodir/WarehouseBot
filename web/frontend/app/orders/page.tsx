@@ -2,11 +2,11 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
-import { api, Order, Store, UserMe } from "@/lib/api";
+import { api, Order, Store, UserMe, Product } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
-import { CheckCircle2, XCircle, Truck, RefreshCw, Search, ArrowUpRight, ArrowDownLeft, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
+import { CheckCircle2, XCircle, Truck, RefreshCw, Search, ArrowUpRight, ArrowDownLeft, ShoppingCart, ChevronLeft, ChevronRight, Plus, Trash2, Package } from "lucide-react";
 
 function badgeClass(status: string) {
   const s = status.toLowerCase();
@@ -59,6 +59,15 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
   const [stores, setStores] = useState<Store[]>([]);
+
+  // Warehouse dispatch modal state
+  const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
+  const [dispatchStoreId, setDispatchStoreId] = useState<number | null>(null);
+  const [dispatchItems, setDispatchItems] = useState<{ product_id: number; quantity: number }[]>([]);
+  const [dispatchLoading, setDispatchLoading] = useState(false);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [itemQuantity, setItemQuantity] = useState("1");
 
   const STATUSES = [
     { key: "", label: t("orders.status_all") },
@@ -167,6 +176,72 @@ export default function OrdersPage() {
      finally { setActionLoading(null); }
   }
 
+  // Warehouse dispatch handlers
+  async function openDispatchModal() {
+    setDispatchModalOpen(true);
+    setDispatchStoreId(null);
+    setDispatchItems([]);
+    setSelectedProductId(null);
+    setItemQuantity("1");
+    try {
+      const products = await api.getProducts({ include_inactive: false, page_size: 1000 });
+      setAvailableProducts(products.items || []);
+    } catch (error) {
+      console.error(error);
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    }
+  }
+
+  function closeDispatchModal() {
+    setDispatchModalOpen(false);
+    setDispatchStoreId(null);
+    setDispatchItems([]);
+    setSelectedProductId(null);
+    setItemQuantity("1");
+  }
+
+  function addDispatchItem() {
+    if (!selectedProductId || !itemQuantity) return;
+    const qty = parseInt(itemQuantity, 10);
+    if (qty <= 0) return;
+
+    const existing = dispatchItems.find((item) => item.product_id === selectedProductId);
+    if (existing) {
+      setDispatchItems(dispatchItems.map((item) =>
+        item.product_id === selectedProductId ? { ...item, quantity: item.quantity + qty } : item
+      ));
+    } else {
+      setDispatchItems([...dispatchItems, { product_id: selectedProductId, quantity: qty }]);
+    }
+    setSelectedProductId(null);
+    setItemQuantity("1");
+  }
+
+  function removeDispatchItem(product_id: number) {
+    setDispatchItems(dispatchItems.filter((item) => item.product_id !== product_id));
+  }
+
+  async function handleDispatchSubmit() {
+    if (!dispatchStoreId || dispatchItems.length === 0) {
+      showToast("Выберите магазин и добавьте товары", "error");
+      return;
+    }
+    setDispatchLoading(true);
+    try {
+      await api.dispatchFromWarehouse({
+        store_id: dispatchStoreId,
+        items: dispatchItems,
+      });
+      showToast("Заказ отправлен в магазин", "success");
+      closeDispatchModal();
+      await refreshOrders();
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    } finally {
+      setDispatchLoading(false);
+    }
+  }
+
   const filtered = orders.filter((o) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -192,10 +267,18 @@ export default function OrdersPage() {
               {t("orders.found", { count: orders.length })}
             </p>
           </div>
-          <button className="btn btn-ghost" onClick={() => void refreshOrders()}>
-            <RefreshCw size={14} />
-            {t("common.refresh")}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {canManage && (
+              <button className="btn btn-primary" onClick={openDispatchModal}>
+                <Package size={14} />
+                Отправить в магазин
+              </button>
+            )}
+            <button className="btn btn-ghost" onClick={() => void refreshOrders()}>
+              <RefreshCw size={14} />
+              {t("common.refresh")}
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
@@ -363,6 +446,108 @@ export default function OrdersPage() {
           </button>
         </div>
       </main>
+
+      {/* Warehouse Dispatch Modal */}
+      {dispatchModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 600 }}>
+            <div className="modal-header">
+              <h3>Отправить в магазин</h3>
+              <button className="btn btn-ghost" onClick={closeDispatchModal} style={{ padding: 4 }}>
+                <XCircle size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Магазин</label>
+                <select
+                  className="input"
+                  value={dispatchStoreId ?? ""}
+                  onChange={(e) => setDispatchStoreId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">— выбрать —</option>
+                  {stores
+                    .filter(s => s.store_type !== "warehouse")
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div style={{ flex: 2 }}>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Товар</label>
+                  <select
+                    className="input"
+                    value={selectedProductId ?? ""}
+                    onChange={(e) => setSelectedProductId(e.target.value ? Number(e.target.value) : null)}
+                  >
+                    <option value="">— выбрать —</option>
+                    {availableProducts.map(p => (
+                      <option key={p.id} value={p.id}>{p.sku} - {p.brand}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Кол-во</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={itemQuantity}
+                    onChange={(e) => setItemQuantity(e.target.value)}
+                  />
+                </div>
+                <button className="btn btn-primary" onClick={addDispatchItem} style={{ padding: "8px 12px" }}>
+                  <Plus size={14} />
+                </button>
+              </div>
+
+              {dispatchItems.length > 0 && (
+                <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
+                    Товары для отправки ({dispatchItems.length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {dispatchItems.map((item) => {
+                      const product = availableProducts.find(p => p.id === item.product_id);
+                      if (!product) return null;
+                      return (
+                        <div key={item.product_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                          <div>
+                            <span style={{ fontWeight: 600 }}>{product.sku}</span>
+                            <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>{product.brand}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <span style={{ fontWeight: 600 }}>{item.quantity} шт</span>
+                            <button
+                              className="btn btn-ghost"
+                              onClick={() => removeDispatchItem(item.product_id)}
+                              style={{ padding: 4, color: "var(--red)" }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ justifyContent: "flex-end", gap: 8 }}>
+              <button className="btn btn-ghost" onClick={closeDispatchModal}>Отмена</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleDispatchSubmit}
+                disabled={dispatchLoading || !dispatchStoreId || dispatchItems.length === 0}
+              >
+                {dispatchLoading ? "Отправка..." : "Отправить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

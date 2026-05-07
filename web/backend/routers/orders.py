@@ -6,11 +6,11 @@ from app.models.enums import OrderStatus
 from app.models.order import Order
 from app.services.order_service import OrderService
 from web.backend.dependencies import CurrentUser, SessionDep
-from web.backend.schemas.orders import OrderCreate, OrderOut
+from web.backend.schemas.orders import OrderCreate, OrderOut, WarehouseDispatchCreate
 
 from app.bot.bot import bot
 from app.services.notification_service import NotificationService
-from app.bot.keyboards.inline import delivery_confirm_kb
+from app.bot.keyboards.inline import delivery_confirm_kb, batch_delivery_confirm_kb
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -142,6 +142,85 @@ async def create_order(
         .where(Order.id == order.id)
     )
     return result.scalar_one()
+
+
+@router.post(
+    "/dispatch-from-warehouse",
+    response_model=list[OrderOut],
+    status_code=status.HTTP_201_CREATED,
+    summary="Отправить заказ в магазин (Складщик)",
+    description="Складщик создаёт партию заказов и отгружает её в магазин. Продавец подтверждает приём в Telegram.",
+)
+async def dispatch_from_warehouse(
+    body: WarehouseDispatchCreate,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[OrderOut]:
+    from app.models.enums import UserRole
+    from app.services.store_service import StoreService
+
+    _ensure_roles(current_user, {UserRole.WAREHOUSE, UserRole.OWNER, UserRole.ADMIN})
+
+    if not body.items:
+        raise HTTPException(status_code=400, detail="No items to dispatch")
+
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        raise HTTPException(status_code=400, detail="Main warehouse not found")
+    if body.store_id == warehouse_id:
+        raise HTTPException(status_code=400, detail="Cannot dispatch to the warehouse itself")
+
+    from app.models.store import Store as StoreModel
+    target_store = await session.get(StoreModel, body.store_id)
+    if target_store is None:
+        raise HTTPException(status_code=404, detail="Target store not found")
+
+    items = [{"product_id": it.product_id, "quantity": it.quantity} for it in body.items]
+
+    order_svc = OrderService(session)
+    try:
+        created = await order_svc.dispatch_from_warehouse(
+            warehouse_store_id=warehouse_id,
+            target_store_id=body.store_id,
+            items=items,
+        )
+        await session.commit()
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        import logging
+        logging.error(f"dispatch_from_warehouse error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    # Reload with relationships
+    order_ids = [o.id for o in created]
+    result = await session.execute(
+        select(Order)
+        .options(joinedload(Order.store), joinedload(Order.product))
+        .where(Order.id.in_(order_ids))
+        .order_by(Order.id)
+    )
+    orders = list(result.scalars().unique().all())
+
+    if orders:
+        batch_id = orders[0].batch_id
+        items_text = "\n".join([f"• {o.product.sku} — {o.quantity} шт" for o in orders])
+
+        try:
+            notif_svc = NotificationService(bot, session)
+            await notif_svc.notify_sellers(
+                store_id=body.store_id,
+                text=lambda _t: _t("order_batch_accepted_seller", items=items_text),
+                reply_markup=lambda _t: batch_delivery_confirm_kb(batch_id, _=_t),
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to notify sellers about warehouse dispatch: {e}")
+
+    return orders
 
 
 @router.put(
