@@ -68,6 +68,7 @@ export default function OrdersPage() {
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [itemQuantity, setItemQuantity] = useState("1");
+  const [productSearch, setProductSearch] = useState("");
 
   const STATUSES = [
     { key: "", label: t("orders.status_all") },
@@ -198,6 +199,7 @@ export default function OrdersPage() {
     setDispatchItems([]);
     setSelectedProductId(null);
     setItemQuantity("1");
+    setProductSearch("");
   }
 
   function addDispatchItem() {
@@ -474,20 +476,34 @@ export default function OrdersPage() {
                 </select>
               </div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                <div style={{ flex: 2 }}>
-                  <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Товар</label>
-                  <select
-                    className="input"
-                    value={selectedProductId ?? ""}
-                    onChange={(e) => setSelectedProductId(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">— выбрать —</option>
-                    {availableProducts.map(p => (
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Товар</label>
+                <input
+                  className="input"
+                  placeholder="Поиск по SKU или бренду"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                />
+                <select
+                  className="input"
+                  style={{ marginTop: 8 }}
+                  value={selectedProductId ?? ""}
+                  onChange={(e) => setSelectedProductId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">— выбрать —</option>
+                  {availableProducts
+                    .filter(p => {
+                      const q = productSearch.toLowerCase();
+                      return !q || p.sku.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q);
+                    })
+                    .slice(0, 100)
+                    .map(p => (
                       <option key={p.id} value={p.id}>{p.sku} - {p.brand}</option>
                     ))}
-                  </select>
-                </div>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Кол-во</label>
                   <input
