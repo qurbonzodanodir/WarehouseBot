@@ -47,9 +47,6 @@ export default function ManagementPage() {
   const selectedStore = stores.find(s => s.id === selectedStoreId) ?? null;
   const isSelectedWarehouse = selectedStore?.store_type === "warehouse";
   const allowedRole = isSelectedWarehouse ? "warehouse" : "seller";
-  const allowedRoleOptions = isSelectedWarehouse
-    ? [{ value: "warehouse", label: t("sidebar.warehouse") }]
-    : [{ value: "seller", label: t("sidebar.seller") }];
 
 
   const fetchStores = useCallback(async () => {
@@ -205,7 +202,7 @@ export default function ManagementPage() {
         await api.createEmployee(selectedStoreId!, { name: empForm.name, role: empForm.role });
       }
       setEmpFormOpen(false);
-      setEmpForm({ name: "", role: "seller" });
+      setEmpForm({ name: "", role: allowedRole });
       if (selectedStoreId) await fetchEmployees(selectedStoreId);
     } catch (error) {
       showToast(getErrorMessage(error, t("common.error")), "error");
@@ -527,15 +524,7 @@ export default function ManagementPage() {
                     <form onSubmit={handleSubmitEmployee} style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
                       <div style={{ flex: "1 1 100%" }}>
                         <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("management.emp_name")}</label>
-                        <input className="input" style={{ width: "100%", borderRadius: 8 }} placeholder={t("management.emp_name_ph")} value={empForm.name} onChange={(e) => setEmpForm({ ...empForm, name: e.target.value })} required />
-                      </div>
-                      <div style={{ flex: "1 1 100%" }}>
-                        <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("management.emp_role")}</label>
-                        <select className="input" style={{ width: "100%", borderRadius: 8 }} value={empForm.role} onChange={(e) => setEmpForm({ ...empForm, role: e.target.value })}>
-                          {allowedRoleOptions.map((role) => (
-                            <option key={role.value} value={role.value}>{role.label}</option>
-                          ))}
-                        </select>
+                        <input className="input" style={{ width: "100%", borderRadius: 8 }} value={empForm.name} onChange={(e) => setEmpForm({ ...empForm, name: e.target.value })} required />
                       </div>
                       <div style={{ flex: "1 1 100%", display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
                         <button type="button" className="btn btn-ghost" style={{ borderRadius: 8 }} onClick={() => setEmpFormOpen(false)}>{t("common.cancel")}</button>
@@ -654,9 +643,7 @@ export default function ManagementPage() {
                           value={newInviteRole}
                           onChange={(e) => setNewInviteRole(e.target.value)}
                         >
-                          {allowedRoleOptions.map((role) => (
-                            <option key={role.value} value={role.value}>{role.label}</option>
-                          ))}
+                          <option value={allowedRole}>{roleBadge(allowedRole)}</option>
                         </select>
                       </div>
                       <button className="btn btn-primary" style={{ padding: "0 20px", height: 40, borderRadius: 8 }} onClick={handleCreateInvite}>
