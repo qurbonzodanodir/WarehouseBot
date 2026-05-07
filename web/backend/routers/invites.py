@@ -4,10 +4,23 @@ from web.backend.dependencies import CurrentUser, SessionDep
 from web.backend.schemas.invites import InviteCreate, InviteOut
 from app.models.invite_code import InviteCode
 from app.models.store import Store
-from app.models.enums import UserRole
+from app.models.enums import StoreType, UserRole
 from app.services.invite_service import InviteService
 
 router = APIRouter(prefix="/invites", tags=["Invites"])
+
+
+def _validate_role_for_store(store: Store, role: UserRole) -> None:
+    if store.store_type == StoreType.WAREHOUSE and role != UserRole.WAREHOUSE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Для склада можно создавать приглашение только для роли Складщик",
+        )
+    if store.store_type == StoreType.STORE and role != UserRole.SELLER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Для магазина можно создавать приглашение только для роли Продавец",
+        )
 
 @router.post("", response_model=InviteOut, status_code=status.HTTP_201_CREATED)
 async def create_invite(
@@ -22,6 +35,7 @@ async def create_invite(
     store = await session.get(Store, body.store_id)
     if not store:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store not found")
+    _validate_role_for_store(store, body.role)
 
     invite_svc = InviteService(session)
     invite = await invite_svc.create_invite(role=body.role, store_id=body.store_id)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.models.enums import UserRole
+from app.models.enums import StoreType, UserRole
 from app.models.store import Store
 from app.models.user import User
 from app.services.store_service import StoreService
@@ -9,6 +9,19 @@ from web.backend.dependencies import CurrentUser, SessionDep
 from web.backend.schemas.stores import EmployeeCreate, StoreCreate, StoreOut, StoreCatalogCard, StoreUpdate, EmployeeUpdate
 
 router = APIRouter(prefix="/stores", tags=["Stores"])
+
+
+def _validate_role_for_store(store: Store, role: UserRole) -> None:
+    if store.store_type == StoreType.WAREHOUSE and role != UserRole.WAREHOUSE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Для склада можно назначать только роль Складщик",
+        )
+    if store.store_type == StoreType.STORE and role != UserRole.SELLER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Для магазина можно назначать только роль Продавец",
+        )
 
 
 @router.get(
@@ -217,9 +230,14 @@ async def update_employee(
         user.name = body.name
     if body.role is not None:
         try:
-            user.role = UserRole(body.role)
+            role = UserRole(body.role)
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
+        if user.store_id is not None:
+            store = await session.get(Store, user.store_id)
+            if store is not None:
+                _validate_role_for_store(store, role)
+        user.role = role
         
     await session.commit()
     await session.refresh(user)
@@ -300,6 +318,7 @@ async def create_employee(
         role = UserRole(body.role)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Неизвестная роль: {body.role}")
+    _validate_role_for_store(store, role)
 
     user = User(
         email=None,
@@ -322,4 +341,3 @@ async def create_employee(
         "store_id": user.store_id,
         "is_active": user.is_active,
     }
-

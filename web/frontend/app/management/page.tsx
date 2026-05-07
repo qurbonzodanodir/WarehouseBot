@@ -44,6 +44,12 @@ export default function ManagementPage() {
   const [user, setUser] = useState<UserMe | null>(null);
   const [mounted, setMounted] = useState(false);
   const isOwner = user?.role === "owner";
+  const selectedStore = stores.find(s => s.id === selectedStoreId) ?? null;
+  const isSelectedWarehouse = selectedStore?.store_type === "warehouse";
+  const allowedRole = isSelectedWarehouse ? "warehouse" : "seller";
+  const allowedRoleOptions = isSelectedWarehouse
+    ? [{ value: "warehouse", label: t("sidebar.warehouse") }]
+    : [{ value: "seller", label: t("sidebar.seller") }];
 
 
   const fetchStores = useCallback(async () => {
@@ -115,11 +121,13 @@ export default function ManagementPage() {
     if (selectedStoreId) {
       fetchEmployees(selectedStoreId);
       fetchInvites(selectedStoreId);
+      setEmpForm((prev) => ({ ...prev, role: allowedRole }));
+      setNewInviteRole(allowedRole);
     } else {
       setEmployees([]);
       setInvites([]);
     }
-  }, [selectedStoreId, showInactiveEmployees, fetchEmployees, fetchInvites]);
+  }, [selectedStoreId, showInactiveEmployees, fetchEmployees, fetchInvites, allowedRole]);
 
   async function handleCreateInvite() {
     if (!selectedStoreId) return;
@@ -163,10 +171,10 @@ export default function ManagementPage() {
   function openEmpForm(emp?: Employee) {
     if (emp) {
       setEditingEmployeeId(emp.id);
-      setEmpForm({ name: emp.name, role: emp.role });
+      setEmpForm({ name: emp.name, role: emp.role === allowedRole ? emp.role : allowedRole });
     } else {
       setEditingEmployeeId(null);
-      setEmpForm({ name: "", role: "seller" });
+      setEmpForm({ name: "", role: allowedRole });
     }
     setEmpFormOpen(true);
   }
@@ -490,10 +498,10 @@ export default function ManagementPage() {
                 }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
-                       {stores.find(s => s.id === selectedStoreId)?.name}
+                       {selectedStore?.name}
                     </h2>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-muted)", fontSize: 13, marginTop: 6 }}>
-                      <MapPin size={14} /> {stores.find(s => s.id === selectedStoreId)?.address || t("management.no_address")}
+                      <MapPin size={14} /> {selectedStore?.address || t("management.no_address")}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -505,7 +513,7 @@ export default function ManagementPage() {
                       <UserPlus size={14} />
                       {t("management.add_emp")}
                     </button>
-                    <button className="btn btn-ghost" style={{ padding: "6px", color: "var(--text-muted)", background: "transparent" }} onClick={() => openStoreForm(stores.find(s => s.id === selectedStoreId))} title={t("management.edit_store_btn_title")}>
+                    <button className="btn btn-ghost" style={{ padding: "6px", color: "var(--text-muted)", background: "transparent" }} onClick={() => openStoreForm(selectedStore ?? undefined)} title={t("management.edit_store_btn_title")}>
                       <StoreIcon size={16} />
                     </button>
                   </div>
@@ -524,8 +532,9 @@ export default function ManagementPage() {
                       <div style={{ flex: "1 1 100%" }}>
                         <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("management.emp_role")}</label>
                         <select className="input" style={{ width: "100%", borderRadius: 8 }} value={empForm.role} onChange={(e) => setEmpForm({ ...empForm, role: e.target.value })}>
-                          <option value="seller">{t("sidebar.seller")}</option>
-                          <option value="warehouse">{t("sidebar.warehouse")}</option>
+                          {allowedRoleOptions.map((role) => (
+                            <option key={role.value} value={role.value}>{role.label}</option>
+                          ))}
                         </select>
                       </div>
                       <div style={{ flex: "1 1 100%", display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
@@ -645,8 +654,9 @@ export default function ManagementPage() {
                           value={newInviteRole}
                           onChange={(e) => setNewInviteRole(e.target.value)}
                         >
-                          <option value="seller">{t("sidebar.seller")}</option>
-                          <option value="warehouse">{t("sidebar.warehouse")}</option>
+                          {allowedRoleOptions.map((role) => (
+                            <option key={role.value} value={role.value}>{role.label}</option>
+                          ))}
                         </select>
                       </div>
                       <button className="btn btn-primary" style={{ padding: "0 20px", height: 40, borderRadius: 8 }} onClick={handleCreateInvite}>
