@@ -451,8 +451,8 @@ export default function OrdersPage() {
 
       {/* Warehouse Dispatch Modal */}
       {dispatchModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 600, width: "90%", maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="modal-overlay orders-dispatch-overlay">
+          <div className="modal-card orders-dispatch-modal">
             <div className="modal-header">
               <h3>Отправить в магазин</h3>
               <button className="btn btn-ghost" onClick={closeDispatchModal} style={{ padding: 4 }}>
@@ -466,7 +466,6 @@ export default function OrdersPage() {
                   className="input"
                   value={dispatchStoreId ?? ""}
                   onChange={(e) => setDispatchStoreId(e.target.value ? Number(e.target.value) : null)}
-                  style={{ height: 40 }}
                 >
                   <option value="">— выбрать —</option>
                   {stores
@@ -484,11 +483,10 @@ export default function OrdersPage() {
                   placeholder="Поиск по SKU или бренду"
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  style={{ height: 40 }}
                 />
                 <select
                   className="input"
-                  style={{ marginTop: 8, height: 40 }}
+                  style={{ marginTop: 8 }}
                   value={selectedProductId ?? ""}
                   onChange={(e) => setSelectedProductId(e.target.value ? Number(e.target.value) : null)}
                 >
@@ -514,10 +512,9 @@ export default function OrdersPage() {
                     min="1"
                     value={itemQuantity}
                     onChange={(e) => setItemQuantity(e.target.value)}
-                    style={{ height: 40 }}
                   />
                 </div>
-                <button className="btn btn-primary" onClick={addDispatchItem} style={{ padding: "8px 12px", height: 40 }}>
+                <button className="btn btn-primary orders-dispatch-add" onClick={addDispatchItem}>
                   <Plus size={14} />
                 </button>
               </div>

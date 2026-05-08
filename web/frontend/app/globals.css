@@ -132,6 +132,46 @@ h3 { font-size: 1rem; font-weight: 600; }
   overflow: hidden;
 }
 
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.orders-dispatch-overlay {
+  z-index: 1000;
+}
+.orders-dispatch-modal {
+  width: min(100%, 600px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+.orders-dispatch-modal .input {
+  width: 100%;
+  min-height: 44px;
+}
+.orders-dispatch-modal select.input {
+  line-height: 1.2;
+}
+.orders-dispatch-add {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex: 0 0 44px;
+}
+
 /* ── Button ──────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
@@ -639,6 +679,57 @@ select.input { cursor: pointer; }
     grid-template-columns: 1fr !important;
     grid-template-rows: 1fr 1fr;
     overflow: hidden;
+  }
+
+  .orders-dispatch-overlay {
+    place-items: end center;
+    padding: 12px;
+  }
+  .orders-dispatch-modal {
+    width: 100%;
+    max-height: calc(100dvh - 96px);
+    border-radius: 18px 18px 0 0;
+    padding: 18px;
+    overflow-y: auto;
+  }
+  .orders-dispatch-modal .modal-header {
+    position: sticky;
+    top: -18px;
+    z-index: 2;
+    background: var(--bg-card);
+    margin: -18px -18px 16px;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .orders-dispatch-modal .modal-body {
+    gap: 14px !important;
+  }
+  .orders-dispatch-modal .input {
+    min-height: 48px;
+    height: auto !important;
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+  .orders-dispatch-modal select.input {
+    padding-right: 38px;
+  }
+  .orders-dispatch-add {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+  }
+  .orders-dispatch-modal .modal-footer {
+    position: sticky;
+    bottom: -18px;
+    z-index: 2;
+    background: var(--bg-card);
+    margin: 18px -18px -18px;
+    padding: 12px 18px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .orders-dispatch-modal .modal-footer .btn {
+    flex: 1 1 0;
+    min-height: 44px;
   }
 
   /* Floating avatar button: hide on mobile (user info is in sidebar) */
