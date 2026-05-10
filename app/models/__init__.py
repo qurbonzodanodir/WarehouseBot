@@ -18,6 +18,7 @@ from app.models.supplier_payment import SupplierPayment
 from app.models.supplier_invoice_item import SupplierInvoiceLineItem
 from app.models.supplier_return import SupplierReturn
 from app.models.supplier_return_item import SupplierReturnLineItem
+from app.models.system_setting import SystemSetting
 
 __all__ = [
     "User",
@@ -40,4 +41,5 @@ __all__ = [
     "SupplierInvoiceLineItem",
     "SupplierReturn",
     "SupplierReturnLineItem",
+    "SystemSetting",
 ]

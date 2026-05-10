@@ -224,7 +224,8 @@ async def return_enter_quantity(
             qty = item["qty"]
 
             # 1. Создаем заказ с правильным статусом и фиксируем цену
-            price_per_item = Decimal("0") if is_display else product.price
+            from app.services.settings_service import SettingsService
+            price_per_item = Decimal("0") if is_display else await SettingsService(session).retail_price(product.price)
             return_order = Order(
                 store_id=user.store_id,
                 product_id=product_id,

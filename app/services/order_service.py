@@ -160,7 +160,8 @@ class OrderService:
         if regular_qty <= 0 and display_qty <= 0:
             raise ValueError("order_must_be_in_vitrine")
 
-        price = product.price
+        from app.services.settings_service import SettingsService
+        price = await SettingsService(self.session).retail_price(product.price)
         total_price = price * quantity
 
         order = Order(
@@ -555,10 +556,12 @@ class OrderService:
 
         import uuid
         from app.services.transaction_service import TransactionService
+        from app.services.settings_service import SettingsService
         from app.models.enums import StockMovementType
 
         batch_id = uuid.uuid4().hex[:12]
         txn_service = TransactionService(self.session)
+        settings_svc = SettingsService(self.session)
         created: list[Order] = []
 
         for item in items:
@@ -588,12 +591,13 @@ class OrderService:
                 to_store_id=target_store_id,
             )
 
+            retail = await settings_svc.retail_price(product.price)
             order = Order(
                 store_id=target_store_id,
                 product_id=product_id,
                 quantity=quantity,
-                price_per_item=product.price,
-                total_price=product.price * quantity,
+                price_per_item=retail,
+                total_price=retail * quantity,
                 status=OrderStatus.DISPATCHED,
                 batch_id=batch_id,
             )
