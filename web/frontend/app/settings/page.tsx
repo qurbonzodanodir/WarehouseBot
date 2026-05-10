@@ -1,11 +1,13 @@
 "use client";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
+import { useToast } from "@/lib/ToastContext";
 import { useTheme } from "next-themes";
-import { Sun, Moon, Globe, Palette, Monitor, Settings } from "lucide-react";
+import { api } from "@/lib/api";
+import { Sun, Moon, Globe, Palette, Monitor, Settings, DollarSign } from "lucide-react";
 
 function subscribe() {
   return () => {};
@@ -15,11 +17,42 @@ export default function SettingsPage() {
   const router = useRouter();
   const { t, lang, setLang } = useTranslation();
   const { theme, setTheme } = useTheme();
+  const { showToast } = useToast();
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
+
+  const [user] = useState(() => getStoredUser());
+  const [retailMarkup, setRetailMarkup] = useState("1.0");
+  const [saving, setSaving] = useState(false);
+
+  const isOwner = user?.role === "owner";
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push("/login"); return; }
-  }, [router]);
+    if (isOwner) {
+      fetchSettings();
+    }
+  }, [router, isOwner]);
+
+  async function fetchSettings() {
+    try {
+      const settings = await api.getSettings();
+      setRetailMarkup(String(settings.retail_markup));
+    } catch (error) {
+      console.error("Failed to fetch settings", error);
+    }
+  }
+
+  async function handleSaveMarkup() {
+    setSaving(true);
+    try {
+      await api.updateSettings({ retail_markup: parseFloat(retailMarkup) || 0 });
+      showToast("Настройки сохранены", "success");
+    } catch (error) {
+      showToast("Ошибка сохранения", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (!mounted) return null;
 
@@ -143,6 +176,63 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Business settings (owner only) */}
+          {isOwner && (
+            <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+              <div style={{
+                padding: "16px 20px",
+                borderBottom: "1px solid var(--border)",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: "var(--accent-muted)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <DollarSign size={18} color="var(--accent)" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>Наценка</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
+                    Добавляется к закупочной цене при отправке в магазин
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
+                      Наценка (сомони)
+                    </label>
+                    <input
+                      className="input"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={retailMarkup}
+                      onChange={(e) => setRetailMarkup(e.target.value)}
+                      style={{ width: "100%", height: 40 }}
+                    />
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSaveMarkup}
+                    disabled={saving}
+                    style={{ height: 40, padding: "0 20px", marginTop: 24 }}
+                  >
+                    {saving ? "Сохранение..." : "Сохранить"}
+                  </button>
+                </div>
+                <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 10 }}>
+                  Пример: если товар закуплен за 114 сомони, при наценке 1 будет продаваться за 115 сомони
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Language section */}
           <div className="card" style={{ padding: 0, overflow: "hidden" }}>
