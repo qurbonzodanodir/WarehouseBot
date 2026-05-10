@@ -341,6 +341,12 @@ export const api = {
     request<SupplierPaymentItem>(`/suppliers/${id}/payments`, { method: "POST", body: JSON.stringify(data) }),
   addSupplierReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
     request<SupplierReturnItem>(`/suppliers/${id}/returns`, { method: "POST", body: JSON.stringify(data) }),
+  addSupplierReceipt: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+    request<SupplierReceiptItem>(`/suppliers/${id}/receipts`, { method: "POST", body: JSON.stringify(data) }),
+  addSupplierPayout: (id: number, data: { amount: number; notes?: string | null }) =>
+    request<SupplierPayoutItem>(`/suppliers/${id}/payouts`, { method: "POST", body: JSON.stringify(data) }),
+  addSupplierOutgoingReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+    request<SupplierOutgoingReturnItem>(`/suppliers/${id}/outgoing-returns`, { method: "POST", body: JSON.stringify(data) }),
 };
 
 export interface PaginatedResponse<T> {
@@ -504,6 +510,9 @@ export interface Supplier {
   is_active: boolean;
   created_at: string;
   current_debt: number;
+  receivable_debt: number;
+  payable_debt: number;
+  net_balance: number;
 }
 
 export interface SupplierInvoiceLineItem {
@@ -543,11 +552,46 @@ export interface SupplierReturnItem {
   items?: SupplierInvoiceLineItem[]; // Reuse line item interface
 }
 
+export interface SupplierReceiptItem {
+  id: number;
+  supplier_id: number;
+  total_amount: number;
+  notes: string | null;
+  created_at: string;
+  user_name: string | null;
+  items?: SupplierInvoiceLineItem[];
+}
+
+export interface SupplierPayoutItem {
+  id: number;
+  supplier_id: number;
+  amount: number;
+  notes: string | null;
+  created_at: string;
+  user_name: string | null;
+}
+
+export interface SupplierOutgoingReturnItem {
+  id: number;
+  supplier_id: number;
+  total_amount: number;
+  notes: string | null;
+  created_at: string;
+  user_name: string | null;
+  items?: SupplierInvoiceLineItem[];
+}
+
 export interface SupplierDetail extends Supplier {
   total_invoiced: number;
   total_paid: number;
   total_returned: number;
+  total_received: number;
+  total_payout: number;
+  total_returned_to_partner: number;
   invoices: SupplierInvoiceItem[];
   payments: SupplierPaymentItem[];
   returns: SupplierReturnItem[];
+  receipts: SupplierReceiptItem[];
+  payouts: SupplierPayoutItem[];
+  outgoing_returns: SupplierOutgoingReturnItem[];
 }

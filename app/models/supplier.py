@@ -10,7 +10,10 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.supplier_invoice import SupplierInvoice
     from app.models.supplier_payment import SupplierPayment
+    from app.models.supplier_payout import SupplierPayout
+    from app.models.supplier_receipt import SupplierReceipt
     from app.models.supplier_return import SupplierReturn
+    from app.models.supplier_outgoing_return import SupplierOutgoingReturn
 
 
 class Supplier(Base):
@@ -33,6 +36,15 @@ class Supplier(Base):
         back_populates="supplier", cascade="all, delete-orphan"
     )
     returns: Mapped[list[SupplierReturn]] = relationship(
+        back_populates="supplier", cascade="all, delete-orphan"
+    )
+    receipts: Mapped[list[SupplierReceipt]] = relationship(
+        back_populates="supplier", cascade="all, delete-orphan"
+    )
+    payouts: Mapped[list[SupplierPayout]] = relationship(
+        back_populates="supplier", cascade="all, delete-orphan"
+    )
+    outgoing_returns: Mapped[list[SupplierOutgoingReturn]] = relationship(
         back_populates="supplier", cascade="all, delete-orphan"
     )
 

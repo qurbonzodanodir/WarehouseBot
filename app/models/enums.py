@@ -60,6 +60,7 @@ class StockMovementType(CaseInsensitiveEnum):
     DISPLAY_RETURN = "display_return"
     DISPATCH_TO_WHOLESALER = "dispatch_to_wholesaler"
     RETURN_FROM_WHOLESALER = "return_from_wholesaler"
+    RETURN_TO_SUPPLIER = "return_to_supplier"
 
 
 class FinancialTransactionType(CaseInsensitiveEnum):

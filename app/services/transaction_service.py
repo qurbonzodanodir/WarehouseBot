@@ -411,6 +411,34 @@ class TransactionService:
         await self.session.flush()
         return inv
 
+    async def return_to_supplier(
+        self,
+        warehouse_store_id: int,
+        product_id: int,
+        quantity: int,
+        user_id: int,
+    ) -> Inventory:
+        """Deduct stock from warehouse when goods are returned back to a partner."""
+        inv = await self._get_or_create_inventory(warehouse_store_id, product_id, lock=True)
+        if inv.quantity < quantity:
+            from app.models.product import Product
+            product = await self.session.get(Product, product_id)
+            sku = product.sku if product else f"id={product_id}"
+            raise ValueError(
+                f"Недостаточно товара на складе ({sku}): "
+                f"в наличии {inv.quantity} шт., нужно вернуть {quantity} шт."
+            )
+        inv.quantity -= quantity
+        await self.record_stock_movement(
+            product_id=product_id,
+            quantity=quantity,
+            movement_type=StockMovementType.RETURN_TO_SUPPLIER,
+            from_store_id=warehouse_store_id,
+            user_id=user_id,
+        )
+        await self.session.flush()
+        return inv
+
     async def dispatch_display_items(
         self,
         warehouse_store_id: int,
