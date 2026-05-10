@@ -78,7 +78,7 @@ export default function ProductsPage() {
   const PAGE_SIZE = 50;
 
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ sku: "", brand: "", price: "" });
+  const [form, setForm] = useState({ sku: "", brand: "", price: "", quantity: "" });
   const [pendingToggleProduct, setPendingToggleProduct] = useState<Product | null>(null);
   const [toggling, setToggling] = useState(false);
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<Product | null>(null);
@@ -370,8 +370,19 @@ export default function ProductsPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await api.createProduct({ sku: form.sku, brand: form.brand, price: Number(form.price) });
-      setForm({ sku: "", brand: "", price: "" });
+      const created = await api.createProduct({ sku: form.sku, brand: form.brand, price: Number(form.price) });
+      const qty = parseInt(form.quantity, 10);
+      if (!isNaN(qty) && qty > 0) {
+        try {
+          await api.receiveStock({ product_id: created.id, quantity: qty });
+          showToast(`Товар создан. Добавлено ${qty} шт на склад`, "success");
+        } catch (stockError) {
+          showToast(`Товар создан, но не удалось добавить остаток: ${getErrorMessage(stockError, t("common.error"))}`, "error");
+        }
+      } else {
+        showToast(t("products.create_success") || "Товар создан", "success");
+      }
+      setForm({ sku: "", brand: "", price: "", quantity: "" });
       setAdding(false);
       setSearch("");
       setSelectedBrand("");
@@ -574,6 +585,10 @@ export default function ProductsPage() {
               <div style={{ flex: "1 1 150px" }}>
                 <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>{t("products.price_tjs")}</label>
                 <input className="input" type="number" placeholder="1500" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required style={{ width: "100%" }} />
+              </div>
+              <div style={{ flex: "1 1 130px" }}>
+                <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>Кол-во (необязательно)</label>
+                <input className="input" type="number" min="0" placeholder="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} style={{ width: "100%" }} />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button type="submit" className="btn btn-primary">{t("common.save")}</button>
