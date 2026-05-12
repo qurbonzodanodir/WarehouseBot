@@ -561,14 +561,14 @@ export default function SuppliersPage() {
           </div>
           <div className="card" style={{ padding: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <AlertCircle size={24} style={{ color: "var(--red)" }} />
+              <AlertCircle size={24} style={{ color: "var(--green)" }} />
               <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>{t("suppliers.total_debt")}</div>
             </div>
             <div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(totalDebt)} <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>TJS</span></div>
           </div>
           <div className="card" style={{ padding: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <Wallet size={24} style={{ color: "var(--green)" }} />
+              <Wallet size={24} style={{ color: "var(--red)" }} />
               <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>{t("suppliers.total_payable")}</div>
             </div>
             <div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(totalPayable)} <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>TJS</span></div>
@@ -578,7 +578,7 @@ export default function SuppliersPage() {
               <History size={24} style={{ color: "var(--accent)" }} />
               <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>{t("suppliers.net_balance")}</div>
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: netBalance >= 0 ? "var(--red)" : "var(--green)" }}>{fmt(Math.abs(netBalance))} <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>TJS</span></div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: netBalance >= 0 ? "var(--green)" : "var(--red)" }}>{fmt(Math.abs(netBalance))} <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>TJS</span></div>
           </div>
         </div>
 
@@ -619,17 +619,17 @@ export default function SuppliersPage() {
                         </td>
                         <td data-label={t("suppliers.col_contact")} style={{ color: "var(--text-secondary)", fontSize: 13 }}>{s.contact_info || "—"}</td>
                         <td data-label={t("suppliers.total_debt")} style={{ textAlign: "right" }}>
-                          <span style={{ fontWeight: 700, color: Number(s.current_debt) > 0 ? "#ef4444" : "var(--text-secondary)" }}>
+                          <span style={{ fontWeight: 700, color: Number(s.current_debt) > 0 ? "var(--green)" : "var(--text-secondary)" }}>
                             {fmt(Number(s.current_debt))} TJS
                           </span>
                         </td>
                         <td data-label={t("suppliers.total_payable")} style={{ textAlign: "right" }}>
-                          <span style={{ fontWeight: 700, color: Number(s.payable_debt || 0) > 0 ? "var(--green)" : "var(--text-secondary)" }}>
+                          <span style={{ fontWeight: 700, color: Number(s.payable_debt || 0) > 0 ? "var(--red)" : "var(--text-secondary)" }}>
                             {fmt(Number(s.payable_debt || 0))} TJS
                           </span>
                         </td>
                         <td data-label={t("suppliers.net_balance")} style={{ textAlign: "right" }}>
-                          <span style={{ fontWeight: 700, color: Number(s.net_balance || 0) >= 0 ? "#ef4444" : "var(--green)" }}>
+                          <span style={{ fontWeight: 700, color: Number(s.net_balance || 0) >= 0 ? "var(--green)" : "var(--red)" }}>
                             {Number(s.net_balance || 0) >= 0 ? "+" : "−"}{fmt(Math.abs(Number(s.net_balance || 0)))} TJS
                           </span>
                         </td>
@@ -659,7 +659,7 @@ export default function SuppliersPage() {
                                         <h3 className="partner-detail-title">{t("suppliers.current_debt")}</h3>
                                         <div className="partner-detail-subtitle">{t("suppliers.btn_invoice")} / {t("suppliers.btn_pay")} / {t("suppliers.btn_return")}</div>
                                       </div>
-                                      <div className="partner-detail-amount" style={{ color: "#ef4444" }}>
+                                      <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
                                         {fmt(Number(detailCache[s.id].receivable_debt || 0))} TJS
                                       </div>
                                     </div>
@@ -681,7 +681,7 @@ export default function SuppliersPage() {
                                           {detailCache[s.id].invoices.length === 0 ? <p className="partner-history-empty">{t("suppliers.no_invoices")}</p> : detailCache[s.id].invoices.slice(0, 4).map(inv => {
                                             const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
                                             const rowKey = `invoice-${inv.id}`;
-                                            return <div key={inv.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(inv.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(inv.total_amount), "#ef4444", "+")}</button>{expandedHistory[rowKey] && renderLineItems(inv.items)}</div>;
+                                            return <div key={inv.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(inv.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(inv.total_amount), "var(--green)", "+")}</button>{expandedHistory[rowKey] && renderLineItems(inv.items)}</div>;
                                           })}
                                         </div>
                                         <div className="partner-history-box">
@@ -708,7 +708,7 @@ export default function SuppliersPage() {
                                         <h3 className="partner-detail-title">{t("suppliers.current_payable")}</h3>
                                         <div className="partner-detail-subtitle">{t("suppliers.btn_receipt")} / {t("suppliers.btn_payout")} / {t("suppliers.btn_return_to_partner")}</div>
                                       </div>
-                                      <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
+                                      <div className="partner-detail-amount" style={{ color: "var(--red)" }}>
                                         {fmt(Number(detailCache[s.id].payable_debt || 0))} TJS
                                       </div>
                                     </div>
@@ -730,7 +730,7 @@ export default function SuppliersPage() {
                                           {(detailCache[s.id].receipts?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].receipts?.slice(0, 4).map(receipt => {
                                             const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
                                             const rowKey = `receipt-${receipt.id}`;
-                                            return <div key={receipt.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(receipt.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(receipt.total_amount), "var(--green)", "+")}</button>{expandedHistory[rowKey] && renderLineItems(receipt.items)}</div>;
+                                            return <div key={receipt.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(receipt.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(receipt.total_amount), "var(--red)", "+")}</button>{expandedHistory[rowKey] && renderLineItems(receipt.items)}</div>;
                                           })}
                                         </div>
                                         <div className="partner-history-box">
@@ -1006,7 +1006,7 @@ export default function SuppliersPage() {
               <ArrowUpCircle size={20} /> {t("suppliers.payment_title")}
             </h3>
             <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4 }}>{paymentModal.name}</p>
-            <p style={{ fontSize: 13, color: "#ef4444", marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: "var(--green)", marginBottom: 20 }}>
               {t("suppliers.current_debt")}: <strong>{fmt(Number(paymentModal.current_debt))} TJS</strong>
             </p>
             <form onSubmit={handleAddPayment} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1031,11 +1031,11 @@ export default function SuppliersPage() {
       {mounted && payoutModal && createPortal(
         <div className="modal-overlay">
           <div className="modal-card" style={{ maxWidth: 420 }}>
-            <h3 style={{ marginBottom: 4, color: "var(--green)", display: "flex", alignItems: "center", gap: 8 }}>
+            <h3 style={{ marginBottom: 4, color: "var(--red)", display: "flex", alignItems: "center", gap: 8 }}>
               <Wallet size={20} /> {t("suppliers.payout_title")}
             </h3>
             <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4 }}>{payoutModal.name}</p>
-            <p style={{ fontSize: 13, color: "var(--green)", marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: "var(--red)", marginBottom: 20 }}>
               {t("suppliers.current_payable")}: <strong>{fmt(Number(payoutModal.payable_debt || 0))} TJS</strong>
             </p>
             <form onSubmit={handleAddPayout} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
