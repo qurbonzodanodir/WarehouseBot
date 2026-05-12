@@ -78,14 +78,14 @@ export default function ProductsPage() {
   const PAGE_SIZE = 50;
 
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ sku: "", brand: "", price: "", quantity: "" });
+  const [form, setForm] = useState({ sku: "", brand: "", price: "", store_price: "", quantity: "" });
   const [pendingToggleProduct, setPendingToggleProduct] = useState<Product | null>(null);
   const [toggling, setToggling] = useState(false);
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [editForm, setEditForm] = useState({ sku: "", brand: "", price: "" });
+  const [editForm, setEditForm] = useState({ sku: "", brand: "", price: "", store_price: "" });
   const [isEditModalOpen, setEditModalOpen] = useState(false);
 
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -370,7 +370,12 @@ export default function ProductsPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const created = await api.createProduct({ sku: form.sku, brand: form.brand, price: Number(form.price) });
+      const created = await api.createProduct({
+        sku: form.sku,
+        brand: form.brand,
+        price: Number(form.price),
+        store_price: form.store_price ? Number(form.store_price) : undefined,
+      });
       const qty = parseInt(form.quantity, 10);
       if (!isNaN(qty) && qty > 0) {
         try {
@@ -382,7 +387,7 @@ export default function ProductsPage() {
       } else {
         showToast(t("products.create_success") || "Товар создан", "success");
       }
-      setForm({ sku: "", brand: "", price: "", quantity: "" });
+      setForm({ sku: "", brand: "", price: "", store_price: "", quantity: "" });
       setAdding(false);
       setSearch("");
       setSelectedBrand("");
@@ -404,7 +409,12 @@ export default function ProductsPage() {
     e.preventDefault();
     if (!editingProduct) return;
     try {
-      await api.updateProduct(editingProduct.id, { sku: editForm.sku, brand: editForm.brand, price: Number(editForm.price) });
+      await api.updateProduct(editingProduct.id, {
+        sku: editForm.sku,
+        brand: editForm.brand,
+        price: Number(editForm.price),
+        store_price: editForm.store_price ? Number(editForm.store_price) : null,
+      });
       showToast(t("products.edit_success"), "success");
       setEditingProduct(null);
       setEditModalOpen(false);
@@ -586,6 +596,10 @@ export default function ProductsPage() {
                 <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>{t("products.price_tjs")}</label>
                 <input className="input" type="number" placeholder="1500" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required style={{ width: "100%" }} />
               </div>
+              <div style={{ flex: "1 1 170px" }}>
+                <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>{t("products.store_price_tjs")}</label>
+                <input className="input" type="number" placeholder={t("products.store_price_hint")} value={form.store_price} onChange={(e) => setForm({ ...form, store_price: e.target.value })} style={{ width: "100%" }} />
+              </div>
               <div style={{ flex: "1 1 130px" }}>
                 <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 5 }}>Кол-во (необязательно)</label>
                 <input className="input" type="number" min="0" placeholder="0" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} style={{ width: "100%" }} />
@@ -672,6 +686,7 @@ export default function ProductsPage() {
                     <th style={{ minWidth: "70px" }}>{t("products.col_sku")}</th>
                     <th>{t("products.col_brand")}</th>
                     <th style={{ textAlign: "right" }}>{t("products.col_price")}</th>
+                    <th style={{ textAlign: "right" }}>{t("products.col_store_price")}</th>
                     <th style={{ textAlign: "center" }}>{t("common.status")}</th>
                     {isWarehouse && <th style={{ textAlign: "center" }}>{t("common.actions")}</th>}
                   </tr>
@@ -696,6 +711,9 @@ export default function ProductsPage() {
                           {normalizeBrandName(p.brand) === "UNKNOWN" ? "-" : normalizeBrandName(p.brand)}
                         </td>
                         <td data-label={t("products.col_price")} style={{ textAlign: "right", fontWeight: 600 }}>{fmt(Number(p.price))} TJS</td>
+                        <td data-label={t("products.col_store_price")} style={{ textAlign: "right", fontWeight: 700, color: "var(--accent)" }}>
+                          {fmt(Number(p.store_price ?? p.price))} TJS
+                        </td>
                         <td data-label={t("common.status")} style={{ textAlign: "center" }}>
                           <span className={p.is_active ? "badge badge-delivered" : "badge badge-rejected"}>
                             {p.is_active ? t("products.active") : t("products.inactive")}
@@ -728,7 +746,7 @@ export default function ProductsPage() {
                                     className="row-action-item"
                                     onClick={() => {
                                       setEditingProduct(p);
-                                      setEditForm({ sku: p.sku, brand: p.brand, price: String(p.price) });
+                                      setEditForm({ sku: p.sku, brand: p.brand, price: String(p.price), store_price: p.store_price ? String(p.store_price) : "" });
                                       setEditModalOpen(true);
                                       setOpenMenuId(null);
                                     }}
@@ -1102,6 +1120,10 @@ export default function ProductsPage() {
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_price")}</label>
                 <input className="input" style={{ width: "100%" }} type="number" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} required />
+              </div>
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_store_price")}</label>
+                <input className="input" style={{ width: "100%" }} type="number" placeholder={t("products.store_price_hint")} value={editForm.store_price} onChange={(e) => setEditForm({ ...editForm, store_price: e.target.value })} />
               </div>
               <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setEditModalOpen(false)}>{t("common.cancel")}</button>

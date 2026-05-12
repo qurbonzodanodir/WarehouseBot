@@ -155,10 +155,9 @@ async def enter_sale_quantity(
 
     try:
         from app.models.product import Product
-        from app.services.settings_service import SettingsService
         product = await session.get(Product, product_id)
 
-        retail_price = await SettingsService(session).retail_price(product.price)
+        retail_price = product.effective_store_price
 
         txn_svc = TransactionService(session)
         await txn_svc.record_sale(

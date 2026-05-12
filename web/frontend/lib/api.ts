@@ -243,7 +243,7 @@ export const api = {
     request<Brand>(`/products/brands/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteBrand: (id: number) =>
     request(`/products/brands/${id}`, { method: "DELETE" }),
-  createProduct: (data: { sku: string; price: number; brand: string }) =>
+  createProduct: (data: { sku: string; price: number; brand: string; store_price?: number | null }) =>
     request<Product>("/products", { method: "POST", body: JSON.stringify(data) }),
   updateProduct: (id: number, data: Partial<Product>) =>
     request<Product>(`/products/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -399,6 +399,7 @@ export interface Product {
   sku: string;
   brand: string;
   price: number;
+  store_price: number | null;
   is_active: boolean;
 }
 
@@ -407,6 +408,7 @@ export interface ProductPicker {
   sku: string;
   brand: string;
   price: number;
+  store_price: number | null;
 }
 
 export interface Brand {
@@ -423,10 +425,15 @@ export interface BrandStat {
 export interface ProductCreate {
   sku: string;
   price: number;
+  brand?: string;
+  store_price?: number | null;
 }
 
 export interface ProductUpdate {
   price?: number;
+  brand?: string;
+  sku?: string;
+  store_price?: number | null;
   is_active?: boolean;
 }
 

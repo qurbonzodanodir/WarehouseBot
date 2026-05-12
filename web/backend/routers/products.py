@@ -353,6 +353,7 @@ async def create_product(
             existing_product.is_active = True
             existing_product.brand = body.brand.strip()
             existing_product.price = body.price
+            existing_product.store_price = body.store_price
             session.add(existing_product)
             await session.commit()
             await session.refresh(existing_product)
@@ -362,6 +363,7 @@ async def create_product(
         sku=body.sku,
         brand=body.brand.strip(),
         price=body.price,
+        store_price=body.store_price,
         is_active=True,
     )
     session.add(product)
@@ -392,8 +394,15 @@ async def update_product(
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
+    if body.sku is not None:
+        cleaned_sku = body.sku.strip()
+        if not cleaned_sku:
+            raise HTTPException(status_code=400, detail="SKU is required")
+        product.sku = cleaned_sku
     if body.price is not None:
         product.price = body.price
+    if "store_price" in body.model_fields_set:
+        product.store_price = body.store_price
     if body.brand is not None:
         cleaned_brand = body.brand.strip()
         if cleaned_brand:
@@ -404,9 +413,13 @@ async def update_product(
     if body.is_active is not None:
         product.is_active = body.is_active
 
-    await session.commit()
-    await session.refresh(product)
-    return product
+    try:
+        await session.commit()
+        await session.refresh(product)
+        return product
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail="Product with this SKU already exists")
 
 @router.delete(
     "/{product_id:int}",

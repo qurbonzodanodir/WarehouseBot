@@ -7,6 +7,7 @@ class ProductOut(BaseModel):
     sku: str
     brand: str
     price: Decimal
+    store_price: Decimal | None = None
     is_active: bool
 
     model_config = {"from_attributes": True}
@@ -16,11 +17,14 @@ class ProductCreate(BaseModel):
     sku: str = Field(..., min_length=1, max_length=100)
     brand: str = Field(..., min_length=1, max_length=120)
     price: Decimal = Field(..., gt=0)
+    store_price: Decimal | None = Field(None, gt=0)
 
 
 class ProductUpdate(BaseModel):
+    sku: str | None = Field(None, min_length=1, max_length=100)
     brand: str | None = Field(None, min_length=1, max_length=120)
     price: Decimal | None = Field(None, gt=0)
+    store_price: Decimal | None = Field(None, gt=0)
     is_active: bool | None = None
 
 
@@ -44,6 +48,7 @@ class ProductPickerOut(BaseModel):
     sku: str
     brand: str
     price: Decimal
+    store_price: Decimal | None = None
 
     model_config = {"from_attributes": True}
 
