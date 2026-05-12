@@ -132,6 +132,120 @@ h3 { font-size: 1rem; font-weight: 600; }
   overflow: hidden;
 }
 
+.partner-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.partner-action-btn {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.partner-detail-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.partner-detail-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.partner-detail-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.partner-detail-subtitle {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.partner-detail-amount {
+  font-size: 18px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.partner-detail-body {
+  padding: 14px 16px 16px;
+}
+
+.partner-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.partner-history-box {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 12px;
+  min-height: 112px;
+}
+
+.partner-history-title {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.partner-history-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.partner-history-row:last-child {
+  border-bottom: 0;
+}
+
+.partner-history-date,
+.partner-history-qty,
+.partner-history-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.partner-history-amount {
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -679,6 +793,30 @@ select.input { cursor: pointer; }
     grid-template-columns: 1fr !important;
     grid-template-rows: 1fr 1fr;
     overflow: hidden;
+  }
+
+  .partner-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .partner-detail-header {
+    display: grid;
+  }
+
+  .partner-detail-amount {
+    font-size: 16px;
+  }
+
+  .partner-history-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .partner-history-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .partner-history-qty {
+    display: none;
   }
 
   .orders-dispatch-overlay {

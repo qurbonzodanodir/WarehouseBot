@@ -506,6 +506,11 @@ export default function SuppliersPage() {
   const totalDebt = suppliers.reduce((acc, s) => acc + Number(s.current_debt), 0);
   const totalPayable = suppliers.reduce((acc, s) => acc + Number(s.payable_debt || 0), 0);
   const netBalance = suppliers.reduce((acc, s) => acc + Number(s.net_balance || 0), 0);
+  const renderAmount = (value: number, color: string, sign = "") => (
+    <span className="partner-history-amount" style={{ color }}>
+      {sign}{fmt(Math.abs(value))} TJS
+    </span>
+  );
 
   return (
     <div style={{ display: "flex" }}>
@@ -611,50 +616,13 @@ export default function SuppliersPage() {
                           </span>
                         </td>
                         <td data-label={t("common.actions")} style={{ textAlign: "center" }}>
-                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }} onClick={e => e.stopPropagation()}>
-                            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                              <button
-                                style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #ef4444", background: "rgba(239,68,68,0.08)", color: "#ef4444", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
-                                onClick={() => { openInvoiceModal(s); }}
-                              >
-                                <ArrowDownCircle size={13} /> {t("suppliers.btn_invoice")}
-                              </button>
-                              {Number(s.current_debt) > 0 && (
-                                <button
-                                  style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #22c55e", background: "rgba(34,197,94,0.08)", color: "#22c55e", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
-                                  onClick={() => { setPaymentModal(s); setPaymentAmount(""); setPaymentNotes(""); }}
-                                >
-                                  <ArrowUpCircle size={13} /> {t("suppliers.btn_pay")}
-                                </button>
-                              )}
-                              <button
-                                style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #d97706", background: "rgba(217,119,6,0.08)", color: "#d97706", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
-                                onClick={() => { openReturnModal(s); }}
-                              >
-                                <History size={13} /> {t("suppliers.btn_return")}
-                              </button>
-                              <button
-                                style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #3b82f6", background: "rgba(59,130,246,0.08)", color: "#3b82f6", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
-                                onClick={() => { openReceiptModal(s); }}
-                              >
-                                <ArrowUpCircle size={13} /> {t("suppliers.btn_receipt")}
-                              </button>
-                              {Number(s.payable_debt || 0) > 0 && (
-                                <button
-                                  style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #22c55e", background: "rgba(34,197,94,0.08)", color: "#22c55e", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
-                                  onClick={() => { setPayoutModal(s); setPayoutAmount(""); setPayoutNotes(""); }}
-                                >
-                                  <Wallet size={13} /> {t("suppliers.btn_payout")}
-                                </button>
-                              )}
-                              <button
-                                style={{ height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid #8b5cf6", background: "rgba(139,92,246,0.08)", color: "#8b5cf6", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
-                                onClick={() => { openOutgoingReturnModal(s); }}
-                              >
-                                <History size={13} /> {t("suppliers.btn_return_to_partner")}
-                              </button>
-                            </div>
-                          </div>
+                          <button
+                            className="btn btn-ghost"
+                            style={{ height: 30, padding: "0 10px", fontSize: 12 }}
+                            onClick={(e) => { e.stopPropagation(); void handleExpand(s.id); }}
+                          >
+                            {expandedId === s.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </button>
                         </td>
                       </tr>
 
@@ -666,115 +634,100 @@ export default function SuppliersPage() {
                               {detailLoading[s.id] ? (
                                 <div className="spinner" style={{ width: 16, height: 16 }} />
                               ) : detailCache[s.id] ? (
-                                <div className="kpi-grid" style={{ gap: 24 }}>
-                                  {/* Invoices */}
-                                  <div>
-                                    <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                                      <Receipt size={13} /> {t("suppliers.invoices_title")}
-                                    </h4>
-                                    {detailCache[s.id].invoices.length === 0 ? (
-                                      <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("suppliers.no_invoices")}</p>
-                                    ) : detailCache[s.id].invoices.slice(0, 5).map(inv => {
-                                      const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                      return (
-                                        <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13, alignItems: "center" }}>
-                                          <span style={{ color: "var(--text-secondary)" }}>{new Date(inv.created_at).toLocaleDateString("ru-RU")}</span>
-                                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                                            <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{totalQty > 0 ? `${totalQty} шт.` : "0 шт."}</span>
-                                            <span style={{ color: "#ef4444", fontWeight: 600, minWidth: 80, textAlign: "right" }}>+{fmt(Number(inv.total_amount))} TJS</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  {/* Payments */}
-                                  <div>
-                                    <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                                      <Wallet size={13} /> {t("suppliers.payments_title")}
-                                    </h4>
-                                    {detailCache[s.id].payments.length === 0 ? (
-                                      <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("suppliers.no_payments")}</p>
-                                    ) : detailCache[s.id].payments.slice(0, 5).map(pay => (
-                                      <div key={pay.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
-                                        <span style={{ color: "var(--text-secondary)" }}>{new Date(pay.created_at).toLocaleDateString("ru-RU")}</span>
-                                        <span style={{ color: "var(--green)", fontWeight: 600 }}>−{fmt(Number(pay.amount))} TJS</span>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
+                                  <section className="partner-detail-panel">
+                                    <div className="partner-detail-header">
+                                      <div>
+                                        <h3 className="partner-detail-title">{t("suppliers.current_debt")}</h3>
+                                        <div className="partner-detail-subtitle">{t("suppliers.btn_invoice")} / {t("suppliers.btn_pay")} / {t("suppliers.btn_return")}</div>
                                       </div>
-                                    ))}
-                                  </div>
-                                  {/* Returns */}
-                                  <div>
-                                    <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                                      <History size={13} /> {t("suppliers.returns_title")}
-                                    </h4>
-                                    {(detailCache[s.id].returns?.length || 0) === 0 ? (
-                                      <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("suppliers.no_returns")}</p>
-                                    ) : detailCache[s.id].returns?.slice(0, 5).map(ret => {
-                                      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                      return (
-                                        <div key={ret.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13, alignItems: "center" }}>
-                                          <span style={{ color: "var(--text-secondary)" }}>{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span>
-                                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                                            <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{totalQty > 0 ? `${totalQty} шт.` : "0 шт."}</span>
-                                            <span style={{ color: "var(--green)", fontWeight: 600, minWidth: 80, textAlign: "right" }}>−{fmt(Number(ret.total_amount))} TJS</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  {/* Receipts */}
-                                  <div>
-                                    <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                                      <ArrowUpCircle size={13} /> {t("suppliers.receipts_title")}
-                                    </h4>
-                                    {(detailCache[s.id].receipts?.length || 0) === 0 ? (
-                                      <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("common.empty")}</p>
-                                    ) : detailCache[s.id].receipts?.slice(0, 5).map(receipt => {
-                                      const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                      return (
-                                        <div key={receipt.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13, alignItems: "center" }}>
-                                          <span style={{ color: "var(--text-secondary)" }}>{new Date(receipt.created_at).toLocaleDateString("ru-RU")}</span>
-                                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                                            <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{totalQty > 0 ? `${totalQty} шт.` : "0 шт."}</span>
-                                            <span style={{ color: "var(--green)", fontWeight: 600, minWidth: 80, textAlign: "right" }}>+{fmt(Number(receipt.total_amount))} TJS</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  {/* Payouts */}
-                                  <div>
-                                    <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                                      <Wallet size={13} /> {t("suppliers.payouts_title")}
-                                    </h4>
-                                    {(detailCache[s.id].payouts?.length || 0) === 0 ? (
-                                      <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("common.empty")}</p>
-                                    ) : detailCache[s.id].payouts?.slice(0, 5).map(payout => (
-                                      <div key={payout.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
-                                        <span style={{ color: "var(--text-secondary)" }}>{new Date(payout.created_at).toLocaleDateString("ru-RU")}</span>
-                                        <span style={{ color: "var(--green)", fontWeight: 600 }}>−{fmt(Number(payout.amount))} TJS</span>
+                                      <div className="partner-detail-amount" style={{ color: "#ef4444" }}>
+                                        {fmt(Number(detailCache[s.id].receivable_debt || 0))} TJS
                                       </div>
-                                    ))}
-                                  </div>
-                                  {/* Outgoing returns */}
-                                  <div>
-                                    <h4 style={{ fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                                      <History size={13} /> {t("suppliers.outgoing_returns_title")}
-                                    </h4>
-                                    {(detailCache[s.id].outgoing_returns?.length || 0) === 0 ? (
-                                      <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("common.empty")}</p>
-                                    ) : detailCache[s.id].outgoing_returns?.slice(0, 5).map(ret => {
-                                      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                      return (
-                                        <div key={ret.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border)", fontSize: 13, alignItems: "center" }}>
-                                          <span style={{ color: "var(--text-secondary)" }}>{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span>
-                                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                                            <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{totalQty > 0 ? `${totalQty} шт.` : "0 шт."}</span>
-                                            <span style={{ color: "#8b5cf6", fontWeight: 600, minWidth: 80, textAlign: "right" }}>−{fmt(Number(ret.total_amount))} TJS</span>
-                                          </div>
+                                    </div>
+                                    <div className="partner-detail-body">
+                                      <div className="partner-actions" onClick={e => e.stopPropagation()}>
+                                        <button className="partner-action-btn" style={{ borderColor: "#ef4444", color: "#ef4444", background: "rgba(239,68,68,0.08)" }} onClick={() => openInvoiceModal(s)}>
+                                          <ArrowDownCircle size={14} /> {t("suppliers.btn_invoice")}
+                                        </button>
+                                        <button className="partner-action-btn" style={{ borderColor: "#22c55e", color: "#22c55e", background: "rgba(34,197,94,0.08)" }} disabled={Number(s.current_debt) <= 0} onClick={() => { setPaymentModal(s); setPaymentAmount(""); setPaymentNotes(""); }}>
+                                          <ArrowUpCircle size={14} /> {t("suppliers.btn_pay")}
+                                        </button>
+                                        <button className="partner-action-btn" style={{ borderColor: "#d97706", color: "#d97706", background: "rgba(217,119,6,0.08)" }} onClick={() => openReturnModal(s)}>
+                                          <History size={14} /> {t("suppliers.btn_return")}
+                                        </button>
+                                      </div>
+                                      <div className="partner-history-grid">
+                                        <div className="partner-history-box">
+                                          <h4 className="partner-history-title"><Receipt size={13} /> {t("suppliers.invoices_title")}</h4>
+                                          {detailCache[s.id].invoices.length === 0 ? <p className="partner-history-empty">{t("suppliers.no_invoices")}</p> : detailCache[s.id].invoices.slice(0, 4).map(inv => {
+                                            const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+                                            return <div key={inv.id} className="partner-history-row"><span className="partner-history-date">{new Date(inv.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(inv.total_amount), "#ef4444", "+")}</div>;
+                                          })}
                                         </div>
-                                      );
-                                    })}
-                                  </div>
+                                        <div className="partner-history-box">
+                                          <h4 className="partner-history-title"><Wallet size={13} /> {t("suppliers.payments_title")}</h4>
+                                          {detailCache[s.id].payments.length === 0 ? <p className="partner-history-empty">{t("suppliers.no_payments")}</p> : detailCache[s.id].payments.slice(0, 4).map(pay => (
+                                            <div key={pay.id} className="partner-history-row"><span className="partner-history-date">{new Date(pay.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(pay.amount), "var(--green)", "−")}</div>
+                                          ))}
+                                        </div>
+                                        <div className="partner-history-box">
+                                          <h4 className="partner-history-title"><History size={13} /> {t("suppliers.returns_title")}</h4>
+                                          {(detailCache[s.id].returns?.length || 0) === 0 ? <p className="partner-history-empty">{t("suppliers.no_returns")}</p> : detailCache[s.id].returns?.slice(0, 4).map(ret => {
+                                            const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+                                            return <div key={ret.id} className="partner-history-row"><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "var(--green)", "−")}</div>;
+                                          })}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </section>
+
+                                  <section className="partner-detail-panel">
+                                    <div className="partner-detail-header">
+                                      <div>
+                                        <h3 className="partner-detail-title">{t("suppliers.current_payable")}</h3>
+                                        <div className="partner-detail-subtitle">{t("suppliers.btn_receipt")} / {t("suppliers.btn_payout")} / {t("suppliers.btn_return_to_partner")}</div>
+                                      </div>
+                                      <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
+                                        {fmt(Number(detailCache[s.id].payable_debt || 0))} TJS
+                                      </div>
+                                    </div>
+                                    <div className="partner-detail-body">
+                                      <div className="partner-actions" onClick={e => e.stopPropagation()}>
+                                        <button className="partner-action-btn" style={{ borderColor: "#3b82f6", color: "#3b82f6", background: "rgba(59,130,246,0.08)" }} onClick={() => openReceiptModal(s)}>
+                                          <ArrowUpCircle size={14} /> {t("suppliers.btn_receipt")}
+                                        </button>
+                                        <button className="partner-action-btn" style={{ borderColor: "#22c55e", color: "#22c55e", background: "rgba(34,197,94,0.08)" }} disabled={Number(s.payable_debt || 0) <= 0} onClick={() => { setPayoutModal(s); setPayoutAmount(""); setPayoutNotes(""); }}>
+                                          <Wallet size={14} /> {t("suppliers.btn_payout")}
+                                        </button>
+                                        <button className="partner-action-btn" style={{ borderColor: "#8b5cf6", color: "#8b5cf6", background: "rgba(139,92,246,0.08)" }} onClick={() => openOutgoingReturnModal(s)}>
+                                          <History size={14} /> {t("suppliers.btn_return_to_partner")}
+                                        </button>
+                                      </div>
+                                      <div className="partner-history-grid">
+                                        <div className="partner-history-box">
+                                          <h4 className="partner-history-title"><ArrowUpCircle size={13} /> {t("suppliers.receipts_title")}</h4>
+                                          {(detailCache[s.id].receipts?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].receipts?.slice(0, 4).map(receipt => {
+                                            const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+                                            return <div key={receipt.id} className="partner-history-row"><span className="partner-history-date">{new Date(receipt.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(receipt.total_amount), "var(--green)", "+")}</div>;
+                                          })}
+                                        </div>
+                                        <div className="partner-history-box">
+                                          <h4 className="partner-history-title"><Wallet size={13} /> {t("suppliers.payouts_title")}</h4>
+                                          {(detailCache[s.id].payouts?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].payouts?.slice(0, 4).map(payout => (
+                                            <div key={payout.id} className="partner-history-row"><span className="partner-history-date">{new Date(payout.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(payout.amount), "var(--green)", "−")}</div>
+                                          ))}
+                                        </div>
+                                        <div className="partner-history-box">
+                                          <h4 className="partner-history-title"><History size={13} /> {t("suppliers.outgoing_returns_title")}</h4>
+                                          {(detailCache[s.id].outgoing_returns?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].outgoing_returns?.slice(0, 4).map(ret => {
+                                            const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+                                            return <div key={ret.id} className="partner-history-row"><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "#8b5cf6", "−")}</div>;
+                                          })}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </section>
                                 </div>
                               ) : null}
                             </div>
