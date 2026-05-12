@@ -504,7 +504,7 @@ async def add_payment(supplier_id: int, body: SupplierPaymentCreate, session: Se
         raise HTTPException(status_code=404, detail="Supplier not found")
 
     # Check: don't allow overpayment
-    _, _, _, current_debt = await _get_supplier_debt(session, supplier_id)
+    _, _, _, current_debt, *_ = await _get_supplier_debt(session, supplier_id)
     if body.amount > current_debt:
         raise HTTPException(status_code=400, detail=f"Payment amount ({body.amount}) exceeds current debt ({current_debt})")
 
