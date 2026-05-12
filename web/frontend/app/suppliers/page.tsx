@@ -35,6 +35,7 @@ export default function SuppliersPage() {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
   const [detailCache, setDetailCache] = useState<Record<number, SupplierDetail>>({});
   const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
 
@@ -511,6 +512,23 @@ export default function SuppliersPage() {
       {sign}{fmt(Math.abs(value))} TJS
     </span>
   );
+  const toggleHistory = (key: string) => {
+    setExpandedHistory(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+  const renderLineItems = (items?: { sku: string; quantity: number; price_per_unit: number; line_total: number }[]) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div className="partner-history-items">
+        {items.map((item, index) => (
+          <div key={`${item.sku}-${index}`} className="partner-history-item">
+            <span>{item.sku}</span>
+            <span>{item.quantity} шт. × {fmt(Number(item.price_per_unit))}</span>
+            <strong>{fmt(Number(item.line_total))} TJS</strong>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div style={{ display: "flex" }}>
@@ -662,20 +680,22 @@ export default function SuppliersPage() {
                                           <h4 className="partner-history-title"><Receipt size={13} /> {t("suppliers.invoices_title")}</h4>
                                           {detailCache[s.id].invoices.length === 0 ? <p className="partner-history-empty">{t("suppliers.no_invoices")}</p> : detailCache[s.id].invoices.slice(0, 4).map(inv => {
                                             const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            return <div key={inv.id} className="partner-history-row"><span className="partner-history-date">{new Date(inv.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(inv.total_amount), "#ef4444", "+")}</div>;
+                                            const rowKey = `invoice-${inv.id}`;
+                                            return <div key={inv.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(inv.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(inv.total_amount), "#ef4444", "+")}</button>{expandedHistory[rowKey] && renderLineItems(inv.items)}</div>;
                                           })}
                                         </div>
                                         <div className="partner-history-box">
                                           <h4 className="partner-history-title"><Wallet size={13} /> {t("suppliers.payments_title")}</h4>
                                           {detailCache[s.id].payments.length === 0 ? <p className="partner-history-empty">{t("suppliers.no_payments")}</p> : detailCache[s.id].payments.slice(0, 4).map(pay => (
-                                            <div key={pay.id} className="partner-history-row"><span className="partner-history-date">{new Date(pay.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(pay.amount), "var(--green)", "−")}</div>
+                                            <button key={pay.id} type="button" className="partner-history-row" style={{ cursor: "default" }}><span className="partner-history-toggle"> </span><span className="partner-history-date">{new Date(pay.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(pay.amount), "var(--green)", "−")}</button>
                                           ))}
                                         </div>
                                         <div className="partner-history-box">
                                           <h4 className="partner-history-title"><History size={13} /> {t("suppliers.returns_title")}</h4>
                                           {(detailCache[s.id].returns?.length || 0) === 0 ? <p className="partner-history-empty">{t("suppliers.no_returns")}</p> : detailCache[s.id].returns?.slice(0, 4).map(ret => {
                                             const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            return <div key={ret.id} className="partner-history-row"><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "var(--green)", "−")}</div>;
+                                            const rowKey = `return-${ret.id}`;
+                                            return <div key={ret.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "var(--green)", "−")}</button>{expandedHistory[rowKey] && renderLineItems(ret.items)}</div>;
                                           })}
                                         </div>
                                       </div>
@@ -709,20 +729,22 @@ export default function SuppliersPage() {
                                           <h4 className="partner-history-title"><ArrowUpCircle size={13} /> {t("suppliers.receipts_title")}</h4>
                                           {(detailCache[s.id].receipts?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].receipts?.slice(0, 4).map(receipt => {
                                             const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            return <div key={receipt.id} className="partner-history-row"><span className="partner-history-date">{new Date(receipt.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(receipt.total_amount), "var(--green)", "+")}</div>;
+                                            const rowKey = `receipt-${receipt.id}`;
+                                            return <div key={receipt.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(receipt.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(receipt.total_amount), "var(--green)", "+")}</button>{expandedHistory[rowKey] && renderLineItems(receipt.items)}</div>;
                                           })}
                                         </div>
                                         <div className="partner-history-box">
                                           <h4 className="partner-history-title"><Wallet size={13} /> {t("suppliers.payouts_title")}</h4>
                                           {(detailCache[s.id].payouts?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].payouts?.slice(0, 4).map(payout => (
-                                            <div key={payout.id} className="partner-history-row"><span className="partner-history-date">{new Date(payout.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(payout.amount), "var(--green)", "−")}</div>
+                                            <button key={payout.id} type="button" className="partner-history-row" style={{ cursor: "default" }}><span className="partner-history-toggle"> </span><span className="partner-history-date">{new Date(payout.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(payout.amount), "var(--green)", "−")}</button>
                                           ))}
                                         </div>
                                         <div className="partner-history-box">
                                           <h4 className="partner-history-title"><History size={13} /> {t("suppliers.outgoing_returns_title")}</h4>
                                           {(detailCache[s.id].outgoing_returns?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].outgoing_returns?.slice(0, 4).map(ret => {
                                             const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            return <div key={ret.id} className="partner-history-row"><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "#8b5cf6", "−")}</div>;
+                                            const rowKey = `outgoing-return-${ret.id}`;
+                                            return <div key={ret.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "#8b5cf6", "−")}</button>{expandedHistory[rowKey] && renderLineItems(ret.items)}</div>;
                                           })}
                                         </div>
                                       </div>
