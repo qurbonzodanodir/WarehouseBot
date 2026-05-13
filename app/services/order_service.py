@@ -22,27 +22,16 @@ class OrderService:
         self.session = session
 
     async def get_available_products(self, store_id: int) -> list[Product]:
-        from app.services.store_service import StoreService
         from sqlalchemy import exists, or_
-        
-        store_svc = StoreService(self.session)
-        warehouse_id = await store_svc.get_main_warehouse_id()
-        
-        if not warehouse_id:
-            return []
 
-        # Alias for warehouse inventory to join twice
         from sqlalchemy.orm import aliased
-        WhInventory = aliased(Inventory)
         StoreInventory = aliased(Inventory)
         StoreDisplayInventory = aliased(DisplayInventory)
 
         stmt = (
             select(Product)
-            .join(WhInventory, (Product.id == WhInventory.product_id) & (WhInventory.store_id == warehouse_id))
             .where(
                 Product.is_active.is_(True),
-                WhInventory.quantity > 0,
                 or_(
                     exists(
                         select(StoreInventory.id).where(
