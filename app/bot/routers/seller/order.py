@@ -31,6 +31,17 @@ logger = logging.getLogger(__name__)
 router = Router(name="seller.order")
 
 
+def _brand(product: Product) -> str:
+    value = (getattr(product, "brand", "") or "").strip()
+    if not value or value.upper() == "UNKNOWN":
+        return "-"
+    return value
+
+
+def _cart_item_line(product: Product, qty: int) -> str:
+    return f"• {product.sku} / {_brand(product)} — {qty} шт"
+
+
 async def _ensure_seller_order_access(
     session: AsyncSession,
     user: User,
@@ -165,6 +176,7 @@ async def enter_order_quantity(
             return
 
         cart = data.get("cart", [])
+        product_names = data.get("product_names", {})
         found = False
         for item in cart:
             if item["product_id"] == product_id:
@@ -173,10 +185,11 @@ async def enter_order_quantity(
                 break
         if not found:
             cart.append({"product_id": product_id, "sku": product.sku, "qty": quantity})
+        product_names[str(product_id)] = f"{product.sku} / {_brand(product)}"
             
-        await state.update_data(cart=cart)
+        await state.update_data(cart=cart, product_names=product_names)
         
-        items_text = "\n".join([_("cart_item", sku=i["sku"], qty=i["qty"]) for i in cart])
+        items_text = "\n".join([f"• {product_names.get(str(i['product_id']), i['sku'])} — {i['qty']} шт" for i in cart])
         await message.answer(
             _("cart_status", items=items_text),
             parse_mode="HTML",
@@ -243,7 +256,23 @@ async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, sess
         notif_svc = NotificationService(callback.bot, session)
         store_name = user.store.name if user.store else _("store_label")
         
-        items_text = "\n".join([_("cart_item", sku=i["sku"], qty=i["qty"]) for i in cart])
+        product_ids = [item["product_id"] for item in cart]
+        products = {
+            product.id: product
+            for product in [
+                await session.get(Product, product_id)
+                for product_id in product_ids
+            ]
+            if product is not None
+        }
+        items_text = "\n".join(
+            [
+                _cart_item_line(products[item["product_id"]], item["qty"])
+                if item["product_id"] in products
+                else _("cart_item", sku=item["sku"], qty=item["qty"])
+                for item in cart
+            ]
+        )
         
         chat_message_ids = await notif_svc.notify_warehouse(
             text=lambda _t: _t("order_batch_notif_new", store=store_name, items=items_text),

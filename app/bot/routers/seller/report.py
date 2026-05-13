@@ -37,9 +37,11 @@ async def daily_report(
 
     store = user.store
     await message.answer(
-        _("report_daily_title") + 
-        _("report_sales_count", count=count) +
-        _("report_sales_amount", total=total) +
-        _("report_current_debt", debt=store.current_debt),
+        _(
+            "report_daily_summary",
+            count=count,
+            total=total,
+            debt=store.current_debt,
+        ),
         parse_mode="HTML",
     )

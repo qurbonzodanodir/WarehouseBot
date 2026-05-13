@@ -25,6 +25,17 @@ logger = logging.getLogger(__name__)
 router = Router(name="warehouse.orders")
 
 
+def _brand(product: Any) -> str:
+    value = (getattr(product, "brand", "") or "").strip()
+    if not value or value.upper() == "UNKNOWN":
+        return "-"
+    return value
+
+
+def _order_item_line(order: Order) -> str:
+    return f"• {order.product.sku} / {_brand(order.product)} — {order.quantity} шт"
+
+
 @router.message(F.text.in_({"🔔 Запросы", "🔔 Дархостҳо"}))
 async def active_requests(message: Message, session: AsyncSession, _: Any) -> None:
     order_svc = OrderService(session)
@@ -39,6 +50,7 @@ async def active_requests(message: Message, session: AsyncSession, _: Any) -> No
             id=order.id,
             store=order.store.name if order.store else _("unknown"),
             sku=order.product.sku,
+            brand=_brand(order.product),
             qty=order.quantity
         )
         await message.answer(
@@ -274,7 +286,7 @@ async def approve_batch_order(
         if not partial and not missing:
             # Full dispatch
             dispatched = await order_svc.dispatch_batch_order(batch_id, warehouse_store_id=warehouse_id)
-            dispatched_text = "\n".join([f"• {o.product.sku} — {o.quantity} шт" for o in dispatched])
+            dispatched_text = "\n".join([_order_item_line(o) for o in dispatched])
             
             await session.commit()
             await callback.message.edit_text(_("batch_dispatched_wh", batch_id=batch_id))
@@ -299,8 +311,8 @@ async def approve_batch_order(
                 item["order"].status = OrderStatus.PARTIAL_APPROVAL_PENDING
             await session.commit()
             
-            avail_text = "\n".join([f"• {i['order'].product.sku} — {i['available_qty']} шт" for i in available]) if available else "—"
-            missing_text = "\n".join([f"• {i['order'].product.sku} — {i['order'].quantity} шт" for i in missing]) if missing else "—"
+            avail_text = "\n".join([f"• {i['order'].product.sku} / {_brand(i['order'].product)} — {i['available_qty']} шт" for i in available]) if available else "—"
+            missing_text = "\n".join([_order_item_line(i["order"]) for i in missing]) if missing else "—"
             
             wh_msg = (
                 _("batch_partial_pending_wh", batch_id=batch_id, available=avail_text, missing=missing_text)
@@ -336,7 +348,7 @@ async def reject_batch_order(
         await session.commit()
             
         store_id = rejected_orders[0].store_id
-        items_text = "\n".join([f"• {o.product.sku} — {o.quantity} шт" for o in rejected_orders])
+        items_text = "\n".join([_order_item_line(o) for o in rejected_orders])
 
         await callback.message.edit_text(
             _("batch_rejected_wh", batch_id=batch_id)

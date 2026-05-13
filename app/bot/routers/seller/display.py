@@ -10,6 +10,13 @@ from app.models.user import User
 router = Router(name="seller.display")
 
 
+def _brand(order: Order) -> str:
+    value = (getattr(order.product, "brand", "") or "").strip()
+    if not value or value.upper() == "UNKNOWN":
+        return "-"
+    return value
+
+
 @router.callback_query(F.data.startswith("display:receive:"))
 async def seller_receive_display(
     callback: CallbackQuery, user: User, session: AsyncSession, _: Any
@@ -29,7 +36,7 @@ async def seller_receive_display(
     await session.commit()
 
     await callback.message.edit_text(
-        _("display_received_seller", sku=order.product.sku, qty=order.quantity),
+        _("display_received_seller", sku=order.product.sku, brand=_brand(order), qty=order.quantity),
         parse_mode="HTML"
     )
 
@@ -37,7 +44,7 @@ async def seller_receive_display(
     # Notify warehouse
     notif_svc = NotificationService(callback.bot, session)
     await notif_svc.notify_warehouse(
-        text=lambda _t: _t("display_received_wh", store=user.store.name if user.store else _t("unknown"), sku=order.product.sku, qty=order.quantity)
+        text=lambda _t: _t("display_received_wh", store=user.store.name if user.store else _t("unknown"), sku=order.product.sku, brand=_brand(order), qty=order.quantity)
     )
     await callback.answer()
 
@@ -72,7 +79,7 @@ async def seller_reject_display(
     await session.commit()
 
     await callback.message.edit_text(
-        _("display_rejected_seller", sku=order.product.sku, qty=order.quantity),
+        _("display_rejected_seller", sku=order.product.sku, brand=_brand(order), qty=order.quantity),
         parse_mode="HTML"
     )
 
@@ -80,6 +87,6 @@ async def seller_reject_display(
     # Notify warehouse
     notif_svc = NotificationService(callback.bot, session)
     await notif_svc.notify_warehouse(
-        text=lambda _t: _t("display_rejected_wh", store=user.store.name if user.store else _t("unknown"), sku=order.product.sku, qty=order.quantity)
+        text=lambda _t: _t("display_rejected_wh", store=user.store.name if user.store else _t("unknown"), sku=order.product.sku, brand=_brand(order), qty=order.quantity)
     )
     await callback.answer()

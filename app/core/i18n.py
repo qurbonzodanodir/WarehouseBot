@@ -136,10 +136,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_debt_note": "\nПримите товар физически и нажмите 'Принять возврат', чтобы списать долг магазина.",
 
         # Seller - Display Flow
-        "display_received_seller": "✅ <b>Образцы приняты!</b>\n\nSKU: {sku}\nКол-во: {qty} шт зачислены на вашу витрину.",
-        "display_received_wh": "✅ <b>Магазин принял образцы!</b>\n\nСклад: {store}\nSKU: {sku} ({qty} шт)",
-        "display_rejected_seller": "❌ <b>Вы отклонили образцы!</b>\n\nSKU: {sku}\nКол-во: {qty} шт.\nТовар возвращен на баланс склада.",
-        "display_rejected_wh": "❌ <b>Магазин ОТКЛОНИЛ образцы!</b>\n\nСклад: {store}\nSKU: {sku} ({qty} шт)\n\nТовары были автоматически возвращены на баланс склада.",
+        "display_received_seller": "✅ <b>Образцы приняты</b>\n\nSKU: {sku}\nФирма: {brand}\nКол-во: {qty} шт\n\nТовар добавлен на витрину.",
+        "display_received_wh": "✅ <b>Магазин принял образцы</b>\n\nМагазин: {store}\nSKU: {sku}\nФирма: {brand}\nКол-во: {qty} шт",
+        "display_rejected_seller": "❌ <b>Образцы отклонены</b>\n\nSKU: {sku}\nФирма: {brand}\nКол-во: {qty} шт\n\nТовар возвращён на склад.",
+        "display_rejected_wh": "❌ <b>Магазин отклонил образцы</b>\n\nМагазин: {store}\nSKU: {sku}\nФирма: {brand}\nКол-во: {qty} шт\n\nТовар возвращён на склад.",
 
         # Seller - Vitrine Flow
         "vitrine_empty": "Ваша витрина пуста.",
@@ -151,6 +151,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Report Flow
         "report_daily_title": "📊 <b>Отчет за сегодня</b>\n\n",
+        "report_daily_summary": "📊 <b>Отчет за сегодня</b>\n\nПродаж: <b>{count}</b>\nСумма: <b>{total} TJS</b>\nТекущий долг: <b>{debt} TJS</b>",
         "report_sales_count": "Продаж: {count}\n",
         "report_sales_amount": "Сумма: {total} TJS\n",
         "report_current_debt": "Текущий долг магазина: {debt} TJS",
@@ -164,26 +165,26 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_stock_wh": "📦 Остатки",
 
         "requests_not_found": "Нет активных запросов. 🎉",
-        "requests_title": "📋 <b>Заявка #{id}</b>\nМагазин: {store}\nSKU: {sku}\nКол-во: {qty} шт",
-        "order_dispatch_success": "🚚 Заявка #{id} — курьер отправлен!\nТовар: {qty} шт (статус: В пути)",
-        "order_dispatch_notif_seller": "📬 Курьер выехал!\nЗаявка #{id}: {qty} шт",
+        "requests_title": "🔔 <b>Заявка #{id}</b>\n\nМагазин: {store}\nSKU: <b>{sku}</b>\nФирма: {brand}\nКол-во: <b>{qty} шт</b>\n\nВыберите действие:",
+        "order_dispatch_success": "🚚 <b>Курьер отправлен</b>\n\nЗаявка: #{id}\nКол-во: {qty} шт\nСтатус: В пути",
+        "order_dispatch_notif_seller": "📬 <b>Курьер выехал</b>\n\nЗаявка: #{id}\nКол-во: {qty} шт\n\nПодтвердите получение, когда товар будет у вас.",
         "order_rejected_wh": "❌ Заявка #{id} отклонена.",
-        "return_approved_wh": "✅ Возврат {type} по заявке #{id} принят!\nТовар зачислен на Главный Склад.",
-        "return_approved_seller_notif": "✅ <b>Склад принял ваш {type} (Заявка #{id})!</b>",
-        "return_rejected_wh_msg": "❌ Вы отклонили возврат по заявке #{id}.\nТовар возвращен на витрину магазина.",
-        "return_rejected_seller_notif": "❌ <b>Склад ОТКЛОНИЛ ваш возврат (Заявка #{id})!</b>\nТовар возвращен на вашу витрину, долг не списан.",
+        "return_approved_wh": "✅ <b>Возврат принят</b>\n\nТип: {type}\nЗаявка: #{id}\nТовар зачислен на главный склад.",
+        "return_approved_seller_notif": "✅ <b>Возврат принят складом</b>\n\nТип: {type}\nЗаявка: #{id}",
+        "return_rejected_wh_msg": "❌ <b>Возврат отклонён</b>\n\nЗаявка: #{id}\nТовар возвращён на витрину магазина.",
+        "return_rejected_seller_notif": "❌ <b>Возврат отклонён складом</b>\n\nЗаявка: #{id}\nТовар возвращён на вашу витрину, долг не списан.",
         "return_type_samples_label": "образцов",
         "return_type_goods_label": "товара",
 
         "stock_empty": "Склад пуст.",
-        "stock_title": "📦 <b>Остатки склада</b>\nСтраница {page}/{total}",
+        "stock_title": "📦 <b>Остатки склада</b>",
 
         "stores_not_found": "Нет магазинов.",
         "display_transfer_title": "📋 <b>Отправить образцы</b>\n\nВыберите магазин:",
         "display_select_product_title": "🏪 <b>{store}</b>\n\nВыберите товар для витрины:",
         "display_enter_qty_title": "📦 <b>{sku}</b>\n\nСколько рулонов отправить для витрины? (обычно 1–2):",
         "display_not_enough_stock": "❌ Недостаточно на складе: есть {available}, нужно {qty}.",
-        "display_dispatched_seller_notif": "🚚 <b>Склад отправил образцы для витрины!</b>\n\n📦 <b>{sku}</b>\n🔢 Количество: <b>{qty} шт</b>\n\n📍 Пожалуйста, подтвердите получение, когда товар будет у вас.",
+        "display_dispatched_seller_notif": "🚚 <b>Склад отправил образцы</b>\n\nSKU: <b>{sku}</b>\nКол-во: <b>{qty} шт</b>\n\nПодтвердите получение, когда товар будет у вас.",
         "display_dispatch_success_wh": "✅ Запрос на отправку образцов создан!\n\n🏪 {store}\n📦 <b>{sku}</b>\n📋 Отправлено: {qty} шт (витрина)\n📊 Остаток на складе: {total} шт\n\n⏳ Продавец получит уведомление и должен подтвердить приёмку.",
         "unit_pcs": "шт",
         "unit_days": "дн",
@@ -191,7 +192,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Warehouse & Returns
         "batch_dispatched_wh": "✅ <b>Партия #{batch_id} отгружена!</b>\nКурьер отправлен, ожидайте подтверждения от магазина.",
-        "return_notif_wh": "🔔 <b>Новый запрос на {type}</b>\n\nМагазин: {store}\nID заявки: #{id}\nSKU: {sku}\nКол-во: {qty} шт\n{note}",
+        "return_notif_wh": "🔔 <b>Новый запрос на {type}</b>\n\nМагазин: {store}\nЗаявка: #{id}\nSKU: <b>{sku}</b>\nКол-во: <b>{qty} шт</b>\n{note}",
         "return_notif_wh_instr": "\n<i>Примите товар физически и подтвердите возврат в боте для списания долга магазина.</i>",
         "return_approve_error": "❌ Ошибка при одобрении возврата: {error}",
         "order_dispatch_error": "❌ Ошибка при отгрузке: {error}",
@@ -201,9 +202,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "batch_rejected_wh": "❌ <b>Партия #{batch_id} отклонена.</b>\nВсе товары возвращены в очередь склада.",
         "stock_error_zero": "❌ Товар <b>{sku}</b> отсутствует на складе (0 шт).",
         "return_quick_not_enough": "❌ На витрине недостаточно товара для этого возврата.",
-        "return_quick_seller_samples": "✅ <b>Запрос на возврат образцов #{id} создан!</b>\n\n📦 SKU: {sku}\n🔢 Кол-во: {qty} шт\n\nОжидайте подтверждения от склада.",
-        "return_quick_seller_goods": "✅ <b>Запрос на возврат товара #{id} создан!</b>\n\n📦 SKU: {sku}\n🔢 Кол-во: {qty} шт\n\nТовар списан с витрины. Ваш долг уменьшится после приемки складом.",
-        "return_quick_wh_title": "🔄 <b>Быстрый возврат: {type}</b>\n\nМагазин: {store}\nID: #{id}\n📦 SKU: {sku}\n🔢 Кол-во: {qty} шт\n{note}",
+        "return_quick_seller_samples": "✅ <b>Возврат образцов создан</b>\n\nЗаявка: #{id}\nSKU: {sku}\nКол-во: {qty} шт\n\nОжидайте подтверждения склада.",
+        "return_quick_seller_goods": "✅ <b>Возврат товара создан</b>\n\nЗаявка: #{id}\nSKU: {sku}\nКол-во: {qty} шт\n\nТовар списан с витрины. Долг уменьшится после приёмки складом.",
+        "return_quick_wh_title": "🔄 <b>Быстрый возврат: {type}</b>\n\nМагазин: {store}\nЗаявка: #{id}\nSKU: {sku}\nКол-во: {qty} шт\n{note}",
         "return_invalid_status": "Некорректный статус товара для возврата.",
     },
     "tg": {
@@ -332,8 +333,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_type_samples": "БОЗГАШТИ НАМУНАҲО",
         "return_type_goods": "БОЗГАШТ",
         # Seller - Display Flow
-        "display_received_seller": "✅ <b>Намунаҳо қабул шуданд!</b>\n\nSKU: {sku}\nМиқдор: {qty} дона ба витринаи шумо илова шуд.",
-        "display_rejected_seller": "❌ <b>Шумо намунаҳоро рад кард!</b>\n\nSKU: {sku}\nМиқдор: {qty} дона.\nМаҳсулот ба баланси анбор баргардонида шуд.",
+        "display_received_seller": "✅ <b>Намунаҳо қабул шуданд</b>\n\nSKU: {sku}\nФирма: {brand}\nМиқдор: {qty} дона\n\nМол ба витрина илова шуд.",
+        "display_received_wh": "✅ <b>Мағоза намунаҳоро қабул кард</b>\n\nМағоза: {store}\nSKU: {sku}\nФирма: {brand}\nМиқдор: {qty} дона",
+        "display_rejected_seller": "❌ <b>Намунаҳо рад шуданд</b>\n\nSKU: {sku}\nФирма: {brand}\nМиқдор: {qty} дона\n\nМол ба анбор баргардонда шуд.",
+        "display_rejected_wh": "❌ <b>Мағоза намунаҳоро рад кард</b>\n\nМағоза: {store}\nSKU: {sku}\nФирма: {brand}\nМиқдор: {qty} дона\n\nМол ба анбор баргардонда шуд.",
 
         # Seller - Vitrine Flow
         "vitrine_empty": "Витринаи шумо холӣ аст.",
@@ -345,6 +348,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Report Flow
         "report_daily_title": "📊 <b>Ҳисоботи имрӯза</b>\n\n",
+        "report_daily_summary": "📊 <b>Ҳисоботи имрӯза</b>\n\nФурӯш: <b>{count}</b>\nМаблағ: <b>{total} TJS</b>\nҚарзи ҷорӣ: <b>{debt} TJS</b>",
         "report_sales_count": "Фурӯш: {count}\n",
         "report_sales_amount": "Маблағ: {total} TJS\n",
         "report_current_debt": "Қарзи ҷории мағоза: {debt} TJS",
@@ -360,23 +364,23 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_stock_wh": "📦 Боқимонда",
 
         "requests_not_found": "Дархостҳои фаъол нестанд. 🎉",
-        "requests_title": "📋 <b>Дархости #{id}</b>\nМағоза: {store}\nSKU: {sku}\nМиқдор: {qty} шт",
-        "order_dispatch_success": "🚚 Дархости #{id} — хаткашон фиристода шуд!\nМол: {qty} шт (статус: Дар роҳ)",
-        "order_dispatch_notif_seller": "📬 Хаткашон баромад!\nДархости #{id}: {qty} шт",
+        "requests_title": "🔔 <b>Дархости #{id}</b>\n\nМағоза: {store}\nSKU: <b>{sku}</b>\nФирма: {brand}\nМиқдор: <b>{qty} шт</b>\n\nАмалро интихоб кунед:",
+        "order_dispatch_success": "🚚 <b>Хаткашон фиристода шуд</b>\n\nДархост: #{id}\nМиқдор: {qty} шт\nСтатус: Дар роҳ",
+        "order_dispatch_notif_seller": "📬 <b>Хаткашон баромад</b>\n\nДархост: #{id}\nМиқдор: {qty} шт\n\nВақте мол расид, қабулро тасдиқ кунед.",
         "order_rejected_wh": "❌ Дархости #{id} рад карда шуд.",
-        "return_approved_seller_notif": "✅ <b>Анбор бозгашти {type}-и шуморо қабул кард (Дархости #{id})!</b>",
-        "return_rejected_wh_msg": "❌ Шумо бозгашти дархости #{id}-ро рад кардед.\nМол ба витринаи мағоза баргардонида шуд.",
-        "return_rejected_seller_notif": "❌ <b>Анбор бозгашти шуморо РАД КАРД (Дархости #{id})!</b>\nМол ба витринаи шумо баргардонида шуд, қарз кам нашуд.",
+        "return_approved_seller_notif": "✅ <b>Бозгашт аз ҷониби анбор қабул шуд</b>\n\nТип: {type}\nДархост: #{id}",
+        "return_rejected_wh_msg": "❌ <b>Бозгашт рад шуд</b>\n\nДархост: #{id}\nМол ба витринаи мағоза баргардонда шуд.",
+        "return_rejected_seller_notif": "❌ <b>Бозгашт аз ҷониби анбор рад шуд</b>\n\nДархост: #{id}\nМол ба витринаи шумо баргашт, қарз кам нашуд.",
 
         "stock_empty": "Анбор холӣ аст.",
-        "stock_title": "📦 <b>Боқимондаи анбор</b>\nСаҳифа {page}/{total}",
+        "stock_title": "📦 <b>Боқимондаи анбор</b>",
 
         "stores_not_found": "Мағозаҳо нестанд.",
         "display_transfer_title": "📋 <b>Фиристодани намунаҳо</b>\n\nМағозаро интихоб кунед:",
         "display_select_product_title": "🏪 <b>{store}</b>\n\nМолро барои витрина интихоб кунед:",
         "display_enter_qty_title": "📦 <b>{sku}</b>\n\nЧанд рулон барои витрина фиристед? (одатан 1–2):",
         "display_not_enough_stock": "❌ Дар анбор кифоя нест: {available} ҳаст, {qty} лозим аст.",
-        "display_dispatched_seller_notif": "🚚 <b>Анбор намунаҳоро барои витрина фиристод!</b>\n\n📦 <b>{sku}</b>\n🔢 Миқдор: <b>{qty} шт</b>\n\n📍 Лутфан, қабулро тасдиқ кунед, вақте ки мол ба наздатон мерасад.",
+        "display_dispatched_seller_notif": "🚚 <b>Анбор намунаҳоро фиристод</b>\n\nSKU: <b>{sku}</b>\nМиқдор: <b>{qty} шт</b>\n\nВақте мол расид, қабулро тасдиқ кунед.",
         "display_dispatch_success_wh": "✅ Дархост барои фиристодани намунаҳо эҷод шуд!\n\n🏪 {store}\n📦 <b>{sku}</b>\n📋 Фиристода шуд: {qty} шт (витрина)\n📊 Боқимонда дар анбор: {total} шт\n\n⏳ Фурӯшанда огоҳинома мегирад ва бояд қабулро тасдиқ кунад.",
         "unit_pcs": "шт",
         "unit_days": "рӯз",
@@ -384,7 +388,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Warehouse & Returns
         "batch_dispatched_wh": "✅ <b>Партияи #{batch_id} фиристода шуд!</b>\nХаткашон баромад, тасдиқи мағозаро интизор шавед.",
-        "return_notif_wh": "🔔 <b>Дархости нав барои {type}</b>\n\nМағоза: {store}\nID дархост: #{id}\nSKU: {sku}\nМиқдор: {qty} шт\n{note}",
+        "return_notif_wh": "🔔 <b>Дархости нав барои {type}</b>\n\nМағоза: {store}\nДархост: #{id}\nSKU: <b>{sku}</b>\nМиқдор: <b>{qty} шт</b>\n{note}",
         "return_notif_wh_instr": "\n<i>Молро қабул кунед ва дар бот тасдиқ кунед, то қарзи мағоза кам карда шавад.</i>",
         "return_approve_error": "❌ Хатогӣ ҳангоми тасдиқи бозгашт: {error}",
         "order_dispatch_error": "❌ Хатогӣ ҳангоми фиристодан: {error}",
@@ -394,9 +398,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "batch_rejected_wh": "❌ <b>Партияи #{batch_id} рад карда шуд.</b>\nҲамаи молҳо ба навбати анбор баргардонида шуданд.",
         "stock_error_zero": "❌ Моли <b>{sku}</b> дар анбор нест (0 шт).",
         "return_quick_not_enough": "❌ Дар витрина барои ин бозгашт моли кофӣ нест.",
-        "return_quick_seller_samples": "✅ <b>Дархости бозгашти намунаҳо #{id} сохта шуд!</b>\n\n📦 SKU: {sku}\n🔢 Миқдор: {qty} шт\n\nТасдиқи анборро интизор шавед.",
-        "return_quick_seller_goods": "✅ <b>Дархости бозгашти мол #{id} сохта шуд!</b>\n\n📦 SKU: {sku}\n🔢 Миқдор: {qty} шт\n\nМол аз витрина хориҷ шуд. Қарзи шумо пас аз қабули анбор кам мешавад.",
-        "return_quick_wh_title": "🔄 <b>Бозгашти фаврӣ: {type}</b>\n\nМағоза: {store}\nID: #{id}\n📦 SKU: {sku}\n🔢 Миқдор: {qty} шт\n{note}",
+        "return_quick_seller_samples": "✅ <b>Бозгашти намунаҳо сохта шуд</b>\n\nДархост: #{id}\nSKU: {sku}\nМиқдор: {qty} шт\n\nТасдиқи анборро интизор шавед.",
+        "return_quick_seller_goods": "✅ <b>Бозгашти мол сохта шуд</b>\n\nДархост: #{id}\nSKU: {sku}\nМиқдор: {qty} шт\n\nМол аз витрина хориҷ шуд. Қарз пас аз қабули анбор кам мешавад.",
+        "return_quick_wh_title": "🔄 <b>Бозгашти фаврӣ: {type}</b>\n\nМағоза: {store}\nДархост: #{id}\nSKU: {sku}\nМиқдор: {qty} шт\n{note}",
         "return_debt_note": "\nМолро қабул кунед ва тугмаи 'Қабули бозгашт'-ро пахш кунед, то қарзи мағоза кам карда шавад.",
         "return_invalid_status": "Статуси нодурусти мол барои бозгашт.",
         "return_approved_wh": "✅ Бозгашти {type} #{id} аз ҷониби анбор тасдиқ шуд.",
