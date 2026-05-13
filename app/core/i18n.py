@@ -39,6 +39,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_report": "📊 Отчет",
         "btn_make_return": "↩️ Сделать возврат",
         "btn_back": "🔙 Назад",
+        "btn_prev": "⬅️ Назад",
+        "btn_next": "Вперёд ➡️",
+        "btn_page": "{current}/{total}",
         "btn_wh_requests": "🔔 Запросы",
         "btn_wh_stock": "📦 Остатки",
         "btn_language": "🌐 Язык / Забон",
@@ -138,8 +141,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Vitrine Flow
         "vitrine_empty": "Ваша витрина пуста.",
-        "vitrine_title": "🖼 <b>Мои остатки (стр {page}):</b>\n",
+        "vitrine_title": "🖼 <b>Мои остатки</b>\nСтраница {page}/{total}",
         "vitrine_item": "• {sku}: <b>{qty}</b> шт",
+        "stock_col_sku": "SKU",
+        "stock_col_brand": "Фирма",
+        "stock_col_qty": "Кол",
 
         # Seller - Report Flow
         "report_daily_title": "📊 <b>Отчет за сегодня</b>\n\n",
@@ -168,7 +174,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_type_goods_label": "товара",
 
         "stock_empty": "Склад пуст.",
-        "stock_title": "📦 Остатки склада (стр {page}):",
+        "stock_title": "📦 <b>Остатки склада</b>\nСтраница {page}/{total}",
 
         "stores_not_found": "Нет магазинов.",
         "display_transfer_title": "📋 <b>Отправить образцы</b>\n\nВыберите магазин:",
@@ -233,6 +239,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_report": "📊 Ҳисобот",
         "btn_make_return": "↩️ Бозгашти мол",
         "btn_back": "🔙 Ба қафо",
+        "btn_prev": "⬅️ Қафо",
+        "btn_next": "Пеш ➡️",
+        "btn_page": "{current}/{total}",
         "btn_wh_requests": "🔔 Дархостҳо",
         "btn_wh_stock": "📦 Боқимонда",
         "btn_language": "🌐 Забон / Язык",
@@ -324,8 +333,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Vitrine Flow
         "vitrine_empty": "Витринаи шумо холӣ аст.",
-        "vitrine_title": "🖼 <b>Боқимондаҳои ман (саҳ {page}):</b>\n",
+        "vitrine_title": "🖼 <b>Боқимондаҳои ман</b>\nСаҳифа {page}/{total}",
         "vitrine_item": "• {sku}: <b>{qty}</b> дона",
+        "stock_col_sku": "SKU",
+        "stock_col_brand": "Фирма",
+        "stock_col_qty": "Ад",
 
         # Seller - Report Flow
         "report_daily_title": "📊 <b>Ҳисоботи имрӯза</b>\n\n",
@@ -353,7 +365,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "return_rejected_seller_notif": "❌ <b>Анбор бозгашти шуморо РАД КАРД (Дархости #{id})!</b>\nМол ба витринаи шумо баргардонида шуд, қарз кам нашуд.",
 
         "stock_empty": "Анбор холӣ аст.",
-        "stock_title": "📦 Боқимондаи анбор (сах. {page}):",
+        "stock_title": "📦 <b>Боқимондаи анбор</b>\nСаҳифа {page}/{total}",
 
         "stores_not_found": "Мағозаҳо нестанд.",
         "display_transfer_title": "📋 <b>Фиристодани намунаҳо</b>\n\nМағозаро интихоб кунед:",

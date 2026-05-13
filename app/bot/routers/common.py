@@ -173,6 +173,11 @@ async def process_invite_code(
 
 # ─── Language Switching ──────────────────────────────────────────────
 
+@router.callback_query(F.data == "ignore")
+async def ignore_callback(callback: Any) -> None:
+    await callback.answer()
+
+
 @router.message(F.text.in_({"🌐 Язык / Забон", "🌐 Забон / Язык"}))
 async def cmd_language(message: Message, _: Any) -> None:
     """Show language selection keyboard."""
@@ -209,4 +214,3 @@ async def set_language(callback: Any, user: User | None, session: AsyncSession, 
             reply_markup=ReplyKeyboardRemove(),
         )
     await callback.answer()
-

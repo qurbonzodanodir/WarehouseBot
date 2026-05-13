@@ -1,3 +1,5 @@
+from html import escape
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -6,6 +8,25 @@ from typing import Any
 from app.models.user import User
 
 router = Router(name="seller.vitrine")
+
+
+def _clean_brand(brand: str | None) -> str:
+    value = (brand or "").strip()
+    if not value or value.upper() == "UNKNOWN":
+        return "-"
+    return value[:12]
+
+
+def _format_inventory_table(items: list, _: Any) -> str:
+    lines = [
+        f"{_('stock_col_sku'):<9} {_('stock_col_brand'):<12} {_('stock_col_qty'):>3}",
+        "-" * 28,
+    ]
+    for inv in items:
+        sku = str(inv.product.sku)[:9]
+        brand = _clean_brand(getattr(inv.product, "brand", None))
+        lines.append(f"{sku:<9} {brand:<12} {inv.quantity:>3}")
+    return "<pre>" + escape("\n".join(lines)) + "</pre>"
 
 
 async def _send_vitrine_page(
@@ -26,17 +47,18 @@ async def _send_vitrine_page(
 
     start, end = get_page_slice(len(items), page, limit)
     page_items = items[start:end]
+    total_pages = max(1, (len(items) + limit - 1) // limit)
 
-    lines = [_("vitrine_title", page=page + 1)]
-    for inv in page_items:
-        lines.append(
-            _("vitrine_item", sku=inv.product.sku, qty=inv.quantity)
-        )
+    lines = [
+        _("vitrine_title", page=page + 1, total=total_pages),
+        _format_inventory_table(page_items, _),
+    ]
 
     builder = InlineKeyboardBuilder()
     add_pagination_buttons(builder, len(items), page, limit, "vitrine:page", _=_)
 
-    markup = builder.as_markup() if len(builder.as_markup().inline_keyboard) > 0 else None
+    built_markup = builder.as_markup()
+    markup = built_markup if built_markup.inline_keyboard else None
 
     text = "\n".join(lines)
     if isinstance(message_or_callback, Message):
