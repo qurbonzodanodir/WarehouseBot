@@ -137,10 +137,13 @@ class TransactionService:
     ) -> FinancialTransaction:
         effective_price = price_per_unit
 
-        # CRITICAL: Lock inventory row to prevent race conditions (double selling)
+        # CRITICAL: Lock inventory rows to prevent race conditions (double selling)
         inv = await self._get_inventory(store_id, product_id, lock=True)
-        if inv is None or inv.quantity < quantity:
-            available = inv.quantity if inv else 0
+        display_inv = await self._get_display_inventory(store_id, product_id, lock=True)
+        regular_available = inv.quantity if inv else 0
+        display_available = display_inv.quantity if display_inv else 0
+        available = regular_available + display_available
+        if available < quantity:
             raise ValueError(
                 f"Недостаточно товара на витрине: в наличии {available}, нужно {quantity}."
             )
@@ -161,8 +164,15 @@ class TransactionService:
 
         amount = effective_price * quantity
 
-        # Deduct inventory
-        inv.quantity -= quantity
+        # Deduct from regular stock first, then from display stock.
+        remaining = quantity
+        if inv is not None and inv.quantity > 0:
+            take = min(inv.quantity, remaining)
+            inv.quantity -= take
+            remaining -= take
+
+        if remaining > 0 and display_inv is not None:
+            display_inv.quantity -= remaining
 
         # 1. Record stock movement
         await self.record_stock_movement(

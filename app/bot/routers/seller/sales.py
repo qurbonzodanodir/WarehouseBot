@@ -1,11 +1,11 @@
 
 import logging
+from html import escape
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.bot.states.states import SaleFlow
 from app.bot.routers.seller.catalog_ui import clean_search_query, product_card, product_matches, send_catalog_page
@@ -19,13 +19,34 @@ logger = logging.getLogger(__name__)
 router = Router(name="seller.sales")
 
 
+def _clean_brand(brand: str | None) -> str:
+    value = (brand or "").strip()
+    if not value or value.upper() == "UNKNOWN":
+        return "-"
+    return value[:10]
+
+
+def _format_sales_table(rows: list, _: Any) -> str:
+    lines = [
+        f"{'Дата':<8} {'SKU':<9} {'Фирма':<10} {'Кол':>3} {'Сумма':>8}",
+        "-" * 45,
+    ]
+    for sale in rows:
+        date = sale.created_at.strftime("%d.%m")
+        sku = str(sale.product.sku)[:9]
+        brand = _clean_brand(getattr(sale.product, "brand", None))
+        amount = f"{sale.total_amount:.0f}"
+        lines.append(f"{date:<8} {sku:<9} {brand:<10} {sale.quantity:>3} {amount:>8}")
+    return "<pre>" + escape("\n".join(lines)) + "</pre>"
+
+
 @router.message(F.text.in_({"💳 Продажа", "💳 Фурӯш"}))
 async def start_sale(
     message: Message, user: User, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
     await state.clear()
     order_svc = OrderService(session)
-    items = await order_svc.get_store_inventory(user.store_id, include_empty=False)
+    items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
     if not items:
         await message.answer(_("sale_no_products"))
         return
@@ -56,7 +77,7 @@ async def sale_search_product(
         return
 
     order_svc = OrderService(session)
-    items = await order_svc.get_store_inventory(user.store_id, include_empty=False)
+    items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
     clean_query = clean_search_query(message.text)
     exact_match = next((item for item in items if clean_search_query(item.product.sku) == clean_query), None)
     matches = [item for item in items if product_matches(item.product, message.text)]
@@ -93,16 +114,8 @@ async def sale_page_nav(
 ) -> None:
     page = int(callback.data.split(":")[-1])
     
-    from app.models.inventory import Inventory
-    result = await session.execute(
-        select(Inventory)
-        .options(selectinload(Inventory.product))
-        .where(
-            Inventory.store_id == user.store_id,
-            Inventory.quantity > 0
-        )
-    )
-    items = result.scalars().all()
+    order_svc = OrderService(session)
+    items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
     await send_catalog_page(
         callback,
         _("sale_title"),
@@ -120,14 +133,11 @@ async def sale_select_product(
     callback: CallbackQuery, state: FSMContext, session: AsyncSession, user: User, _: Any
 ) -> None:
     product_id = int(callback.data.split(":")[-1])
-    
-    from app.models.inventory import Inventory
-    result = await session.execute(
-        select(Inventory).where(Inventory.store_id == user.store_id, Inventory.product_id == product_id)
-    )
-    inv = result.scalar_one_or_none()
-    qty = inv.quantity if inv else 0
-    
+
+    order_svc = OrderService(session)
+    regular_qty, display_qty = await order_svc.get_store_vitrine_product_stock(user.store_id, product_id)
+    qty = regular_qty + display_qty
+
     from app.models.product import Product
     product = await session.get(Product, product_id)
     await state.update_data(product_id=product_id)
@@ -195,14 +205,10 @@ async def sales_history(
         await message.answer(_("sales_history_empty"))
         return
 
-    lines = [_("sales_history_title") + "\n"]
-    for sale in rows:
-        dt_str = sale.created_at.strftime("%d.%m %H:%M")
-        amount = sale.total_amount
-        lines.append(
-            _("sales_history_item", date=dt_str, sku=sale.product.sku, qty=sale.quantity, amount=amount)
-        )
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    await message.answer(
+        _("sales_history_title") + "\n" + _format_sales_table(rows, _),
+        parse_mode="HTML",
+    )
 
 
 @router.callback_query(F.data.startswith("order:sold:"))
