@@ -275,7 +275,7 @@ export const api = {
     request<{success: boolean; product_id: number; new_quantity: number}>("/inventory/receive", { method: "POST", body: JSON.stringify(data) }),
   bulkReceiveStock: (data: { items: { sku: string; quantity: number; price?: number; brand?: string }[], replace_quantity?: boolean }) =>
     request<{success: boolean; processed: number; created: number}>("/inventory/bulk-receive", { method: "POST", body: JSON.stringify(data) }),
-  importVitrina: (store_id: number, items: { sku: string; brand: string }[]) =>
+  importVitrina: (store_id: number, items: { sku: string; brand: string; price?: number; store_price?: number | null }[]) =>
     request<{success: boolean; store: string; created: number; updated: number; added_qty: number}>("/inventory/import-vitrina", {
       method: "POST",
       body: JSON.stringify({ store_id, items })

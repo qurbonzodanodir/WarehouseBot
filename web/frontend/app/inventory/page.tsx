@@ -13,6 +13,44 @@ function fmt(n: number) {
   return new Intl.NumberFormat("ru-RU").format(n);
 }
 
+type VitrinaImportItem = {
+  sku: string;
+  brand: string;
+  price?: number;
+  store_price?: number | null;
+};
+
+function parseImportNumber(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  const text = String(value ?? "").trim().replace(/\s/g, "").replace(",", ".");
+  if (!text) return undefined;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeVitrinaSku(raw: unknown): string {
+  let sku = String(raw ?? "").trim();
+  const starMatch = sku.match(/^(\*+)/);
+  if (starMatch) {
+    sku = "0".repeat(starMatch[1].length) + sku.slice(starMatch[1].length);
+  }
+  const replaced = sku.replace(/[oO]/g, "0");
+  if (/^\d+$/.test(replaced)) {
+    sku = replaced;
+  }
+  return sku.trim().toUpperCase();
+}
+
+function isPriceHeader(value: unknown): boolean {
+  const text = String(value ?? "").trim().toLowerCase();
+  return text === "цена" || text === "нарх";
+}
+
+function isStorePriceHeader(value: unknown): boolean {
+  const text = String(value ?? "").trim().toLowerCase();
+  return text.includes("магаз") || text.includes("мағоза");
+}
+
 export default function InventoryPage() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -30,7 +68,7 @@ export default function InventoryPage() {
   const [catalog, setCatalog] = useState<StoreCatalogCard[]>([]);
   const [userRole, setUserRole] = useState<string>("seller");
 
-  const [importData, setImportData] = useState<{sku: string, brand: string}[]>([]);
+  const [importData, setImportData] = useState<VitrinaImportItem[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 
@@ -146,35 +184,35 @@ export default function InventoryPage() {
                         showToast("Файл пустой или неверный формат", "error");
                         return;
                       }
-                      const brandsRow = data[0];
-                      const brandsMap: Record<number, string> = {};
-                      for (let i = 0; i < brandsRow.length; i++) {
-                        if (brandsRow[i]) {
-                          let brandName = String(brandsRow[i]).trim();
-                          // Fix Excel removing leading zeros in brand headers (e.g. "o53" → "053")
-                          const replacedBrand = brandName.replace(/[oO]/g, '0');
-                          if (/^\d+$/.test(replacedBrand)) {
-                            brandName = replacedBrand;
-                          }
-                          brandsMap[i] = brandName;
+                      const headers = data[0];
+                      const groups: { brand: string; skuCol: number; priceCol?: number; storePriceCol?: number }[] = [];
+                      for (let c = 0; c < headers.length; c++) {
+                        const header = String(headers[c] ?? "").trim();
+                        if (!header || isPriceHeader(header) || isStorePriceHeader(header)) continue;
+                        const priceCol = isPriceHeader(headers[c + 1]) ? c + 1 : undefined;
+                        const storePriceCol = isStorePriceHeader(headers[c + 2]) ? c + 2 : undefined;
+                        groups.push({ brand: header, skuCol: c, priceCol, storePriceCol });
+                      }
+
+                      const parsed: VitrinaImportItem[] = [];
+                      for (let r = 1; r < data.length; r++) {
+                        const row = data[r] || [];
+                        for (const group of groups) {
+                          const sku = normalizeVitrinaSku(row[group.skuCol]);
+                          if (!sku || sku.toLowerCase().includes("пример") || sku.toLowerCase() === "sku") continue;
+                          const price = group.priceCol !== undefined ? parseImportNumber(row[group.priceCol]) : undefined;
+                          const storePrice = group.storePriceCol !== undefined ? parseImportNumber(row[group.storePriceCol]) : undefined;
+                          parsed.push({
+                            sku,
+                            brand: group.brand,
+                            price,
+                            store_price: storePrice ?? null,
+                          });
                         }
                       }
-                      const parsed: {sku: string, brand: string}[] = [];
-                      for (let r = 1; r < data.length; r++) {
-                        for (let c = 0; c < data[r].length; c++) {
-                          if (brandsMap[c] && data[r][c]) {
-                            let sku = String(data[r][c]).trim();
-                            // Only replace o/O with 0 if the whole SKU becomes numeric
-                            // (keeps SKU length as-is; does NOT add leading zeros)
-                            const replaced = sku.replace(/[oO]/g, '0');
-                            if (/^\d+$/.test(replaced)) {
-                              sku = replaced;
-                            }
-                            if (sku && !sku.toLowerCase().includes("пример") && sku.toLowerCase() !== "sku") {
-                              parsed.push({ sku, brand: brandsMap[c] });
-                            }
-                          }
-                        }
+                      if (parsed.length === 0) {
+                        showToast("Не найдено товаров. Проверьте формат: Фирма | Цена | Цена для магазина", "error");
+                        return;
                       }
                       setImportData(parsed);
                       setIsImportModalOpen(true);
@@ -415,7 +453,7 @@ export default function InventoryPage() {
             </div>
             
             <div style={{ padding: "0 24px", color: "var(--text-secondary)", fontSize: 14 }}>
-              Будет загружено: <strong style={{color:"var(--text-primary)"}}>{importData.length}</strong> артикулов по 1 шт на выбранную витрину.
+              Будет загружено: <strong style={{color:"var(--text-primary)"}}>{importData.length}</strong> артикулов по 1 шт на выбранную витрину. Цены товара тоже обновятся.
             </div>
 
             <div className="modal-body" style={{ flex: 1, overflowY: "auto", marginTop: 12 }}>
@@ -425,6 +463,8 @@ export default function InventoryPage() {
                     <tr>
                       <th>Бренд (Колонка)</th>
                       <th>Артикул</th>
+                      <th style={{ textAlign: "right" }}>Цена склада</th>
+                      <th style={{ textAlign: "right" }}>Цена магазина</th>
                       <th style={{ textAlign: "center" }}>Кол-во</th>
                     </tr>
                   </thead>
@@ -433,6 +473,8 @@ export default function InventoryPage() {
                       <tr key={idx}>
                         <td style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{row.brand}</td>
                         <td style={{ fontWeight: 700, fontFamily: "monospace", color: "var(--accent)" }}>{row.sku}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{row.price ? `${fmt(row.price)} TJS` : "—"}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{row.store_price ? `${fmt(row.store_price)} TJS` : "—"}</td>
                         <td style={{ textAlign: "center", fontWeight: 700 }}>1 шт</td>
                       </tr>
                     ))}

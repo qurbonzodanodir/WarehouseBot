@@ -445,13 +445,19 @@ async def import_vitrina_endpoint(
                 product = Product(
                     sku=sku,
                     brand=item.brand,
-                    price=Decimal("0.00"),
+                    price=item.price if item.price is not None else Decimal("0.00"),
+                    store_price=item.store_price,
                     is_active=True,
                 )
                 session.add(product)
                 products_map[sku] = product
                 products_to_add += 1
             else:
+                product.brand = item.brand
+                if item.price is not None:
+                    product.price = item.price
+                if "store_price" in item.model_fields_set:
+                    product.store_price = item.store_price
                 products_updated += 1
 
         await session.flush()

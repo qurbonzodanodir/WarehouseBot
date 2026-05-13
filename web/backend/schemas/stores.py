@@ -76,6 +76,8 @@ class DispatchDisplayInput(BaseModel):
 class BulkVitrinaItem(BaseModel):
     sku: str = Field(..., min_length=1)
     brand: str = Field(..., min_length=1)
+    price: Optional[Decimal] = None
+    store_price: Optional[Decimal] = None
 
 
 class BulkVitrinaInput(BaseModel):
