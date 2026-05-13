@@ -73,6 +73,8 @@ export default function InventoryPage() {
   const [importing, setImporting] = useState(false);
   const [bulkStorePrice, setBulkStorePrice] = useState<string>("");
   const [bulkPrice, setBulkPrice] = useState<string>("");
+  const [previewPage, setPreviewPage] = useState(1);
+  const previewPageSize = 100;
 
   useEffect(() => {
     const user = getStoredUser();
@@ -219,6 +221,7 @@ export default function InventoryPage() {
                         return;
                       }
                       setImportData(parsed);
+                      setPreviewPage(1);
                       setIsImportModalOpen(true);
                     } catch (err) {
                       showToast("Ошибка чтения файла", "error");
@@ -524,48 +527,67 @@ export default function InventoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {importData.slice(0, 100).map((row, idx) => (
-                      <tr key={idx}>
-                        <td style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{row.brand}</td>
-                        <td style={{ fontWeight: 700, fontFamily: "monospace", color: "var(--accent)" }}>{row.sku}</td>
-                        <td style={{ textAlign: "right" }}>
-                          <input
-                            type="number"
-                            className="input"
-                            value={row.price ?? ""}
-                            placeholder="0"
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              const v = raw === "" ? undefined : parseFloat(raw);
-                              setImportData(prev => prev.map((r, i) => i === idx ? { ...r, price: v === undefined || isNaN(v) ? undefined : v } : r));
-                            }}
-                            style={{ width: 100, height: 30, textAlign: "right", fontWeight: 600 }}
-                          />
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          <input
-                            type="number"
-                            className="input"
-                            value={row.store_price ?? ""}
-                            placeholder="0"
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              const v = raw === "" ? null : parseFloat(raw);
-                              setImportData(prev => prev.map((r, i) => i === idx ? { ...r, store_price: v === null || isNaN(v as number) ? null : (v as number) } : r));
-                            }}
-                            style={{ width: 100, height: 30, textAlign: "right", fontWeight: 600 }}
-                          />
-                        </td>
-                        <td style={{ textAlign: "center", fontWeight: 700 }}>1 шт</td>
-                      </tr>
-                    ))}
+                    {importData.slice((previewPage - 1) * previewPageSize, previewPage * previewPageSize).map((row, pageIdx) => {
+                      const actualIdx = (previewPage - 1) * previewPageSize + pageIdx;
+                      return (
+                        <tr key={actualIdx}>
+                          <td style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{row.brand}</td>
+                          <td style={{ fontWeight: 700, fontFamily: "monospace", color: "var(--accent)" }}>{row.sku}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <input
+                              type="number"
+                              className="input"
+                              value={row.price ?? ""}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const v = raw === "" ? undefined : parseFloat(raw);
+                                setImportData(prev => prev.map((r, i) => i === actualIdx ? { ...r, price: v === undefined || isNaN(v) ? undefined : v } : r));
+                              }}
+                              style={{ width: 100, height: 30, textAlign: "right", fontWeight: 600 }}
+                            />
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            <input
+                              type="number"
+                              className="input"
+                              value={row.store_price ?? ""}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const v = raw === "" ? null : parseFloat(raw);
+                                setImportData(prev => prev.map((r, i) => i === actualIdx ? { ...r, store_price: v === null || isNaN(v as number) ? null : (v as number) } : r));
+                              }}
+                              style={{ width: 100, height: 30, textAlign: "right", fontWeight: 600 }}
+                            />
+                          </td>
+                          <td style={{ textAlign: "center", fontWeight: 700 }}>1 шт</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-                {importData.length > 100 && (
-                  <div style={{ padding: 16, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                    ... и еще {importData.length - 100} товаров. Используйте поля выше для массового задания цен.
-                  </div>
-                )}
+                <div style={{ padding: 16, display: "flex", justifyContent: "center", alignItems: "center", gap: 12, borderTop: "1px solid var(--border)" }}>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setPreviewPage(p => Math.max(1, p - 1))}
+                    disabled={previewPage === 1}
+                    style={{ padding: "6px 12px", height: 32 }}
+                  >
+                    ← Назад
+                  </button>
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    Страница {previewPage} из {Math.ceil(importData.length / previewPageSize)} ({importData.length} товаров)
+                  </span>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setPreviewPage(p => Math.min(Math.ceil(importData.length / previewPageSize), p + 1))}
+                    disabled={previewPage >= Math.ceil(importData.length / previewPageSize)}
+                    style={{ padding: "6px 12px", height: 32 }}
+                  >
+                    Вперёд →
+                  </button>
+                </div>
               </div>
             </div>
 
