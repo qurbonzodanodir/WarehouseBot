@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from app.models.enums import UserRole
 from app.models.invite_code import InviteCode
@@ -20,7 +20,7 @@ class InviteService:
         """Look up a valid (unused, not expired) invite code."""
         result = await self.session.execute(
             select(InviteCode)
-            .options(joinedload(InviteCode.store))
+            .options(selectinload(InviteCode.store))
             .where(
                 InviteCode.code == code,
                 InviteCode.is_used.is_(False),
