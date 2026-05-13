@@ -11,9 +11,13 @@ from app.bot.keyboards.inline import (
     batch_delivery_accepted_kb,
     batch_order_action_kb,
     cart_action_kb,
-    catalog_kb,
     delivery_accepted_kb,
     delivery_confirm_kb,
+)
+from app.bot.routers.seller.catalog_ui import (
+    product_card,
+    product_matches,
+    send_catalog_page,
 )
 from app.bot.routers.seller.common import MENU_TEXTS
 from app.bot.states.states import OrderFlow
@@ -25,10 +29,6 @@ from app.services import NotificationService, OrderService
 logger = logging.getLogger(__name__)
 
 router = Router(name="seller.order")
-
-
-def _clean_search_query(text: str) -> str:
-    return text.strip().lower().replace(" ", "").replace("-", "")
 
 
 async def _ensure_seller_order_access(
@@ -55,12 +55,14 @@ async def start_order(
         await message.answer(_("order_empty_cat"))
         return
 
-    await message.answer(
+    await send_catalog_page(
+        message,
         _("order_title"),
-        parse_mode="HTML",
-        reply_markup=catalog_kb(
-            items, page=0, callback_prefix="order:page", item_callback_prefix="order:select", _=_
-        ),
+        items,
+        page=0,
+        callback_prefix="order:page",
+        item_callback_prefix="order:select",
+        _=_,
     )
     await state.set_state(OrderFlow.select_product)
 
@@ -75,12 +77,7 @@ async def search_product(
 
     order_svc = OrderService(session)
     items = await order_svc.get_available_products(store_id=user.store_id)
-    clean_query = _clean_search_query(message.text)
-    matches = [
-        product
-        for product in items
-        if clean_query in _clean_search_query(product.sku)
-    ]
+    matches = [product for product in items if product_matches(product, message.text)]
 
     if not matches:
         await message.answer(_("order_not_found_search"))
@@ -91,21 +88,20 @@ async def search_product(
         product = matches[0]
         await state.update_data(product_id=product.id)
         await message.answer(
-            _("order_found", sku=product.sku),
+            product_card(product, _) + "\n\n" + _("order_enter_qty"),
             parse_mode="HTML",
         )
         await state.set_state(OrderFlow.enter_quantity)
         return
     else:
-        await message.answer(
+        await send_catalog_page(
+            message,
             _("order_search_found"),
-            reply_markup=catalog_kb(
-                matches,
-                page=0,
-                callback_prefix="order:page",
-                item_callback_prefix="order:select",
-                _=_
-            )
+            matches,
+            page=0,
+            callback_prefix="order:page",
+            item_callback_prefix="order:select",
+            _=_,
         )
         return
 
@@ -118,21 +114,29 @@ async def order_page_nav(
     order_svc = OrderService(session)
     items = await order_svc.get_available_products(store_id=user.store_id)
     
-    await callback.message.edit_reply_markup(
-        reply_markup=catalog_kb(
-            items, page=page, callback_prefix="order:page", item_callback_prefix="order:select", _=_
-        ),
+    await send_catalog_page(
+        callback,
+        _("order_title"),
+        items,
+        page=page,
+        callback_prefix="order:page",
+        item_callback_prefix="order:select",
+        _=_,
     )
     await callback.answer()
 
 
 @router.callback_query(OrderFlow.select_product, F.data.startswith("order:select:"))
 async def select_product(
-    callback: CallbackQuery, state: FSMContext, _: Any
+    callback: CallbackQuery, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
     product_id = int(callback.data.split(":")[-1])
+    product = await session.get(Product, product_id)
     await state.update_data(product_id=product_id)
-    await callback.message.edit_text(_("order_enter_qty"))
+    await callback.message.edit_text(
+        (product_card(product, _) + "\n\n" if product else "") + _("order_enter_qty"),
+        parse_mode="HTML",
+    )
     await state.set_state(OrderFlow.enter_quantity)
     await callback.answer()
 
@@ -192,12 +196,14 @@ async def cart_add_more(callback: CallbackQuery, user: User, state: FSMContext, 
         await callback.message.edit_text(_("order_empty_cat"))
         return
 
-    await callback.message.edit_text(
+    await send_catalog_page(
+        callback,
         _("order_title"),
-        parse_mode="HTML",
-        reply_markup=catalog_kb(
-            items, page=0, callback_prefix="order:page", item_callback_prefix="order:select", _=_
-        ),
+        items,
+        page=0,
+        callback_prefix="order:page",
+        item_callback_prefix="order:select",
+        _=_,
     )
     await state.set_state(OrderFlow.select_product)
     await callback.answer()

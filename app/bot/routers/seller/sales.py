@@ -7,10 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.bot.keyboards.inline import catalog_kb
 from app.bot.states.states import SaleFlow
+from app.bot.routers.seller.catalog_ui import clean_search_query, product_card, product_matches, send_catalog_page
 from app.models.user import User
-from app.services import OrderService, ProductService, TransactionService
+from app.services import OrderService, TransactionService
 from app.bot.routers.seller.common import MENU_TEXTS
 from typing import Any
 
@@ -30,21 +30,19 @@ async def start_sale(
         await message.answer(_("sale_no_products"))
         return
         
-    products = [inv.product for inv in items if inv.quantity > 0]
-    if not products:
+    available_items = [inv for inv in items if inv.quantity > 0]
+    if not available_items:
         await message.answer(_("sale_no_available"))
         return
 
-    await message.answer(
+    await send_catalog_page(
+        message,
         _("sale_title"),
-        parse_mode="HTML",
-        reply_markup=catalog_kb(
-            products, 
-            page=0, 
-            callback_prefix="sale:page", 
-            item_callback_prefix="sale:select",
-            _=_
-        )
+        available_items,
+        page=0,
+        callback_prefix="sale:page",
+        item_callback_prefix="sale:select",
+        _=_,
     )
     await state.set_state(SaleFlow.select_product)
 
@@ -57,29 +55,31 @@ async def sale_search_product(
         await state.clear()
         return
 
-    prod_svc = ProductService(session)
-    product, matches, inv = await prod_svc.search_store_inventory(
-        message.text, user.store_id, require_stock=True
-    )
+    order_svc = OrderService(session)
+    items = await order_svc.get_store_inventory(user.store_id, include_empty=False)
+    clean_query = clean_search_query(message.text)
+    exact_match = next((item for item in items if clean_search_query(item.product.sku) == clean_query), None)
+    matches = [item for item in items if product_matches(item.product, message.text)]
 
-    if product:
-        await state.update_data(product_id=product.id)
+    if exact_match:
+        await state.update_data(product_id=exact_match.product.id)
         await message.answer(
-            _("sale_selected", sku=product.sku, qty=inv.quantity),
-            parse_mode="HTML"
+            product_card(exact_match.product, _, exact_match.quantity)
+            + "\n\n"
+            + _("sale_enter_qty", qty=exact_match.quantity),
+            parse_mode="HTML",
         )
         await state.set_state(SaleFlow.enter_quantity)
         return
     elif matches:
-        await message.answer(
+        await send_catalog_page(
+            message,
             _("sale_search_found"),
-            reply_markup=catalog_kb(
-                matches,
-                page=0,
-                callback_prefix="sale:page",
-                item_callback_prefix="sale:select",
-                _=_
-            )
+            matches,
+            page=0,
+            callback_prefix="sale:page",
+            item_callback_prefix="sale:select",
+            _=_,
         )
         return
     else:
@@ -103,16 +103,14 @@ async def sale_page_nav(
         )
     )
     items = result.scalars().all()
-    products = [inv.product for inv in items] if items else []
-    
-    await callback.message.edit_reply_markup(
-        reply_markup=catalog_kb(
-            products, 
-            page=page, 
-            callback_prefix="sale:page",
-            item_callback_prefix="sale:select",
-            _=_
-        )
+    await send_catalog_page(
+        callback,
+        _("sale_title"),
+        list(items),
+        page=page,
+        callback_prefix="sale:page",
+        item_callback_prefix="sale:select",
+        _=_,
     )
     await callback.answer()
 
@@ -130,8 +128,13 @@ async def sale_select_product(
     inv = result.scalar_one_or_none()
     qty = inv.quantity if inv else 0
     
+    from app.models.product import Product
+    product = await session.get(Product, product_id)
     await state.update_data(product_id=product_id)
-    await callback.message.edit_text(_("sale_enter_qty", qty=qty))
+    await callback.message.edit_text(
+        (product_card(product, _, qty) + "\n\n" if product else "") + _("sale_enter_qty", qty=qty),
+        parse_mode="HTML",
+    )
     await state.set_state(SaleFlow.enter_quantity)
     await callback.answer()
 

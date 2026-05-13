@@ -42,6 +42,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_prev": "⬅️ Назад",
         "btn_next": "Вперёд ➡️",
         "btn_page": "{current}/{total}",
+        "catalog_page": "Страница {page}/{total}",
+        "catalog_hint": "Напишите SKU или фирму для поиска.",
         "btn_wh_requests": "🔔 Запросы",
         "btn_wh_stock": "📦 Остатки",
         "btn_language": "🌐 Язык / Забон",
@@ -64,9 +66,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # Seller - Sales Flow
         "sale_no_products": "Ваша витрина пуста. Нет товаров для продажи.",
         "sale_no_available": "На вашей витрине нет доступных товаров для продажи (количество равно 0).",
-        "sale_title": "💳 <b>Оформление продажи</b>\n\nНапишите артикул (SKU) или название товара из **вашей витрины**.\nЛилибо выберите из списка ниже:",
+        "sale_title": "💳 <b>Продажа</b>",
         "sale_selected": "✅ Выбран товар: <b>{sku}</b> (В наличии: {qty} шт)\n\nВведите количество для продажи (шт):",
-        "sale_search_found": "Найдено по вашему запросу. Выберите товар для продажи:",
+        "sale_search_found": "💳 <b>Найденные товары для продажи</b>",
         "sale_not_found": "❌ Товар не найден на вашей витрине, либо его количество равно 0.",
         "sale_enter_qty": "Введите количество для продажи (доступно {qty} шт):",
         "sale_invalid_qty": "Введите целое положительное число.",
@@ -82,9 +84,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Order Flow
         "order_empty_cat": "Каталог пуст.",
-        "order_title": "🛒 <b>Оформление заказа</b>\n\nНапишите артикул (SKU) или название товара для поиска.\nЛилибо выберите из каталога ниже:",
+        "order_title": "🛒 <b>Заказ товара</b>",
         "order_found": "✅ Найден товар: <b>{sku}</b>\nВведите необходимое количество (шт):",
-        "order_search_found": "Найдено по вашему запросу. Выберите товар для заказа:",
+        "order_search_found": "🛒 <b>Найденные товары для заказа</b>",
         "order_not_found_search": "❌ Товар не найден. Попробуйте еще раз.",
         "order_enter_qty": "Введите количество (шт):",
         "order_notif_new": "🔔 <b>Новая заявка #{id}</b>\n\nМагазин: {store}\nSKU: {sku}\nКол-во: {qty} шт",
@@ -122,9 +124,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # Seller - Returns Flow
         "return_no_products": "У вас нет товаров в наличии для возврата.",
         "return_no_available": "На вашей витрине нет доступных товаров для возврата (количество равно 0).",
-        "return_title": "🔄 <b>Оформление возврата на Склад</b>\n\nНапишите артикул (SKU) или название товара из **вашей витрины**.\nЛилибо выберите из списка ниже:",
+        "return_title": "🔄 <b>Возврат на склад</b>",
         "return_selected": "✅ Найден товар: <b>{sku}</b> (В наличии: {qty} шт)\n\nВведите количество для возврата (шт):",
-        "return_search_found": "Найдено по вашему запросу. Выберите товар для возврата:",
+        "return_search_found": "🔄 <b>Найденные товары для возврата</b>",
         "return_not_found": "❌ Товар не найден на вашей витрине, либо его количество равно 0.",
         "return_enter_qty": "Введите количество для возврата (доступно {qty} шт):",
         "return_confirm_msg_samples": "✅ Образцы отправлены на возврат!\nДолг магазина не изменится.",
@@ -141,7 +143,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Vitrine Flow
         "vitrine_empty": "Ваша витрина пуста.",
-        "vitrine_title": "🖼 <b>Мои остатки</b>\nСтраница {page}/{total}",
+        "vitrine_title": "🖼 <b>Мои остатки</b>",
         "vitrine_item": "• {sku}: <b>{qty}</b> шт",
         "stock_col_sku": "SKU",
         "stock_col_brand": "Фирма",
@@ -242,6 +244,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_prev": "⬅️ Қафо",
         "btn_next": "Пеш ➡️",
         "btn_page": "{current}/{total}",
+        "catalog_page": "Саҳифа {page}/{total}",
+        "catalog_hint": "Барои ҷустуҷӯ SKU ё фирмаро нависед.",
         "btn_wh_requests": "🔔 Дархостҳо",
         "btn_wh_stock": "📦 Боқимонда",
         "btn_language": "🌐 Забон / Язык",
@@ -264,9 +268,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # Seller - Sales Flow
         "sale_no_products": "Витринаи шумо холӣ аст. Маҳсулот барои фурӯш нест.",
         "sale_no_available": "Дар витринаи шумо маҳсулоти дастрас барои фурӯш нест (миқдор ба 0 баробар аст).",
-        "sale_title": "💳 <b>Бақайдгирии фурӯш</b>\n\nАртикул (SKU) ё номи маҳсулотро аз **витринаи худ** нависед.\nЁ аз рӯйхати зер интихоб кунед:",
+        "sale_title": "💳 <b>Фурӯш</b>",
         "sale_selected": "✅ Маҳсулот интихоб шуд: <b>{sku}</b> (Дар анбор: {qty} дона)\n\nМиқдорро барои фурӯш ворид кунед (дона):",
-        "sale_search_found": "Мувофиқи дархости шумо ёфт шуд. Маҳсулотро барои фурӯш интихоб кунед:",
+        "sale_search_found": "💳 <b>Молҳои ёфтшуда барои фурӯш</b>",
         "sale_not_found": "❌ Маҳсулот дар витринаи шумо ёфт нашуд, ё миқдори он ба 0 баробар аст.",
         "sale_enter_qty": "Миқдорро барои фурӯш ворид кунед (дастрас {qty} дона):",
         "sale_invalid_qty": "Миқдори дурустро (адади бутун) ворид кунед.",
@@ -282,9 +286,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Order Flow
         "order_empty_cat": "Каталог холӣ аст.",
-        "order_title": "🛒 <b>Бақайдгирии дархост</b>\n\nБарои ҷустуҷӯ артикул (SKU) ё номи маҳсулотро нависед.\nЁ аз каталоги зер интихоб кунед:",
+        "order_title": "🛒 <b>Дархости мол</b>",
         "order_found": "✅ Маҳсулот ёфт шуд: <b>{sku}</b>\nМиқдори заруриро ворид кунед (дона):",
-        "order_search_found": "Мувофиқи дархости шумо ёфт шуд. Маҳсулотро барои дархост интихоб кунед:",
+        "order_search_found": "🛒 <b>Молҳои ёфтшуда барои дархост</b>",
         "order_not_found_search": "❌ Маҳсулот ёфт нашуд. Боз кӯшиш кунед.",
         "order_enter_qty": "Миқдорро ворид кунед (дона):",
         "order_notif_new": "🔔 <b>Дархости нав #{id}</b>\n\nМағоза: {store}\nSKU: {sku}\nМиқдор: {qty} дона",
@@ -318,9 +322,9 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # Seller - Returns Flow
         "return_no_products": "Шумо маҳсулоти дастрас барои бозгашт надоред.",
         "return_no_available": "Дар витринаи шумо маҳсулоти дастрас барои бозгашт нест (миқдор ба 0 баробар аст).",
-        "return_title": "🔄 <b>Бақайдгирии бозгашт ба Анбор</b>\n\nАртикул (SKU) ё номи маҳсулотро аз **витринаи худ** нависед.\nЁ аз рӯйхати зер интихоб кунед:",
+        "return_title": "🔄 <b>Бозгашт ба анбор</b>",
         "return_selected": "✅ Маҳсулот ёфт шуд: <b>{sku}</b> (Дар анбор: {qty} дона)\n\nМиқдорро барои бозгашт ворид кунед (дона):",
-        "return_search_found": "Мувофиқи дархости шумо ёфт шуд. Маҳсулотро барои бозгашт интихоб кунед:",
+        "return_search_found": "🔄 <b>Молҳои ёфтшуда барои бозгашт</b>",
         "return_not_found": "❌ Маҳсулот дар витринаи шумо ёфт нашуд, ё миқдори он ба 0 баробар аст.",
         "return_enter_qty": "Миқдорро барои бозгашт ворид кунед (дастрас {qty} дона):",
         "return_confirm_msg_samples": "✅ Намунаҳо барои бозгашт фиристода шуданд!\nҚарзи мағоза тағйир намеёбад.",
@@ -333,7 +337,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         # Seller - Vitrine Flow
         "vitrine_empty": "Витринаи шумо холӣ аст.",
-        "vitrine_title": "🖼 <b>Боқимондаҳои ман</b>\nСаҳифа {page}/{total}",
+        "vitrine_title": "🖼 <b>Боқимондаҳои ман</b>",
         "vitrine_item": "• {sku}: <b>{qty}</b> дона",
         "stock_col_sku": "SKU",
         "stock_col_brand": "Фирма",

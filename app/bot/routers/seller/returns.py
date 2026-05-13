@@ -9,8 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 
-from app.bot.keyboards.inline import catalog_kb, warehouse_return_kb
+from app.bot.keyboards.inline import warehouse_return_kb
 from app.bot.states.states import ReturnFlow
+from app.bot.routers.seller.catalog_ui import (
+    clean_search_query,
+    product_card,
+    product_matches,
+    send_catalog_page,
+)
 from app.models.user import User
 from app.models.product import Product
 from app.models.order import Order
@@ -26,10 +32,6 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 router = Router(name="seller.returns")
-
-
-def _clean_search_query(text: str) -> str:
-    return text.strip().lower().replace(" ", "").replace("-", "")
 
 
 async def _get_display_qty_available(
@@ -73,21 +75,19 @@ async def start_return(
         await message.answer(_("return_no_products"))
         return
         
-    products = [inv.product for inv in items if inv.quantity > 0]
-    if not products:
+    available_items = [inv for inv in items if inv.quantity > 0]
+    if not available_items:
         await message.answer(_("return_no_available"))
         return
     
-    await message.answer(
+    await send_catalog_page(
+        message,
         _("return_title"),
-        parse_mode="HTML",
-        reply_markup=catalog_kb(
-            products, 
-            page=0, 
-            callback_prefix="return:page", 
-            item_callback_prefix="return:select",
-            _=_
-        )
+        available_items,
+        page=0,
+        callback_prefix="return:page",
+        item_callback_prefix="return:select",
+        _=_,
     )
     await state.set_state(ReturnFlow.select_product)
 
@@ -102,28 +102,27 @@ async def return_search_product(
 
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
-    clean_query = _clean_search_query(message.text)
-    exact_match = next((item for item in items if _clean_search_query(item.product.sku) == clean_query), None)
-    partial_matches = [item.product for item in items if clean_query in _clean_search_query(item.product.sku)]
+    clean_query = clean_search_query(message.text)
+    exact_match = next((item for item in items if clean_search_query(item.product.sku) == clean_query), None)
+    partial_matches = [item for item in items if product_matches(item.product, message.text)]
 
     if exact_match:
         await state.update_data(product_id=exact_match.product.id)
         await message.answer(
-            _("return_selected", sku=exact_match.product.sku, qty=exact_match.quantity),
+            product_card(exact_match.product, _, exact_match.quantity) + "\n\n" + _("return_enter_qty", qty=exact_match.quantity),
             parse_mode="HTML"
         )
         await state.set_state(ReturnFlow.enter_quantity)
         return
     elif partial_matches:
-        await message.answer(
+        await send_catalog_page(
+            message,
             _("return_search_found"),
-            reply_markup=catalog_kb(
-                partial_matches,
-                page=0,
-                callback_prefix="return:page",
-                item_callback_prefix="return:select",
-                _=_
-            )
+            partial_matches,
+            page=0,
+            callback_prefix="return:page",
+            item_callback_prefix="return:select",
+            _=_,
         )
         return
     else:
@@ -138,16 +137,14 @@ async def return_page_nav(
     page = int(callback.data.split(":")[-1])
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
-    products = [item.product for item in items] if items else []
-    
-    await callback.message.edit_reply_markup(
-        reply_markup=catalog_kb(
-            products, 
-            page=page, 
-            callback_prefix="return:page",
-            item_callback_prefix="return:select",
-            _=_
-        )
+    await send_catalog_page(
+        callback,
+        _("return_title"),
+        items,
+        page=page,
+        callback_prefix="return:page",
+        item_callback_prefix="return:select",
+        _=_,
     )
     await callback.answer()
 
@@ -162,7 +159,11 @@ async def return_select_product(
     qty = regular_qty + display_qty
     
     await state.update_data(product_id=product_id)
-    await callback.message.edit_text(_("return_enter_qty", qty=qty))
+    product = await session.get(Product, product_id)
+    await callback.message.edit_text(
+        (product_card(product, _, qty) + "\n\n" if product else "") + _("return_enter_qty", qty=qty),
+        parse_mode="HTML",
+    )
     await state.set_state(ReturnFlow.enter_quantity)
     await callback.answer()
 
