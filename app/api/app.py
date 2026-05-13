@@ -8,7 +8,7 @@ from app.bot.bot import bot, dp
 from app.core.config import settings
 
 from fastapi.middleware.cors import CORSMiddleware
-from web.backend.routers import auth, orders, products, inventory, analytics, stores, finance, invites, suppliers, settings as settings_router
+from web.backend.routers import auth, orders, products, inventory, analytics, stores, finance, invites, suppliers
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,6 @@ app.include_router(stores.router, prefix=API_PREFIX)
 app.include_router(finance.router, prefix=API_PREFIX)
 app.include_router(invites.router, prefix=API_PREFIX)
 app.include_router(suppliers.router, prefix=API_PREFIX)
-app.include_router(settings_router.router, prefix=API_PREFIX)
 
 
 @app.post(settings.webhook_path)

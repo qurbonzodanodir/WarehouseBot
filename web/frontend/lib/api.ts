@@ -250,12 +250,6 @@ export const api = {
   deleteProduct: (id: number) =>
     request(`/products/${id}`, { method: "DELETE" }),
 
-  // Settings
-  getSettings: () =>
-    request<{ retail_markup: number }>("/settings"),
-  updateSettings: (data: { retail_markup?: number }) =>
-    request<{ retail_markup: number }>("/settings", { method: "PATCH", body: JSON.stringify(data) }),
-
   // Inventory
   getInventory: (store_id: number, page: number = 1, pageSize: number = 50, search?: string) => {
     const qs = new URLSearchParams();
