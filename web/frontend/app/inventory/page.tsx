@@ -71,6 +71,8 @@ export default function InventoryPage() {
   const [importData, setImportData] = useState<VitrinaImportItem[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [bulkStorePrice, setBulkStorePrice] = useState<string>("");
+  const [bulkPrice, setBulkPrice] = useState<string>("");
 
   useEffect(() => {
     const user = getStoredUser();
@@ -126,6 +128,8 @@ export default function InventoryPage() {
       showToast(`✅ Загружено успешно! Фирм: ${new Set(importData.map(d=>d.brand)).size}, Артикулов: ${importData.length}. Сохранено новых: ${res.created}, обновлено на витрине: ${res.added_qty}`, "success");
       setIsImportModalOpen(false);
       setImportData([]);
+      setBulkPrice("");
+      setBulkStorePrice("");
       api.getInventory(selectedStore, currentPage, pageSize).then((data) => {
         setItems(data.items);
         setTotalItems(data.total);
@@ -456,6 +460,57 @@ export default function InventoryPage() {
               Будет загружено: <strong style={{color:"var(--text-primary)"}}>{importData.length}</strong> артикулов по 1 шт на выбранную витрину. Цены товара тоже обновятся.
             </div>
 
+            <div style={{ padding: "12px 24px 0", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>
+                  Цена склада — применить ко всем
+                </label>
+                <input
+                  type="number"
+                  className="input"
+                  placeholder="0"
+                  value={bulkPrice}
+                  onChange={(e) => setBulkPrice(e.target.value)}
+                  style={{ width: "100%", height: 36 }}
+                />
+              </div>
+              <button
+                className="btn btn-ghost"
+                style={{ height: 36 }}
+                onClick={() => {
+                  const v = parseFloat(bulkPrice);
+                  if (!isFinite(v) || v < 0) { showToast("Введите корректную цену", "error"); return; }
+                  setImportData(prev => prev.map(r => ({ ...r, price: v })));
+                }}
+              >
+                Применить
+              </button>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>
+                  Цена магазина — применить ко всем
+                </label>
+                <input
+                  type="number"
+                  className="input"
+                  placeholder="0"
+                  value={bulkStorePrice}
+                  onChange={(e) => setBulkStorePrice(e.target.value)}
+                  style={{ width: "100%", height: 36 }}
+                />
+              </div>
+              <button
+                className="btn btn-ghost"
+                style={{ height: 36 }}
+                onClick={() => {
+                  const v = parseFloat(bulkStorePrice);
+                  if (!isFinite(v) || v < 0) { showToast("Введите корректную цену", "error"); return; }
+                  setImportData(prev => prev.map(r => ({ ...r, store_price: v })));
+                }}
+              >
+                Применить
+              </button>
+            </div>
+
             <div className="modal-body" style={{ flex: 1, overflowY: "auto", marginTop: 12 }}>
               <div className="table-wrap">
                 <table>
@@ -473,8 +528,34 @@ export default function InventoryPage() {
                       <tr key={idx}>
                         <td style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{row.brand}</td>
                         <td style={{ fontWeight: 700, fontFamily: "monospace", color: "var(--accent)" }}>{row.sku}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{row.price ? `${fmt(row.price)} TJS` : "—"}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{row.store_price ? `${fmt(row.store_price)} TJS` : "—"}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <input
+                            type="number"
+                            className="input"
+                            value={row.price ?? ""}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const v = raw === "" ? undefined : parseFloat(raw);
+                              setImportData(prev => prev.map((r, i) => i === idx ? { ...r, price: v === undefined || isNaN(v) ? undefined : v } : r));
+                            }}
+                            style={{ width: 100, height: 30, textAlign: "right", fontWeight: 600 }}
+                          />
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <input
+                            type="number"
+                            className="input"
+                            value={row.store_price ?? ""}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const v = raw === "" ? null : parseFloat(raw);
+                              setImportData(prev => prev.map((r, i) => i === idx ? { ...r, store_price: v === null || isNaN(v as number) ? null : (v as number) } : r));
+                            }}
+                            style={{ width: 100, height: 30, textAlign: "right", fontWeight: 600 }}
+                          />
+                        </td>
                         <td style={{ textAlign: "center", fontWeight: 700 }}>1 шт</td>
                       </tr>
                     ))}
@@ -482,7 +563,7 @@ export default function InventoryPage() {
                 </table>
                 {importData.length > 100 && (
                   <div style={{ padding: 16, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-                    ... и еще {importData.length - 100} товаров.
+                    ... и еще {importData.length - 100} товаров. Используйте поля выше для массового задания цен.
                   </div>
                 )}
               </div>
