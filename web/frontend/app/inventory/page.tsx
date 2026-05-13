@@ -445,8 +445,8 @@ export default function InventoryPage() {
       </main>
 
       {isImportModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsImportModalOpen(false)}>
-          <div className="modal-content" style={{ maxWidth: 600, width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setIsImportModalOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: 600, width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", background: "var(--bg-card)" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Database size={20} /> Предпросмотр: Витрина
