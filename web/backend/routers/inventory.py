@@ -29,6 +29,14 @@ def normalize_import_brand(brand: str) -> str:
     return value
 
 
+def sku_import_candidates(sku: str) -> list[str]:
+    value = sku.strip().upper()
+    candidates = [value]
+    if value.isdigit() and not value.startswith("0"):
+        candidates.append(f"0{value}")
+    return candidates
+
+
 @router.get(
     "/{store_id:int}",
     response_model=PaginatedInventoryResponse,
@@ -263,10 +271,15 @@ async def bulk_receive_inventory(
             if item.quantity <= 0:
                 raise HTTPException(status_code=400, detail=f"Invalid quantity for SKU {sku}")
 
-            # Find product by SKU
-            stmt = select(Product).where(Product.sku == sku)
+            # Find product by SKU. If Excel dropped a leading zero, reuse the
+            # existing zero-prefixed product instead of creating a duplicate.
+            stmt = select(Product).where(Product.sku.in_(sku_import_candidates(sku)))
             res = await session.execute(stmt)
-            product = res.scalar_one_or_none()
+            candidates = res.scalars().all()
+            product = next((p for p in candidates if p.sku == sku), None) or next(
+                (p for p in candidates if p.sku == f"0{sku}"),
+                None,
+            )
             
             # Resolve effective brand: per-item brand is required
             effective_brand: str | None = (
@@ -441,7 +454,11 @@ async def import_vitrina_endpoint(
     qty_added = 0
 
     try:
-        skus: set[str] = {item.sku for item in body.items}
+        skus: set[str] = {
+            candidate
+            for item in body.items
+            for candidate in sku_import_candidates(item.sku)
+        }
         products_result = await session.execute(select(Product).where(Product.sku.in_(skus)))
         products_map: dict[str, Product] = {
             product.sku: product for product in products_result.scalars().all()
@@ -450,7 +467,10 @@ async def import_vitrina_endpoint(
         for item in body.items:
             sku = item.sku
             brand = normalize_import_brand(item.brand)
-            product = products_map.get(sku)
+            product = next(
+                (products_map[candidate] for candidate in sku_import_candidates(sku) if candidate in products_map),
+                None,
+            )
             if not product:
                 product = Product(
                     sku=sku,
@@ -463,6 +483,7 @@ async def import_vitrina_endpoint(
                 products_map[sku] = product
                 products_to_add += 1
             else:
+                products_map[sku] = product
                 product.brand = brand
                 product.is_active = True
                 if item.price is not None:
