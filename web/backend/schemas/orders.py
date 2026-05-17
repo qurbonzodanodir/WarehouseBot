@@ -52,6 +52,13 @@ class WarehouseDispatchCreate(BaseModel):
     items: list[WarehouseDispatchItem]
 
 
+class ReturnRequestCreate(BaseModel):
+    product_id: int
+    from_store_id: int
+    quantity: int
+    prefer_display: bool = True
+
+
 class OrderFilters(BaseModel):
     store_id: int | None = None
     status: OrderStatus | None = None

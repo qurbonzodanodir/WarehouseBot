@@ -6,7 +6,7 @@ from app.models.enums import OrderStatus
 from app.models.order import Order
 from app.services.order_service import OrderService
 from web.backend.dependencies import CurrentUser, SessionDep
-from web.backend.schemas.orders import OrderCreate, OrderOut, WarehouseDispatchCreate
+from web.backend.schemas.orders import OrderCreate, OrderOut, ReturnRequestCreate, WarehouseDispatchCreate
 
 from app.bot.bot import bot
 from app.services.notification_service import NotificationService
@@ -129,6 +129,147 @@ async def create_order(
         )
         await session.commit()
         await session.refresh(order)
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    result = await session.execute(
+        select(Order)
+        .options(joinedload(Order.store), joinedload(Order.product))
+        .where(Order.id == order.id)
+    )
+    return result.scalar_one()
+
+
+@router.post(
+    "/returns",
+    response_model=OrderOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Вернуть товар из магазина на склад",
+    description="Owner/warehouse/admin возвращает товар сразу без подтверждения продавца.",
+)
+async def create_return(
+    body: ReturnRequestCreate,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> OrderOut:
+    from app.models.debt_ledger import DebtLedger
+    from app.models.enums import DebtLedgerReason, StockMovementType, UserRole
+    from app.models.product import Product
+    from app.models.store import Store as StoreModel
+    from app.services.store_service import StoreService
+    from app.services.transaction_service import TransactionService
+
+    if body.quantity < 1:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than zero")
+
+    if current_user.role == UserRole.SELLER:
+        if current_user.store_id != body.from_store_id:
+            raise HTTPException(status_code=403, detail="Access denied for this store")
+        raise HTTPException(
+            status_code=400,
+            detail="Seller return requests are supported from Telegram. Use owner/warehouse web return here.",
+        )
+
+    _ensure_roles(current_user, {UserRole.WAREHOUSE, UserRole.OWNER, UserRole.ADMIN})
+
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        raise HTTPException(status_code=400, detail="Main warehouse not found")
+    if body.from_store_id == warehouse_id:
+        raise HTTPException(status_code=400, detail="Cannot return from the warehouse to itself")
+
+    store = await session.get(StoreModel, body.from_store_id)
+    if store is None:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    product = await session.get(Product, body.product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    txn_svc = TransactionService(session)
+
+    try:
+        display_inv = await txn_svc._get_display_inventory(body.from_store_id, body.product_id, lock=True)
+        regular_inv = await txn_svc._get_inventory(body.from_store_id, body.product_id, lock=True)
+
+        display_qty = display_inv.quantity if display_inv else 0
+        regular_qty = regular_inv.quantity if regular_inv else 0
+        use_display = body.prefer_display and display_qty >= body.quantity
+
+        if use_display:
+            if display_inv is None:
+                raise ValueError("Display inventory not found")
+            source_inv = display_inv
+            status_to_set = OrderStatus.DISPLAY_RETURNED
+            movement_type = StockMovementType.DISPLAY_RETURN
+            price = product.effective_store_price
+        elif regular_qty >= body.quantity:
+            if regular_inv is None:
+                raise ValueError("Inventory not found")
+            source_inv = regular_inv
+            status_to_set = OrderStatus.RETURNED
+            movement_type = StockMovementType.RETURN_TO_WAREHOUSE
+            price = product.effective_store_price
+        elif display_qty >= body.quantity:
+            if display_inv is None:
+                raise ValueError("Display inventory not found")
+            source_inv = display_inv
+            status_to_set = OrderStatus.DISPLAY_RETURNED
+            movement_type = StockMovementType.DISPLAY_RETURN
+            price = product.effective_store_price
+        else:
+            available = display_qty + regular_qty
+            raise ValueError(
+                f"Недостаточно товара для возврата: в наличии {available}, нужно {body.quantity}."
+            )
+
+        source_inv.quantity -= body.quantity
+        warehouse_inv = await txn_svc._get_or_create_inventory(warehouse_id, body.product_id, lock=True)
+        warehouse_inv.quantity += body.quantity
+
+        order = Order(
+            store_id=body.from_store_id,
+            product_id=body.product_id,
+            quantity=body.quantity,
+            price_per_item=price,
+            total_price=price * body.quantity,
+            status=status_to_set,
+        )
+        session.add(order)
+        await session.flush()
+
+        await txn_svc.record_stock_movement(
+            product_id=body.product_id,
+            quantity=body.quantity,
+            movement_type=movement_type,
+            from_store_id=body.from_store_id,
+            to_store_id=warehouse_id,
+            user_id=current_user.id,
+        )
+
+        if status_to_set == OrderStatus.RETURNED and order.total_price > 0:
+            await txn_svc.record_debt_ledger(
+                store_id=body.from_store_id,
+                amount_change=-order.total_price,
+                reason=DebtLedgerReason.RETURN_APPROVED,
+                description=f"Возврат owner #{order.id} на склад (SKU: {product.sku}, {body.quantity} шт.)",
+            )
+        elif status_to_set == OrderStatus.DISPLAY_RETURNED:
+            ledger = DebtLedger(
+                store_id=body.from_store_id,
+                amount_change=0,
+                balance_after=store.current_debt,
+                reason=DebtLedgerReason.RETURN_APPROVED,
+                description=f"Возврат витрины owner #{order.id} на склад (SKU: {product.sku}, {body.quantity} шт.)",
+            )
+            session.add(ledger)
+
+        await session.commit()
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
