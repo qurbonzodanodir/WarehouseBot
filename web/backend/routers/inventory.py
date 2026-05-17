@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 
+def normalize_import_brand(brand: str) -> str:
+    value = brand.strip()
+    if len(value) > 1 and value[0].lower() == "o" and value[1:].isdigit():
+        return f"0{value[1:]}"
+    return value
+
+
 @router.get(
     "/{store_id:int}",
     response_model=PaginatedInventoryResponse,
@@ -266,6 +273,8 @@ async def bulk_receive_inventory(
                 item.brand.strip() if item.brand and item.brand.strip()
                 else (body.default_brand.strip() if body.default_brand else None)
             )
+            if effective_brand:
+                effective_brand = normalize_import_brand(effective_brand)
             if not effective_brand:
                 raise HTTPException(
                     status_code=400,
@@ -440,11 +449,12 @@ async def import_vitrina_endpoint(
 
         for item in body.items:
             sku = item.sku
+            brand = normalize_import_brand(item.brand)
             product = products_map.get(sku)
             if not product:
                 product = Product(
                     sku=sku,
-                    brand=item.brand,
+                    brand=brand,
                     price=item.price if item.price is not None else Decimal("0.00"),
                     store_price=item.store_price,
                     is_active=True,
@@ -453,7 +463,8 @@ async def import_vitrina_endpoint(
                 products_map[sku] = product
                 products_to_add += 1
             else:
-                product.brand = item.brand
+                product.brand = brand
+                product.is_active = True
                 if item.price is not None:
                     product.price = item.price
                 if "store_price" in item.model_fields_set:

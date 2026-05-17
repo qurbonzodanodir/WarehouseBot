@@ -41,6 +41,14 @@ function normalizeVitrinaSku(raw: unknown): string {
   return sku.trim().toUpperCase();
 }
 
+function normalizeImportBrand(raw: unknown): string {
+  const brand = String(raw ?? "").trim();
+  if (/^[oO]\d+$/.test(brand)) {
+    return `0${brand.slice(1)}`;
+  }
+  return brand;
+}
+
 function isPriceHeader(value: unknown): boolean {
   const text = String(value ?? "").trim().toLowerCase();
   return text === "цена" || text === "нарх";
@@ -197,7 +205,7 @@ export default function InventoryPage() {
                         if (!header || isPriceHeader(header) || isStorePriceHeader(header)) continue;
                         const priceCol = isPriceHeader(headers[c + 1]) ? c + 1 : undefined;
                         const storePriceCol = isStorePriceHeader(headers[c + 2]) ? c + 2 : undefined;
-                        groups.push({ brand: header, skuCol: c, priceCol, storePriceCol });
+                        groups.push({ brand: normalizeImportBrand(header), skuCol: c, priceCol, storePriceCol });
                       }
 
                       const parsed: VitrinaImportItem[] = [];
