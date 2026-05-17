@@ -251,11 +251,12 @@ export const api = {
     request(`/products/${id}`, { method: "DELETE" }),
 
   // Inventory
-  getInventory: (store_id: number, page: number = 1, pageSize: number = 50, search?: string) => {
+  getInventory: (store_id: number, page: number = 1, pageSize: number = 50, search?: string, brand?: string) => {
     const qs = new URLSearchParams();
     qs.set("page", String(page));
     qs.set("page_size", String(pageSize));
     if (search && search.trim()) qs.set("search", search.trim());
+    if (brand && brand.trim()) qs.set("brand", brand.trim());
     return request<{
       items: InventoryItem[];
       total: number;

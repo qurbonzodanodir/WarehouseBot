@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
-import { api, Store, InventoryItem, StoreCatalogCard } from "@/lib/api";
+import { api, Brand, Store, InventoryItem, StoreCatalogCard } from "@/lib/api";
 import { isAuthenticated, getStoredUser } from "@/lib/auth";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
@@ -68,6 +68,8 @@ export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(50);
   const [totalItems, setTotalItems] = useState(0);
@@ -93,6 +95,7 @@ export default function InventoryPage() {
     setUserRole(user.role);
     
     api.getStores().then(setStores).catch(console.error);
+    api.getBrands().then(setBrands).catch(console.error);
   }, [router]);
 
   // Debounce search (300ms)
@@ -102,10 +105,15 @@ export default function InventoryPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // Reset to page 1 when search or store changes
+  const visibleBrands = useMemo(
+    () => brands.filter((brand) => brand.name.trim().toUpperCase() !== "UNKNOWN"),
+    [brands]
+  );
+
+  // Reset to page 1 when search, brand or store changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, selectedStore]);
+  }, [debouncedSearch, selectedBrand, selectedStore]);
 
   useEffect(() => {
     setLoading(true);
@@ -118,7 +126,7 @@ export default function InventoryPage() {
       setTotalItems(0);
       setTotalPages(0);
     } else {
-      api.getInventory(selectedStore, currentPage, pageSize, debouncedSearch)
+      api.getInventory(selectedStore, currentPage, pageSize, debouncedSearch, selectedBrand)
         .then((data) => {
           setItems(data.items);
           setTotalItems(data.total);
@@ -128,7 +136,7 @@ export default function InventoryPage() {
         .finally(() => setLoading(false));
       setCatalog([]);
     }
-  }, [selectedStore, currentPage, pageSize, debouncedSearch]);
+  }, [selectedStore, currentPage, pageSize, debouncedSearch, selectedBrand]);
 
   const handleConfirmImport = async () => {
     if (!selectedStore || importData.length === 0) return;
@@ -140,7 +148,7 @@ export default function InventoryPage() {
       setImportData([]);
       setBulkPrice("");
       setBulkStorePrice("");
-      api.getInventory(selectedStore, currentPage, pageSize).then((data) => {
+      api.getInventory(selectedStore, currentPage, pageSize, debouncedSearch, selectedBrand).then((data) => {
         setItems(data.items);
         setTotalItems(data.total);
         setTotalPages(data.total_pages);
@@ -277,38 +285,63 @@ export default function InventoryPage() {
             </button>
           )}
 
-          {/* Search input (only when a store is selected) */}
+          {/* Search and brand filters (only when a store is selected) */}
           {selectedStore && (
-            <div style={{ position: "relative", maxWidth: 480, width: "100%" }}>
-              <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-              <input
-                type="text"
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ position: "relative", flex: "1 1 320px", maxWidth: 480 }}>
+                <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+                <input
+                  type="text"
+                  className="input"
+                  placeholder={t("inventory.search_placeholder")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ paddingLeft: 36, paddingRight: search ? 34 : undefined, width: "100%" }}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    title="Очистить"
+                    style={{
+                      position: "absolute",
+                      right: 8,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text-secondary)",
+                      padding: 4,
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+              <select
                 className="input"
-                placeholder={t("inventory.search_placeholder")}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{ paddingLeft: 36, paddingRight: search ? 34 : undefined, width: "100%" }}
-              />
-              {search && (
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                style={{ flex: "0 1 260px", minWidth: 220 }}
+              >
+                <option value="">Все фирмы</option>
+                {visibleBrands.map((brand) => (
+                  <option key={brand.id} value={brand.name}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+              {selectedBrand && (
                 <button
                   type="button"
-                  onClick={() => setSearch("")}
-                  title="Очистить"
-                  style={{
-                    position: "absolute",
-                    right: 8,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-secondary)",
-                    padding: 4,
-                    display: "flex",
-                    alignItems: "center",
-                  }}
+                  className="btn btn-ghost"
+                  onClick={() => setSelectedBrand("")}
+                  style={{ height: 40 }}
                 >
-                  <X size={16} />
+                  Очистить фирму
                 </button>
               )}
             </div>

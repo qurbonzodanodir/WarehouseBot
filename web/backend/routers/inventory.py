@@ -49,6 +49,7 @@ async def get_store_inventory(
     current_user: CurrentUser,
     include_empty: bool = Query(False),
     search: str | None = Query(None),
+    brand: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
 ) -> PaginatedInventoryResponse:
@@ -119,6 +120,14 @@ async def get_store_inventory(
             items_list = [
                 it for it in items_list
                 if q in it.product_sku.lower() or q in it.product_brand.lower()
+            ]
+
+    if brand:
+        normalized = brand.strip().lower().replace(" ", "").replace("-", "")
+        if normalized:
+            items_list = [
+                it for it in items_list
+                if it.product_brand.strip().lower().replace(" ", "").replace("-", "") == normalized
             ]
 
     # Apply pagination
