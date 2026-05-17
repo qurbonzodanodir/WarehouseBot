@@ -459,6 +459,7 @@ class TransactionService:
     ):
         from app.models.order import Order
         from app.models.enums import OrderStatus
+        from app.models.product import Product
 
         wh_inv = await self._get_or_create_inventory(warehouse_store_id, product_id, lock=True)
         if wh_inv.quantity < quantity:
@@ -466,14 +467,19 @@ class TransactionService:
                 f"Недостаточно на складе: есть {wh_inv.quantity}, нужно {quantity}."
             )
 
+        product = await self.session.get(Product, product_id)
+        if product is None:
+            raise ValueError(f"Product #{product_id} not found.")
+
         wh_inv.quantity -= quantity
+        retail = product.effective_store_price
 
         display_order = Order(
             store_id=target_store_id,
             product_id=product_id,
             quantity=quantity,
-            price_per_item=Decimal("0"),
-            total_price=Decimal("0"),
+            price_per_item=retail,
+            total_price=retail * quantity,
             status=OrderStatus.DISPLAY_DISPATCHED,
         )
         self.session.add(display_order)
@@ -500,6 +506,7 @@ class TransactionService:
     ):
         from app.models.order import Order
         from app.models.enums import OrderStatus
+        from app.models.product import Product
 
         wh_inv = await self._get_or_create_inventory(warehouse_store_id, product_id, lock=True)
         if wh_inv.quantity < quantity:
@@ -507,7 +514,12 @@ class TransactionService:
                 f"Недостаточно на складе: есть {wh_inv.quantity}, нужно {quantity}."
             )
 
+        product = await self.session.get(Product, product_id)
+        if product is None:
+            raise ValueError(f"Product #{product_id} not found.")
+
         wh_inv.quantity -= quantity
+        retail = product.effective_store_price
 
         display_inv = await self._get_or_create_display_inventory(target_store_id, product_id, lock=True)
         display_inv.quantity += quantity
@@ -516,8 +528,8 @@ class TransactionService:
             store_id=target_store_id,
             product_id=product_id,
             quantity=quantity,
-            price_per_item=Decimal("0"),
-            total_price=Decimal("0"),
+            price_per_item=retail,
+            total_price=retail * quantity,
             status=OrderStatus.DISPLAY_DELIVERED,
         )
         self.session.add(display_order)
