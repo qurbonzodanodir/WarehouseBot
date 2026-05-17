@@ -376,13 +376,36 @@ async def dispatch_display(
     txn_svc = TransactionService(session)
     
     try:
-        display_order, wh_inv = await txn_svc.dispatch_display_items(
-            warehouse_store_id=warehouse_id,
-            target_store_id=body.target_store_id,
-            product_id=body.product_id,
-            quantity=body.quantity,
-            user_id=current_user.id,
+        from app.models.user import User
+
+        seller_result = await session.execute(
+            select(User.id)
+            .where(
+                User.store_id == body.target_store_id,
+                User.role == UserRole.SELLER,
+                User.is_active.is_(True),
+                User.telegram_id.is_not(None),
+            )
+            .limit(1)
         )
+        requires_seller_confirmation = seller_result.scalar_one_or_none() is not None
+
+        if requires_seller_confirmation:
+            display_order, wh_inv = await txn_svc.dispatch_display_items(
+                warehouse_store_id=warehouse_id,
+                target_store_id=body.target_store_id,
+                product_id=body.product_id,
+                quantity=body.quantity,
+                user_id=current_user.id,
+            )
+        else:
+            display_order, wh_inv = await txn_svc.dispatch_display_items_direct(
+                warehouse_store_id=warehouse_id,
+                target_store_id=body.target_store_id,
+                product_id=body.product_id,
+                quantity=body.quantity,
+                user_id=current_user.id,
+            )
         await session.commit()
     except ValueError as e:
         await session.rollback()
@@ -391,38 +414,40 @@ async def dispatch_display(
         await session.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
     
-    # Send notification to sellers
-    try:
-        from app.models.product import Product
-        res = await session.execute(select(Product).where(Product.id == display_order.product_id))
-        product = res.scalar_one()
-        
-        notif_svc = NotificationService(bot, session)
-        await notif_svc.notify_sellers(
-            store_id=display_order.store_id,
-            text=lambda t: t("display_dispatched_seller_notif", sku=product.sku, qty=display_order.quantity),
-            reply_markup=lambda t: InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=t("btn_received"), 
-                        callback_data=f"display:receive:{display_order.id}"
-                    ),
-                    InlineKeyboardButton(
-                        text=t("btn_not_received"), 
-                        callback_data=f"display:reject:{display_order.id}"
-                    )
-                ]
-            ])
-        )
-    except Exception as exc:
-        logger.error("Failed to send web dispatch notification: %s", exc)
+    if requires_seller_confirmation:
+        # Send notification to sellers only when the store has Telegram-linked sellers.
+        try:
+            from app.models.product import Product
+            res = await session.execute(select(Product).where(Product.id == display_order.product_id))
+            product = res.scalar_one()
+
+            notif_svc = NotificationService(bot, session)
+            await notif_svc.notify_sellers(
+                store_id=display_order.store_id,
+                text=lambda t: t("display_dispatched_seller_notif", sku=product.sku, qty=display_order.quantity),
+                reply_markup=lambda t: InlineKeyboardMarkup(inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=t("btn_received"),
+                            callback_data=f"display:receive:{display_order.id}"
+                        ),
+                        InlineKeyboardButton(
+                            text=t("btn_not_received"),
+                            callback_data=f"display:reject:{display_order.id}"
+                        )
+                    ]
+                ])
+            )
+        except Exception as exc:
+            logger.error("Failed to send web dispatch notification: %s", exc)
         
     return {
         "success": True, 
         "order_id": display_order.id,
         "product_id": display_order.product_id, 
         "target_store_id": display_order.store_id,
-        "quantity": display_order.quantity
+        "quantity": display_order.quantity,
+        "requires_confirmation": requires_seller_confirmation,
     }
 
 

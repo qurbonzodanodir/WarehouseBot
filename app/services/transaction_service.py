@@ -490,6 +490,50 @@ class TransactionService:
         await self.session.flush()
         return display_order, wh_inv
 
+    async def dispatch_display_items_direct(
+        self,
+        warehouse_store_id: int,
+        target_store_id: int,
+        product_id: int,
+        quantity: int,
+        user_id: int,
+    ):
+        from app.models.order import Order
+        from app.models.enums import OrderStatus
+
+        wh_inv = await self._get_or_create_inventory(warehouse_store_id, product_id, lock=True)
+        if wh_inv.quantity < quantity:
+            raise ValueError(
+                f"Недостаточно на складе: есть {wh_inv.quantity}, нужно {quantity}."
+            )
+
+        wh_inv.quantity -= quantity
+
+        display_inv = await self._get_or_create_display_inventory(target_store_id, product_id, lock=True)
+        display_inv.quantity += quantity
+
+        display_order = Order(
+            store_id=target_store_id,
+            product_id=product_id,
+            quantity=quantity,
+            price_per_item=Decimal("0"),
+            total_price=Decimal("0"),
+            status=OrderStatus.DISPLAY_DELIVERED,
+        )
+        self.session.add(display_order)
+        await self.session.flush()
+
+        await self.record_stock_movement(
+            product_id=product_id,
+            quantity=quantity,
+            movement_type=StockMovementType.DISPLAY_DISPATCH,
+            from_store_id=warehouse_store_id,
+            to_store_id=target_store_id,
+            user_id=user_id,
+        )
+        await self.session.flush()
+        return display_order, wh_inv
+
     async def _get_inventory(
         self, store_id: int, product_id: int, lock: bool = False
     ) -> Inventory | None:
