@@ -241,6 +241,8 @@ class TransactionService:
                 raise ValueError(f"Недостаточно товара для возврата: в наличии {available}, нужно {quantity}.")
 
         inv.quantity -= quantity
+        if is_display_return and inv.quantity <= 0:
+            await self.session.delete(inv)
         await self.session.flush()
 
     async def approve_return(

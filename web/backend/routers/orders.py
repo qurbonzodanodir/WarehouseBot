@@ -229,6 +229,8 @@ async def create_return(
             )
 
         source_inv.quantity -= body.quantity
+        if status_to_set == OrderStatus.DISPLAY_RETURNED and source_inv.quantity <= 0:
+            await session.delete(source_inv)
         movement_to_store_id = None
         if status_to_set != OrderStatus.DISPLAY_RETURNED:
             warehouse_inv = await txn_svc._get_or_create_inventory(warehouse_id, body.product_id, lock=True)
