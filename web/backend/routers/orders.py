@@ -229,8 +229,11 @@ async def create_return(
             )
 
         source_inv.quantity -= body.quantity
-        warehouse_inv = await txn_svc._get_or_create_inventory(warehouse_id, body.product_id, lock=True)
-        warehouse_inv.quantity += body.quantity
+        movement_to_store_id = None
+        if status_to_set != OrderStatus.DISPLAY_RETURNED:
+            warehouse_inv = await txn_svc._get_or_create_inventory(warehouse_id, body.product_id, lock=True)
+            warehouse_inv.quantity += body.quantity
+            movement_to_store_id = warehouse_id
 
         order = Order(
             store_id=body.from_store_id,
@@ -248,7 +251,7 @@ async def create_return(
             quantity=body.quantity,
             movement_type=movement_type,
             from_store_id=body.from_store_id,
-            to_store_id=warehouse_id,
+            to_store_id=movement_to_store_id,
             user_id=current_user.id,
         )
 
@@ -265,7 +268,7 @@ async def create_return(
                 amount_change=0,
                 balance_after=store.current_debt,
                 reason=DebtLedgerReason.RETURN_APPROVED,
-                description=f"Возврат витрины owner #{order.id} на склад (SKU: {product.sku}, {body.quantity} шт.)",
+                description=f"Возврат витрины owner #{order.id} на фирму (SKU: {product.sku}, {body.quantity} шт.)",
             )
             session.add(ledger)
 

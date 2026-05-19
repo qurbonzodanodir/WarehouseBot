@@ -269,9 +269,11 @@ class TransactionService:
         price_to_use = order.price_per_item if order.price_per_item > 0 else product.price
         amount = price_to_use * order.quantity
 
-        # Credit inventory to Warehouse WITH LOCK
-        inv = await self._get_or_create_inventory(warehouse_store_id, order.product_id, lock=True)
-        inv.quantity += order.quantity
+        movement_to_store_id = None
+        if not is_display_return:
+            inv = await self._get_or_create_inventory(warehouse_store_id, order.product_id, lock=True)
+            inv.quantity += order.quantity
+            movement_to_store_id = warehouse_store_id
 
         order.status = OrderStatus.DISPLAY_RETURNED if is_display_return else OrderStatus.RETURNED
 
@@ -279,7 +281,7 @@ class TransactionService:
         mov_type = StockMovementType.DISPLAY_RETURN if is_display_return else StockMovementType.RETURN_TO_WAREHOUSE
         mov = await self.record_stock_movement(
             order.product_id, order.quantity, mov_type,
-            from_store_id=order.store_id, to_store_id=warehouse_store_id, user_id=warehouse_user_id
+            from_store_id=order.store_id, to_store_id=movement_to_store_id, user_id=warehouse_user_id
         )
 
         # 2. Record Debt Reduction (CRITICAL FIX)
