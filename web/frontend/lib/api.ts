@@ -319,8 +319,8 @@ export const api = {
     request(`/invites/${code}`, { method: "DELETE" }),
 
   // Samples
-  dispatchDisplay: (data: { product_id: number; target_store_id: number; quantity: number }) =>
-    request<{ success: boolean; order_id: number }>("/inventory/dispatch-display", {
+  dispatchDisplay: (data: { product_id: number; target_store_ids: number[]; quantity: number }) =>
+    request<{ success: boolean; dispatched_count: number }>("/inventory/dispatch-display", {
       method: "POST",
       body: JSON.stringify(data),
     }),

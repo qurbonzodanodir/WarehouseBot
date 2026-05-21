@@ -69,7 +69,7 @@ class BulkReceiveInput(BaseModel):
 
 class DispatchDisplayInput(BaseModel):
     product_id: int
-    target_store_id: int
+    target_store_ids: list[int]
     quantity: int = Field(..., gt=0)
 
 

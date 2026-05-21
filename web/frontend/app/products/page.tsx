@@ -114,7 +114,7 @@ export default function ProductsPage() {
 
   const [dispatchProduct, setDispatchProduct] = useState<Product | null>(null);
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
-  const [targetStoreId, setTargetStoreId] = useState<number | string>("");
+  const [targetStoreIds, setTargetStoreIds] = useState<number[]>([]);
   const [dispatchQty, setDispatchQty] = useState<string>("1");
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
@@ -329,18 +329,18 @@ export default function ProductsPage() {
 
   const handleDispatch = async () => {
     const qty = parseInt(dispatchQty);
-    if (!dispatchProduct || !targetStoreId || isNaN(qty) || qty <= 0) return;
+    if (!dispatchProduct || targetStoreIds.length === 0 || isNaN(qty) || qty <= 0) return;
     try {
       await api.dispatchDisplay({
         product_id: dispatchProduct.id,
-        target_store_id: Number(targetStoreId),
+        target_store_ids: targetStoreIds,
         quantity: qty
       });
       const updated = await api.getProductInventory(dispatchProduct.id);
       setInventoryCache((prev) => ({ ...prev, [dispatchProduct.id]: updated }));
       setIsDispatchModalOpen(false);
       setDispatchProduct(null);
-      setTargetStoreId("");
+      setTargetStoreIds([]);
       setDispatchQty("1");
       showToast(t("inventory.dispatch_success"), "success");
     } catch (error) {
@@ -923,16 +923,79 @@ export default function ProductsPage() {
         <div className="modal-overlay">
           <div className="modal-card" style={{ maxWidth: 400 }}>
             <h3 style={{ marginBottom: 8 }}>{t("inventory.dispatch_modal_title")}</h3>
-            <p style={{ marginBottom: 20 }}>{dispatchProduct?.sku}</p>
-            <div style={{ marginBottom: 16 }}>
-              <select className="input" style={{ width: "100%" }} value={targetStoreId} onChange={(e) => setTargetStoreId(e.target.value)}>
-                <option value="">---</option>
-                {stores.filter(s => s.store_type !== "warehouse").map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+            <p style={{ marginBottom: 20, color: "var(--text-secondary)" }}>{dispatchProduct?.sku}</p>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 600 }}>Выберите магазины:</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setTargetStoreIds(stores.filter(s => s.store_type !== "warehouse").map(s => s.id))}
+                  style={{ background: "transparent", border: "none", color: "var(--accent)", fontSize: 12, cursor: "pointer" }}
+                >
+                  Выбрать все
+                </button>
+                <span style={{ color: "var(--text-muted)", fontSize: 12 }}>|</span>
+                <button
+                  type="button"
+                  onClick={() => setTargetStoreIds([])}
+                  style={{ background: "transparent", border: "none", color: "var(--text-secondary)", fontSize: 12, cursor: "pointer" }}
+                >
+                  Сбросить
+                </button>
+              </div>
             </div>
-            <input type="number" className="input" style={{ width: "100%", marginBottom: 24 }} value={dispatchQty} onChange={(e) => setDispatchQty(e.target.value)} min={1} />
+            
+            <div style={{
+              maxHeight: 180,
+              overflowY: "auto",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "6px 12px",
+              marginBottom: 16,
+              background: "var(--bg)"
+            }}>
+              {stores.filter(s => s.store_type !== "warehouse").map(s => {
+                const checked = targetStoreIds.includes(s.id);
+                return (
+                  <label
+                    key={s.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "8px 0",
+                      borderBottom: "1px solid rgba(139,143,168,0.1)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      userSelect: "none"
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        if (checked) {
+                          setTargetStoreIds(prev => prev.filter(id => id !== s.id));
+                        } else {
+                          setTargetStoreIds(prev => [...prev, s.id]);
+                        }
+                      }}
+                      style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--accent)" }}
+                    />
+                    <span>{s.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+            
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Количество на каждый магазин:</label>
+              <input type="number" className="input" style={{ width: "100%" }} value={dispatchQty} onChange={(e) => setDispatchQty(e.target.value)} min={1} />
+            </div>
+            
             <div style={{ display: "flex", gap: 12 }}>
-               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setIsDispatchModalOpen(false)}>{t("common.cancel")}</button>
+               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setIsDispatchModalOpen(false); setTargetStoreIds([]); }}>{t("common.cancel")}</button>
                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleDispatch}>{t("common.confirm")}</button>
             </div>
           </div>
