@@ -12,7 +12,7 @@ from app.models.inventory import Inventory
 from app.models.enums import UserRole
 from app.models.store import Store
 from web.backend.dependencies import CurrentUser, SessionDep
-from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, BulkReceiveInput, DispatchDisplayInput, BulkVitrinaInput, PaginatedInventoryResponse
+from web.backend.schemas.stores import InventoryItemOut, ReceiveStockInput, SetQuantityInput, BulkReceiveInput, DispatchDisplayInput, BulkVitrinaInput, PaginatedInventoryResponse
 from app.bot.bot import bot
 from app.services.notification_service import NotificationService
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -241,6 +241,53 @@ async def receive_inventory(
         "new_quantity": inv.quantity
     }
 
+
+@router.patch(
+    "/set-quantity",
+    response_model=dict,
+    summary="Установить количество товара на Главном Складе",
+    description="Напрямую устанавливает (заменяет) количество товара на Главном Складе.",
+)
+async def set_warehouse_quantity(
+    body: SetQuantityInput,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> dict:
+    if current_user.role not in (UserRole.OWNER, UserRole.WAREHOUSE):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    from app.services.store_service import StoreService
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        raise HTTPException(status_code=404, detail="Главный склад не найден")
+
+    try:
+        inv_stmt = select(Inventory).where(
+            Inventory.store_id == warehouse_id,
+            Inventory.product_id == body.product_id,
+        )
+        inv_res = await session.execute(inv_stmt)
+        existing_inv = inv_res.scalar_one_or_none()
+
+        if existing_inv:
+            existing_inv.quantity = body.quantity
+        else:
+            session.add(Inventory(
+                store_id=warehouse_id,
+                product_id=body.product_id,
+                quantity=body.quantity,
+            ))
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    return {
+        "success": True,
+        "product_id": body.product_id,
+        "new_quantity": body.quantity,
+    }
 
 @router.post(
     "/bulk-receive",

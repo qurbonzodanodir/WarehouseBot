@@ -268,6 +268,8 @@ export const api = {
   getAllInventory: () => request<Record<string, StoreInventory>>("/inventory"),
   receiveStock: (data: { product_id: number; quantity: number }) =>
     request<{success: boolean; product_id: number; new_quantity: number}>("/inventory/receive", { method: "POST", body: JSON.stringify(data) }),
+  setWarehouseQuantity: (data: { product_id: number; quantity: number }) =>
+    request<{success: boolean; product_id: number; new_quantity: number}>("/inventory/set-quantity", { method: "PATCH", body: JSON.stringify(data) }),
   bulkReceiveStock: (data: { items: { sku: string; quantity: number; price?: number; brand?: string }[], replace_quantity?: boolean }) =>
     request<{success: boolean; processed: number; created: number}>("/inventory/bulk-receive", { method: "POST", body: JSON.stringify(data) }),
   importVitrina: (store_id: number, items: { sku: string; brand: string; price?: number; store_price?: number | null }[]) =>

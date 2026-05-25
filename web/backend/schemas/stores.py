@@ -54,6 +54,12 @@ class ReceiveStockInput(BaseModel):
     quantity: int = Field(..., gt=0, description="Quantity to receive")
 
 
+class SetQuantityInput(BaseModel):
+    product_id: int
+    quantity: int = Field(..., ge=0, description="Quantity to set")
+
+
+
 class BulkReceiveItem(BaseModel):
     sku: str = Field(..., min_length=1, max_length=255)
     quantity: int = Field(..., gt=0)

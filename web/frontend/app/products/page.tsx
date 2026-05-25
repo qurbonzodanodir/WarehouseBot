@@ -85,7 +85,7 @@ export default function ProductsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [editForm, setEditForm] = useState({ sku: "", brand: "", price: "", store_price: "" });
+  const [editForm, setEditForm] = useState({ sku: "", brand: "", price: "", store_price: "", warehouse_qty: "" });
   const [isEditModalOpen, setEditModalOpen] = useState(false);
 
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -415,9 +415,17 @@ export default function ProductsPage() {
         price: Number(editForm.price),
         store_price: editForm.store_price ? Number(editForm.store_price) : null,
       });
+      // Update warehouse quantity if changed
+      if (editForm.warehouse_qty !== "") {
+        await api.setWarehouseQuantity({
+          product_id: editingProduct.id,
+          quantity: Number(editForm.warehouse_qty),
+        });
+      }
       showToast(t("products.edit_success"), "success");
       setEditingProduct(null);
       setEditModalOpen(false);
+      setInventoryCache((prev) => { const n = { ...prev }; delete n[editingProduct.id]; return n; });
       await fetchProducts({ search, page, brand: selectedBrand || undefined, showInactive });
     } catch (error) {
       showToast(getErrorMessage(error, t("common.error")), "error");
@@ -746,7 +754,18 @@ export default function ProductsPage() {
                                     className="row-action-item"
                                     onClick={() => {
                                       setEditingProduct(p);
-                                      setEditForm({ sku: p.sku, brand: p.brand, price: String(p.price), store_price: p.store_price ? String(p.store_price) : "" });
+                                      const cachedInv = inventoryCache[p.id];
+                                      const whInv = cachedInv?.find(i => !i.is_display);
+                                      const whQty = whInv ? String(whInv.quantity) : "";
+                                      setEditForm({ sku: p.sku, brand: p.brand, price: String(p.price), store_price: p.store_price ? String(p.store_price) : "", warehouse_qty: whQty });
+                                      // Load inventory if not cached to get warehouse qty
+                                      if (!cachedInv) {
+                                        api.getProductInventory(p.id).then((inv) => {
+                                          setInventoryCache((prev) => ({ ...prev, [p.id]: inv }));
+                                          const wh = inv.find(i => !i.is_display);
+                                          setEditForm(prev => ({ ...prev, warehouse_qty: wh ? String(wh.quantity) : "0" }));
+                                        });
+                                      }
                                       setEditModalOpen(true);
                                       setOpenMenuId(null);
                                     }}
@@ -1187,6 +1206,10 @@ export default function ProductsPage() {
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_store_price")}</label>
                 <input className="input" style={{ width: "100%" }} type="number" placeholder={t("products.store_price_hint")} value={editForm.store_price} onChange={(e) => setEditForm({ ...editForm, store_price: e.target.value })} />
+              </div>
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Кол-во на складе</label>
+                <input className="input" style={{ width: "100%" }} type="number" min={0} value={editForm.warehouse_qty} onChange={(e) => setEditForm({ ...editForm, warehouse_qty: e.target.value })} />
               </div>
               <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setEditModalOpen(false)}>{t("common.cancel")}</button>

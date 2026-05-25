@@ -236,3 +236,27 @@ class TestInventoryReservation:
             inv.quantity += order.quantity
 
         assert inv.quantity == 10  # back to original
+
+
+# ─── 5. Set Warehouse Quantity & Schema ──────────────────────────────────────
+
+class TestSetWarehouseQuantity:
+
+    def test_set_quantity_input_schema_validation(self):
+        """Verify SetQuantityInput validates and allows quantity of 0 or positive numbers."""
+        from web.backend.schemas.stores import SetQuantityInput
+        from pydantic import ValidationError
+
+        # Valid 0 quantity
+        data_zero = SetQuantityInput(product_id=42, quantity=0)
+        assert data_zero.product_id == 42
+        assert data_zero.quantity == 0
+
+        # Valid positive quantity
+        data_pos = SetQuantityInput(product_id=42, quantity=5)
+        assert data_pos.quantity == 5
+
+        # Invalid negative quantity
+        with pytest.raises(ValidationError):
+            SetQuantityInput(product_id=42, quantity=-1)
+
