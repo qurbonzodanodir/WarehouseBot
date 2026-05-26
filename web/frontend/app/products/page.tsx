@@ -1197,7 +1197,20 @@ export default function ProductsPage() {
               </div>
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_brand")}</label>
-                <input className="input" style={{ width: "100%" }} value={editForm.brand} onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })} required />
+                <select
+                  className="input"
+                  style={{ width: "100%" }}
+                  value={editForm.brand}
+                  onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+                  required
+                >
+                  <option value="">{t("products.brand_select")}</option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.name}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{t("products.col_price")}</label>
