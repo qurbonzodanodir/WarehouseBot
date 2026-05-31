@@ -110,11 +110,10 @@ async def dispatch_order_start(
                 _("order_dispatch_success", id=order.id, qty=order.quantity)
             )
 
-            from app.bot.keyboards.inline import delivery_accepted_kb
             await notif_svc.notify_sellers(
                 store_id=order.store_id,
                 text=lambda _t: _t("order_dispatch_notif_seller", id=order.id, qty=order.quantity),
-                reply_markup=lambda _t: delivery_accepted_kb(order.id, _=_t),
+                reply_markup=lambda _t: delivery_confirm_kb(order.id, order.quantity, _=_t),
             )
         else:
             # Propose partial dispatch
@@ -292,11 +291,11 @@ async def approve_batch_order(
             await session.commit()
             await callback.message.edit_text(_("batch_dispatched_wh", batch_id=batch_id))
             
-            from app.bot.keyboards.inline import batch_delivery_accepted_kb
+            from app.bot.keyboards.inline import batch_delivery_confirm_kb
             await notif_svc.notify_sellers(
                 store_id=store_id,
                 text=lambda _t: _t("order_batch_accepted_seller", items=dispatched_text),
-                reply_markup=lambda _t: batch_delivery_accepted_kb(batch_id, _=_t)
+                reply_markup=lambda _t: batch_delivery_confirm_kb(batch_id, _=_t)
             )
         else:
             # Propose partial fulfillment to seller.
