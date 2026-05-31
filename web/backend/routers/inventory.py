@@ -327,16 +327,6 @@ async def bulk_receive_inventory(
             if item.quantity <= 0:
                 raise HTTPException(status_code=400, detail=f"Invalid quantity for SKU {sku}")
 
-            # Find product by SKU. If Excel dropped a leading zero, reuse the
-            # existing zero-prefixed product instead of creating a duplicate.
-            stmt = select(Product).where(Product.sku.in_(sku_import_candidates(sku)))
-            res = await session.execute(stmt)
-            candidates = res.scalars().all()
-            product = next((p for p in candidates if p.sku == sku), None) or next(
-                (p for p in candidates if p.sku == f"0{sku}"),
-                None,
-            )
-            
             # Resolve effective brand: per-item brand is required
             effective_brand: str | None = (
                 item.brand.strip() if item.brand and item.brand.strip()
@@ -350,6 +340,19 @@ async def bulk_receive_inventory(
                     detail=f"Фирма обязательна для товара SKU='{sku}'. Выберите фирму для каждого товара."
                 )
 
+            # Find product by SKU and brand. If Excel dropped a leading zero, reuse the
+            # existing zero-prefixed product instead of creating a duplicate.
+            stmt = select(Product).where(
+                Product.sku.in_(sku_import_candidates(sku)),
+                Product.brand == effective_brand
+            )
+            res = await session.execute(stmt)
+            candidates = res.scalars().all()
+            product = next((p for p in candidates if p.sku == sku), None) or next(
+                (p for p in candidates if p.sku == f"0{sku}"),
+                None,
+            )
+
             if not product:
                 # Create new product
                 price_val = Decimal(str(item.price)) if item.price is not None else Decimal(0)
@@ -362,14 +365,12 @@ async def bulk_receive_inventory(
                 )
                 created_count += 1
             else:
-                # Update existing product — apply price and brand if provided
+                # Update existing product — apply price if provided
                 if item.price is not None:
                     new_price = Decimal(str(item.price))
                     if new_price < 0:
                         raise HTTPException(status_code=400, detail=f"Invalid price for SKU {sku}")
                     product.price = new_price
-                if effective_brand:
-                    product.brand = effective_brand
                 
             # Receive stock — replace or accumulate based on flag
             inv_stmt = select(Inventory).where(
@@ -551,15 +552,16 @@ async def import_vitrina_endpoint(
             for candidate in sku_import_candidates(item.sku)
         }
         products_result = await session.execute(select(Product).where(Product.sku.in_(skus)))
-        products_map: dict[str, Product] = {
-            product.sku: product for product in products_result.scalars().all()
+        # Create a map of (sku, brand) -> Product to correctly handle duplicates
+        products_map: dict[tuple[str, str], Product] = {
+            (product.sku, product.brand): product for product in products_result.scalars().all()
         }
 
         for item in body.items:
             sku = item.sku
             brand = normalize_import_brand(item.brand)
             product = next(
-                (products_map[candidate] for candidate in sku_import_candidates(sku) if candidate in products_map),
+                (products_map.get((candidate, brand)) for candidate in sku_import_candidates(sku) if (candidate, brand) in products_map),
                 None,
             )
             if not product:
@@ -571,11 +573,10 @@ async def import_vitrina_endpoint(
                     is_active=True,
                 )
                 session.add(product)
-                products_map[sku] = product
+                products_map[(sku, brand)] = product
                 products_to_add += 1
             else:
-                products_map[sku] = product
-                product.brand = brand
+                products_map[(product.sku, brand)] = product
                 product.is_active = True
                 if item.price is not None:
                     product.price = item.price
@@ -602,7 +603,12 @@ async def import_vitrina_endpoint(
             }
 
         for item in body.items:
-            product = products_map[item.sku]
+            brand = normalize_import_brand(item.brand)
+            
+            # Find which SKU candidate was actually used/saved in the map
+            matched_candidate = next((c for c in sku_import_candidates(item.sku) if (c, brand) in products_map), item.sku)
+            product = products_map[(matched_candidate, brand)]
+            
             inventory = inventory_map.get(product.id)
 
             if not inventory:

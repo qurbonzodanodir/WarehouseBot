@@ -343,15 +343,16 @@ async def create_product(
     if not brand_exists.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Brand not found")
 
-    existing_res = await session.execute(select(Product).where(Product.sku == body.sku))
+    existing_res = await session.execute(
+        select(Product).where(Product.sku == body.sku, Product.brand == body.brand.strip())
+    )
     existing_product = existing_res.scalar_one_or_none()
 
     if existing_product:
         if existing_product.is_active:
-            raise HTTPException(status_code=400, detail="Product with this SKU already exists")
+            raise HTTPException(status_code=400, detail="Product with this SKU and Brand already exists")
         else:
             existing_product.is_active = True
-            existing_product.brand = body.brand.strip()
             existing_product.price = body.price
             existing_product.store_price = body.store_price
             session.add(existing_product)
@@ -373,7 +374,7 @@ async def create_product(
         return product
     except IntegrityError:
         await session.rollback()
-        raise HTTPException(status_code=400, detail="Product with this SKU already exists")
+        raise HTTPException(status_code=400, detail="Product with this SKU and Brand already exists")
 
 
 @router.patch(
@@ -419,7 +420,7 @@ async def update_product(
         return product
     except IntegrityError:
         await session.rollback()
-        raise HTTPException(status_code=400, detail="Product with this SKU already exists")
+        raise HTTPException(status_code=400, detail="Product with this SKU and Brand already exists")
 
 @router.delete(
     "/{product_id:int}",

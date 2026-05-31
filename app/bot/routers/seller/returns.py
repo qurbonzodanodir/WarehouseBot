@@ -103,7 +103,10 @@ async def return_search_product(
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
     clean_query = clean_search_query(message.text)
-    exact_match = next((item for item in items if clean_search_query(item.product.sku) == clean_query), None)
+    
+    exact_matches = [item for item in items if clean_search_query(item.product.sku) == clean_query]
+    exact_match = exact_matches[0] if len(exact_matches) == 1 else None
+    
     partial_matches = [item for item in items if product_matches(item.product, message.text)]
 
     if exact_match:
