@@ -457,6 +457,7 @@ class OrderService:
         """
         Seller accepts delivery.
         - Add quantity to the store's inventory.
+        - Increase the store's debt for the accepted goods (Wholesale Model).
         - Set order status to DELIVERED.
         """
         order = await self.session.get(Order, order_id)
@@ -469,8 +470,21 @@ class OrderService:
         )
         inv.quantity += order.quantity
 
+        # Increase store debt for the delivered items (Wholesale Model)
+        amount = order.price_per_item * order.quantity
+        if amount > 0:
+            from app.services.transaction_service import TransactionService
+            from app.models.enums import DebtLedgerReason
+            txn_service = TransactionService(self.session)
+            await txn_service.record_debt_ledger(
+                store_id=order.store_id,
+                amount_change=amount,  # Positive means debt increase
+                reason=DebtLedgerReason.DELIVERY_ACCEPTED,
+                description=f"Получение товара #{order.id} в магазин ({order.quantity} шт.)"
+            )
+
         # StockMovement is already recorded as DISPATCH_TO_STORE in dispatch_order.
-        # We don't need to record a second one here (Point 8 fix).
+        # We don't need to record a second one here.
         
         order.status = OrderStatus.DELIVERED
         await self.session.flush()

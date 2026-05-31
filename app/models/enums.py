@@ -71,3 +71,4 @@ class DebtLedgerReason(CaseInsensitiveEnum):
     SALE_COMPLETED = "sale_completed"
     CASH_COLLECTION = "cash_collection"
     RETURN_APPROVED = "return_approved"
+    DELIVERY_ACCEPTED = "delivery_accepted"

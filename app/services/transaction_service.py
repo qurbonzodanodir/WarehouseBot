@@ -195,11 +195,12 @@ class TransactionService:
             order_id=order_id,
         )
 
-        # 4. Increase debt
-        await self.record_debt_ledger(
-            store_id, amount, DebtLedgerReason.SALE_COMPLETED,
-            description=f"Продажа {quantity} шт. (Заявка {order_id if order_id else 'Витрина'})"
-        )
+        # 4. Debt is NOT increased here in the Wholesale Model, 
+        # because the debt was already increased when the store received the goods.
+        # await self.record_debt_ledger(
+        #     store_id, amount, DebtLedgerReason.SALE_COMPLETED,
+        #     description=f"Продажа {quantity} шт. (Заявка {order_id if order_id else 'Витрина'})"
+        # )
 
         return txn
 
