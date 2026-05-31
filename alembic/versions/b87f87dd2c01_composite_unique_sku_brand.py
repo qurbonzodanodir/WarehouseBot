@@ -19,8 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Drop the old unique index on sku
-    op.drop_index('ix_products_sku', table_name='products')
+    # Drop the old unique index on sku (if it exists)
+    op.execute('DROP INDEX IF EXISTS ix_products_sku')
     # Recreate the index on sku but not unique
     op.create_index('ix_products_sku', 'products', ['sku'], unique=False)
     # Create the new composite unique constraint
