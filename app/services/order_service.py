@@ -194,7 +194,25 @@ class OrderService:
             from_store_id=warehouse_store_id, to_store_id=order.store_id
         )
 
-        order.status = OrderStatus.DISPATCHED
+        order.status = OrderStatus.DELIVERED
+
+        # Credit to store inventory automatically
+        store_inv = await self._get_or_create_inventory(
+            order.store_id, order.product_id
+        )
+        store_inv.quantity += order.quantity
+
+        # Increase store debt for the delivered items (Wholesale Model)
+        amount = order.price_per_item * order.quantity
+        if amount > 0:
+            from app.models.enums import DebtLedgerReason
+            await txn_service.record_debt_ledger(
+                store_id=order.store_id,
+                amount_change=amount,  # Positive means debt increase
+                reason=DebtLedgerReason.DELIVERY_ACCEPTED,
+                description=f"Получение товара #{order.id} в магазин со склада ({order.quantity} шт.)"
+            )
+
         await self.session.flush()
         return order
 
@@ -313,7 +331,25 @@ class OrderService:
                     from_store_id=warehouse_store_id, to_store_id=order.store_id
                 )
 
-                order.status = OrderStatus.DISPATCHED
+                order.status = OrderStatus.DELIVERED
+                
+                # Credit to store inventory automatically
+                store_inv = await self._get_or_create_inventory(
+                    order.store_id, order.product_id
+                )
+                store_inv.quantity += order.quantity
+
+                # Increase store debt for the delivered items (Wholesale Model)
+                amount = order.price_per_item * order.quantity
+                if amount > 0:
+                    from app.models.enums import DebtLedgerReason
+                    await txn_service.record_debt_ledger(
+                        store_id=order.store_id,
+                        amount_change=amount,  # Positive means debt increase
+                        reason=DebtLedgerReason.DELIVERY_ACCEPTED,
+                        description=f"Получение товара #{order.id} в магазин со склада ({order.quantity} шт.)"
+                    )
+
                 dispatched_orders.append(order)
                 
         await self.session.flush()
@@ -401,7 +437,25 @@ class OrderService:
             from_store_id=warehouse_store_id, to_store_id=order.store_id
         )
 
-        order.status = OrderStatus.DISPATCHED
+        order.status = OrderStatus.DELIVERED
+        
+        # Credit to store inventory automatically
+        store_inv = await self._get_or_create_inventory(
+            order.store_id, order.product_id
+        )
+        store_inv.quantity += order.quantity
+
+        # Increase store debt for the delivered items (Wholesale Model)
+        amount = order.price_per_item * order.quantity
+        if amount > 0:
+            from app.models.enums import DebtLedgerReason
+            await txn_service.record_debt_ledger(
+                store_id=order.store_id,
+                amount_change=amount,  # Positive means debt increase
+                reason=DebtLedgerReason.DELIVERY_ACCEPTED,
+                description=f"Получение товара #{order.id} в магазин со склада ({order.quantity} шт.)"
+            )
+
         await self.session.flush()
         return order
 
@@ -598,10 +652,28 @@ class OrderService:
                 quantity=quantity,
                 price_per_item=retail,
                 total_price=retail * quantity,
-                status=OrderStatus.DISPATCHED,
+                status=OrderStatus.DELIVERED,
                 batch_id=batch_id,
             )
             self.session.add(order)
+
+            # Credit to store inventory automatically
+            store_inv = await self._get_or_create_inventory(
+                target_store_id, product_id
+            )
+            store_inv.quantity += quantity
+
+            # Increase store debt for the delivered items
+            amount = retail * quantity
+            if amount > 0:
+                from app.models.enums import DebtLedgerReason
+                await txn_service.record_debt_ledger(
+                    store_id=target_store_id,
+                    amount_change=amount,
+                    reason=DebtLedgerReason.DELIVERY_ACCEPTED,
+                    description=f"Получение товара в магазин со склада ({product.sku}, {quantity} шт.)"
+                )
+
             created.append(order)
 
         await self.session.flush()

@@ -447,38 +447,17 @@ async def dispatch_display(
             raise HTTPException(status_code=404, detail="Товар не найден")
 
         for store_id in body.target_store_ids:
-            seller_result = await session.execute(
-                select(User.id)
-                .where(
-                    User.store_id == store_id,
-                    User.role == UserRole.SELLER,
-                    User.is_active.is_(True),
-                    User.telegram_id.is_not(None),
-                )
-                .limit(1)
+            display_order, _ = await txn_svc.dispatch_display_items_direct(
+                warehouse_store_id=warehouse_id,
+                target_store_id=store_id,
+                product_id=body.product_id,
+                quantity=body.quantity,
+                user_id=current_user.id,
             )
-            requires_seller_confirmation = seller_result.scalar_one_or_none() is not None
-
-            if requires_seller_confirmation:
-                display_order, _ = await txn_svc.dispatch_display_items(
-                    warehouse_store_id=warehouse_id,
-                    target_store_id=store_id,
-                    product_id=body.product_id,
-                    quantity=body.quantity,
-                    user_id=current_user.id,
-                )
-            else:
-                display_order, _ = await txn_svc.dispatch_display_items_direct(
-                    warehouse_store_id=warehouse_id,
-                    target_store_id=store_id,
-                    product_id=body.product_id,
-                    quantity=body.quantity,
-                    user_id=current_user.id,
-                )
             
             # Flush so order IDs are populated for notifications
             await session.flush()
-            dispatched_orders.append((display_order, requires_seller_confirmation))
+            dispatched_orders.append((display_order, False))
             
         await session.commit()
     except ValueError as e:
