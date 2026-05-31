@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from web.backend.dependencies import get_db, get_current_user
+from web.backend.dependencies import SessionDep, CurrentUser
 from app.core.config import settings
 from app.models.user import User
 from app.models.push_subscription import PushSubscription
@@ -31,8 +31,8 @@ async def get_vapid_public_key() -> dict[str, str | None]:
 @router.post("/subscribe")
 async def subscribe_push(
     sub: PushSubscriptionCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: SessionDep,
+    current_user: CurrentUser,
 ) -> dict[str, str]:
     # Check if subscription already exists
     stmt = select(PushSubscription).where(PushSubscription.endpoint == sub.endpoint)
