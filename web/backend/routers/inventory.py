@@ -92,7 +92,8 @@ async def get_store_inventory(
                 product_sku=inv.product.sku,
                 product_brand=inv.product.brand or "",
                 quantity=inv.quantity,
-                is_display=False
+                is_display=False,
+                product_price=inv.product.price or Decimal(0)
             )
     
     for inv in items_disp:
@@ -106,7 +107,8 @@ async def get_store_inventory(
                 product_sku=inv.product.sku,
                 product_brand=inv.product.brand or "",
                 quantity=inv.quantity,
-                is_display=True
+                is_display=True,
+                product_price=inv.product.price or Decimal(0)
             )
 
     # Convert to list and sort by SKU
@@ -130,6 +132,9 @@ async def get_store_inventory(
                 if it.product_brand.strip().lower().replace(" ", "").replace("-", "") == normalized
             ]
 
+    # Calculate total value before pagination
+    total_value = sum(Decimal(str(it.quantity)) * it.product_price for it in items_list)
+
     # Apply pagination
     total = len(items_list)
     total_pages = (total + page_size - 1) // page_size
@@ -141,7 +146,8 @@ async def get_store_inventory(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages
+        total_pages=total_pages,
+        total_value=total_value
     )
 
 

@@ -74,6 +74,7 @@ export default function InventoryPage() {
   const [pageSize] = useState(50);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [totalValue, setTotalValue] = useState(0);
 
   const [catalog, setCatalog] = useState<StoreCatalogCard[]>([]);
   const [userRole, setUserRole] = useState<string>("seller");
@@ -137,6 +138,7 @@ export default function InventoryPage() {
               setItems(data.items);
               setTotalItems(data.total);
               setTotalPages(data.total_pages);
+              setTotalValue(data.total_value || 0);
             }
           })
           .catch(console.error)
@@ -168,6 +170,7 @@ export default function InventoryPage() {
         setItems(data.items);
         setTotalItems(data.total);
         setTotalPages(data.total_pages);
+        setTotalValue(data.total_value || 0);
       });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Ошибка сохранения", "error");
@@ -180,6 +183,7 @@ export default function InventoryPage() {
   const filtered = items;
 
   const totalQuantity = selectedStore ? totalItems : catalog.reduce((s, c) => s + c.total_items, 0);
+  const computedTotalValue = selectedStore ? totalValue : catalog.reduce((s, c) => s + Number(c.total_value || 0), 0);
 
   return (
     <div style={{ display: "flex" }}>
@@ -193,6 +197,9 @@ export default function InventoryPage() {
             </h1>
             <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
               {t("inventory.found", { count: totalQuantity })}
+              <span style={{ marginLeft: 8, paddingLeft: 8, borderLeft: "1px solid var(--border)", fontWeight: 600, color: "var(--text-primary)" }}>
+                Сумма: {new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(computedTotalValue)} TJS
+              </span>
             </p>
           </div>
 

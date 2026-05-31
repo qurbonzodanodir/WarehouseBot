@@ -35,6 +35,7 @@ class InventoryItemOut(BaseModel):
     product_brand: str = ""
     quantity: int
     is_display: bool = False
+    product_price: Decimal = Decimal(0)
 
 
 class EmployeeCreate(BaseModel):
@@ -97,3 +98,4 @@ class PaginatedInventoryResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+    total_value: Decimal = Decimal(0)

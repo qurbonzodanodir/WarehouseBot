@@ -361,6 +361,14 @@ export interface PaginatedResponse<T> {
   total_pages: number;
 }
 
+export interface PaginatedInventoryResponse {
+  items: ProductInventoryOut[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  total_value: number;
+}
 
 export interface UserMe {
   id: number;
