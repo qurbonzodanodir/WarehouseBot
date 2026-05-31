@@ -29,6 +29,7 @@ def get_seller_more_menu(_) -> ReplyKeyboardMarkup:
                 KeyboardButton(text=_("btn_make_return")),
             ],
             [
+                KeyboardButton(text=_("btn_customer_return")),
                 KeyboardButton(text=_("btn_back")),
             ],
         ],

@@ -246,6 +246,59 @@ class TransactionService:
             await self.session.delete(inv)
         await self.session.flush()
 
+    async def record_customer_return_and_dispatch(
+        self,
+        store_id: int,
+        user_id: int,
+        product_id: int,
+        quantity: int,
+    ) -> int:
+        """
+        Records a return from customer (negative sale) and immediately
+        creates a RETURN_PENDING order to send the item to the warehouse.
+        """
+        from app.models.product import Product
+        from app.models.order import Order
+        from app.models.enums import OrderStatus, FinancialTransactionType
+        
+        product = await self.session.get(Product, product_id)
+        if not product:
+            raise ValueError("Товар не найден.")
+            
+        price_per_unit = product.effective_store_price
+            
+        # 1. Record negative sale to balance statistics
+        await self.record_sale_entry(
+            store_id=store_id,
+            user_id=user_id,
+            product_id=product_id,
+            quantity=-quantity,
+            price_per_item=price_per_unit,
+        )
+        
+        # 2. Record negative payment (cash returned to customer)
+        amount = price_per_unit * quantity
+        await self.record_financial_transaction(
+            store_id=store_id,
+            user_id=user_id,
+            amount=-amount,
+            type=FinancialTransactionType.PAYMENT
+        )
+        
+        # 3. Create RETURN_PENDING order directly to warehouse
+        return_order = Order(
+            store_id=store_id,
+            product_id=product_id,
+            quantity=quantity,
+            status=OrderStatus.RETURN_PENDING,
+            price_per_item=product.price, # wholesale price
+            is_display=False,
+        )
+        self.session.add(return_order)
+        await self.session.flush()
+        
+        return return_order.id
+
     async def approve_return(
         self,
         warehouse_store_id: int,

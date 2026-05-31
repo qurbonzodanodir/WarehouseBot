@@ -7,6 +7,7 @@ from .report import router as report_router
 from .returns import router as returns_router
 from .sales import router as sales_router
 from .vitrine import router as vitrine_router
+from .customer_return import router as customer_return_router
 
 from app.bot.filters import RoleFilter
 from app.models.enums import UserRole
@@ -24,3 +25,4 @@ seller_router.include_router(sales_router)
 seller_router.include_router(returns_router)
 seller_router.include_router(display_router)
 seller_router.include_router(report_router)
+seller_router.include_router(customer_return_router)
