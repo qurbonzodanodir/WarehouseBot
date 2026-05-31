@@ -1,8 +1,11 @@
+import json
 import logging
 
 from aiogram import Bot
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pywebpush import webpush, WebPushException
+
 from app.models.enums import UserRole
 from app.models.user import User
 from typing import Any, Callable, Union
@@ -72,9 +75,63 @@ class NotificationService:
         self,
         text: Union[str, Callable[[Any], str]],
         reply_markup: Union[InlineKeyboardMarkup, Callable[[Any], InlineKeyboardMarkup], None] = None,
+        push_title: str | None = None,
     ) -> list[tuple[int, int]]:
-        """Send a message to all active warehouse workers."""
-        return await self._notify_by_role(UserRole.WAREHOUSE, None, text, reply_markup)
+        """Send a message to all active warehouse workers, and a Web Push to WAREHOUSE/ADMIN/OWNER."""
+        # Send Telegram message to Warehouse workers
+        chat_msg_ids = await self._notify_by_role(UserRole.WAREHOUSE, None, text, reply_markup)
+
+        # Send Web Push to Warehouse, Admin, and Owner
+        await self._send_web_push_to_roles(
+            roles=[UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.OWNER],
+            title=push_title or "Новое уведомление склада",
+            body=text(Translator("ru")) if callable(text) else text, # use ru by default for web push
+            url="/orders" # Default URL to open when clicked
+        )
+
+        return chat_msg_ids
+
+    async def _send_web_push_to_roles(self, roles: list[UserRole], title: str, body: str, url: str | None = None) -> None:
+        from app.models.push_subscription import PushSubscription
+        from app.core.config import settings
+
+        if not settings.vapid_private_key:
+            return
+
+        stmt = select(PushSubscription).join(User).where(User.role.in_(roles), User.is_active.is_(True))
+        result = await self.session.execute(stmt)
+        subscriptions = result.scalars().all()
+
+        payload = json.dumps({
+            "title": title,
+            "body": body,
+            "url": url
+        })
+
+        import asyncio
+
+        def _send(sub: PushSubscription):
+            try:
+                sub_info = {
+                    "endpoint": sub.endpoint,
+                    "keys": {
+                        "p256dh": sub.p256dh,
+                        "auth": sub.auth
+                    }
+                }
+                webpush(
+                    subscription_info=sub_info,
+                    data=payload,
+                    vapid_private_key=settings.vapid_private_key,
+                    vapid_claims={"sub": "mailto:admin@warehouse.local"}
+                )
+            except WebPushException as ex:
+                logger.error(f"Web Push failed: {ex}")
+                # We could delete the subscription here if response status is 410 Gone
+
+        for sub in subscriptions:
+            # We use to_thread because webpush is synchronous
+            await asyncio.to_thread(_send, sub)
 
     async def save_order_notifications(
         self,

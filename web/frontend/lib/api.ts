@@ -162,6 +162,13 @@ async function request<T>(
 }
 
 export const api = {
+  // Push Notifications
+  getVapidPublicKey: () => request<{publicKey: string}>("/notifications/vapid-public-key"),
+  subscribeToPush: (data: any) => request<{status: string}>("/notifications/subscribe", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+
   // Auth
   login: (email: string, password: string) =>
     request<{ user: UserMe }>("/auth/login", {

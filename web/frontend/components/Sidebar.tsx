@@ -18,6 +18,7 @@ import {
 import { clearAuth, getStoredUser, onAuthExpired } from "@/lib/auth";
 import { api, UserMe } from "@/lib/api";
 import { useEffect, useState } from "react";
+import { PushNotificationManager } from "@/components/PushNotificationManager";
 
 const ownerNav = [
   { href: "/dashboard", icon: LayoutDashboard, label: "sidebar.dashboard" },
@@ -200,6 +201,10 @@ export default function Sidebar() {
             </div>
           </div>
         )}
+
+        <div style={{ marginBottom: 12 }}>
+          <PushNotificationManager />
+        </div>
 
         <button
           onClick={handleLogout}
