@@ -195,12 +195,12 @@ export default function InventoryPage() {
               <Warehouse size={32} style={{ color: "var(--accent)" }} />
               {t("inventory.title")}
             </h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, marginLeft: 44 }}>
-              {t("inventory.found", { count: totalQuantity })}
-              <span style={{ marginLeft: 8, paddingLeft: 8, borderLeft: "1px solid var(--border)", fontWeight: 600, color: "var(--text-primary)" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 12px", color: "var(--text-secondary)", fontSize: 12, marginTop: 4, marginLeft: 44 }}>
+              <span>{t("inventory.found", { count: totalQuantity })}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", background: "var(--bg-secondary)", borderRadius: 6, border: "1px solid var(--border)", fontWeight: 600, color: "var(--text-primary)" }}>
                 Сумма: {new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(computedTotalValue)} TJS
               </span>
-            </p>
+            </div>
           </div>
 
         </div>
