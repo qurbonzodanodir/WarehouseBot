@@ -270,6 +270,7 @@ export const api = {
       page: number;
       page_size: number;
       total_pages: number;
+      total_value: number;
     }>(`/inventory/${store_id}?${qs.toString()}`);
   },
   getAllInventory: () => request<Record<string, StoreInventory>>("/inventory"),
