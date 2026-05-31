@@ -70,7 +70,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) { router.push("/login"); return; }
-    void loadData();
+    void loadData(true);
+
+    const intervalId = setInterval(() => {
+      void loadData(false);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
@@ -125,9 +131,6 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
-            <button className="icon-btn" onClick={() => void loadData(false)} title="Refresh">
-              <RefreshCw size={15} />
-            </button>
           </div>
         </div>
 

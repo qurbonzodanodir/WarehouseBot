@@ -116,26 +116,42 @@ export default function InventoryPage() {
   }, [debouncedSearch, selectedBrand, selectedStore]);
 
   useEffect(() => {
-    setLoading(true);
-    if (!selectedStore) {
-      api.getStoreCatalog()
-        .then(setCatalog)
-        .catch(console.error)
-        .finally(() => setLoading(false));
-      setItems([]);
-      setTotalItems(0);
-      setTotalPages(0);
-    } else {
-      api.getInventory(selectedStore, currentPage, pageSize, debouncedSearch, selectedBrand)
-        .then((data) => {
-          setItems(data.items);
-          setTotalItems(data.total);
-          setTotalPages(data.total_pages);
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
-      setCatalog([]);
+    let isActive = true;
+
+    function loadData(isInitial = false) {
+      if (isInitial) setLoading(true);
+      if (!selectedStore) {
+        api.getStoreCatalog()
+          .then((data) => { if (isActive) setCatalog(data); })
+          .catch(console.error)
+          .finally(() => { if (isActive && isInitial) setLoading(false); });
+        if (isActive) {
+          setItems([]);
+          setTotalItems(0);
+          setTotalPages(0);
+        }
+      } else {
+        api.getInventory(selectedStore, currentPage, pageSize, debouncedSearch, selectedBrand)
+          .then((data) => {
+            if (isActive) {
+              setItems(data.items);
+              setTotalItems(data.total);
+              setTotalPages(data.total_pages);
+            }
+          })
+          .catch(console.error)
+          .finally(() => { if (isActive && isInitial) setLoading(false); });
+        if (isActive) setCatalog([]);
+      }
     }
+
+    loadData(true);
+    const intervalId = setInterval(() => loadData(false), 5000);
+
+    return () => {
+      isActive = false;
+      clearInterval(intervalId);
+    };
   }, [selectedStore, currentPage, pageSize, debouncedSearch, selectedBrand]);
 
   const handleConfirmImport = async () => {

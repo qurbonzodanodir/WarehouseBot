@@ -115,8 +115,8 @@ export default function OrdersPage() {
 
     let isActive = true;
 
-    async function loadOrders() {
-      setLoading(true);
+    async function loadOrders(isInitial = false) {
+      if (isInitial) setLoading(true);
       try {
         const data = await requestOrders(statusFilter, storeFilter, page, PAGE_SIZE);
         if (isActive) {
@@ -127,16 +127,21 @@ export default function OrdersPage() {
           console.error(error);
         }
       } finally {
-        if (isActive) {
+        if (isActive && isInitial) {
           setLoading(false);
         }
       }
     }
 
-    void loadOrders();
+    void loadOrders(true);
+
+    const intervalId = setInterval(() => {
+      void loadOrders(false);
+    }, 5000);
 
     return () => {
       isActive = false;
+      clearInterval(intervalId);
     };
   }, [user, statusFilter, storeFilter, page]);
 
@@ -276,10 +281,6 @@ export default function OrdersPage() {
                 Отправить в магазин
               </button>
             )}
-            <button className="btn btn-ghost" onClick={() => void refreshOrders()}>
-              <RefreshCw size={14} />
-              {t("common.refresh")}
-            </button>
           </div>
         </div>
 
