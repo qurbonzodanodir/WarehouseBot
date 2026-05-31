@@ -4,7 +4,8 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
 from app.models.user import User
-from app.bot.routers.seller.catalog_ui import send_catalog_page
+from app.bot.routers.seller.catalog_ui import send_catalog_page, product_matches
+from app.bot.states.states import VitrineFlow
 
 router = Router(name="seller.vitrine")
 
@@ -37,19 +38,38 @@ async def my_inventory(
     message: Message, user: User, session: AsyncSession, state: FSMContext, _: Any
 ) -> None:
     await state.clear()
+    await state.set_state(VitrineFlow.viewing)
+    await state.update_data(vitrine_query="")
     from app.services import OrderService
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id)
     await _send_vitrine_page(message, items, page=0, _=_)
 
-
-@router.callback_query(F.data.startswith("vitrine:page:"))
-async def vitrine_page_nav(
-    callback: CallbackQuery, user: User, session: AsyncSession, _: Any
+@router.message(VitrineFlow.viewing, F.text)
+async def vitrine_search(
+    message: Message, user: User, session: AsyncSession, state: FSMContext, _: Any
 ) -> None:
-    page = int(callback.data.split(":")[-1])
+    query = message.text.strip()
+    await state.update_data(vitrine_query=query)
     from app.services import OrderService
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id)
+    if query:
+        items = [item for item in items if product_matches(item, query)]
+    await _send_vitrine_page(message, items, page=0, _=_)
+
+
+@router.callback_query(F.data.startswith("vitrine:page:"))
+async def vitrine_page_nav(
+    callback: CallbackQuery, user: User, session: AsyncSession, state: FSMContext, _: Any
+) -> None:
+    page = int(callback.data.split(":")[-1])
+    data = await state.get_data()
+    query = data.get("vitrine_query", "")
+    from app.services import OrderService
+    order_svc = OrderService(session)
+    items = await order_svc.get_store_vitrine_inventory(user.store_id)
+    if query:
+        items = [item for item in items if product_matches(item, query)]
     await _send_vitrine_page(callback, items, page, _=_)
     await callback.answer()

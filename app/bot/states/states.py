@@ -23,3 +23,6 @@ class ReturnFlow(StatesGroup):
 
 class RegistrationFlow(StatesGroup):
     enter_code = State()
+
+class VitrineFlow(StatesGroup):
+    viewing = State()
