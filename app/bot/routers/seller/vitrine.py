@@ -55,7 +55,7 @@ async def vitrine_search(
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id)
     if query:
-        items = [item for item in items if product_matches(item, query)]
+        items = [item for item in items if product_matches(getattr(item, "product", item), query)]
     await _send_vitrine_page(message, items, page=0, _=_)
 
 
@@ -70,6 +70,6 @@ async def vitrine_page_nav(
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id)
     if query:
-        items = [item for item in items if product_matches(item, query)]
+        items = [item for item in items if product_matches(getattr(item, "product", item), query)]
     await _send_vitrine_page(callback, items, page, _=_)
     await callback.answer()
