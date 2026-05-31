@@ -129,7 +129,6 @@ export default function ProductsPage() {
 
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFillBrand, setImportFillBrand] = useState(""); // global fill-all brand
-  const [importReplaceQty, setImportReplaceQty] = useState(true);
   const [importData, setImportData] = useState<ImportItem[]>([]);
   const [importing, setImporting] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -527,13 +526,12 @@ export default function ProductsPage() {
           price: d.price > 0 ? d.price : undefined,
           brand: d.brand || undefined,
         })),
-        replace_quantity: importReplaceQty,
+        replace_quantity: false,
       });
       showToast(t("products.import_success", { processed: res.processed, created: res.created }));
       setImportModalOpen(false);
       setImportData([]);
       setImportFillBrand("");
-      setImportReplaceQty(true);
       setSelectedBrand("");
       setSearch("");
       setPage(1);
@@ -1027,7 +1025,7 @@ export default function ProductsPage() {
             {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ margin: 0 }}>{t("products.import_title")}</h3>
-              <button onClick={() => { setImportModalOpen(false); setImportData([]); setImportFillBrand(""); setImportReplaceQty(true); }} style={{ background: "transparent", border: "none", cursor: "pointer" }}><X size={24} /></button>
+              <button onClick={() => { setImportModalOpen(false); setImportData([]); setImportFillBrand(""); }} style={{ background: "transparent", border: "none", cursor: "pointer" }}><X size={24} /></button>
             </div>
 
             {/* Controls bar (shown only after file loaded) */}
@@ -1044,13 +1042,6 @@ export default function ProductsPage() {
                   {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                 </select>
                 <div style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer",
-                  color: importReplaceQty ? "var(--accent)" : "var(--text-secondary)",
-                  padding: "4px 10px", borderRadius: 8, border: "1px solid var(--border)",
-                  background: importReplaceQty ? "var(--accent-muted, rgba(99,102,241,.1))" : "transparent" }}>
-                  <input type="checkbox" checked={importReplaceQty} onChange={e => setImportReplaceQty(e.target.checked)} style={{ margin: 0 }} />
-                  {t("products.import_replace_qty")}
-                </label>
                 <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-muted)" }}>
                   {importData.filter(d => !d.brand).length > 0
                     ? t("products.import_warn_no_brand", { count: importData.filter(d => !d.brand).length })
