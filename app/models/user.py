@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from app.models.store import Store
     from app.models.sale import Sale
     from app.models.financial_transaction import FinancialTransaction
+    from app.models.push_subscription import PushSubscription
 
 from app.core.database import Base
 from app.models.enums import UserRole, db_enum
@@ -42,6 +43,10 @@ class User(Base):
         back_populates="user"
     )
     refresh_sessions: Mapped[list[RefreshSession]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    push_subscriptions: Mapped[list[PushSubscription]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

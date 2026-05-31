@@ -24,6 +24,7 @@ from app.models.supplier_payout import SupplierPayout
 from app.models.supplier_outgoing_return import SupplierOutgoingReturn
 from app.models.supplier_outgoing_return_item import SupplierOutgoingReturnLineItem
 from app.models.system_setting import SystemSetting
+from app.models.push_subscription import PushSubscription
 
 __all__ = [
     "User",
@@ -47,4 +48,5 @@ __all__ = [
     "SupplierReturn",
     "SupplierReturnLineItem",
     "SystemSetting",
+    "PushSubscription",
 ]

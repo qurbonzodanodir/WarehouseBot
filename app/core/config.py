@@ -8,6 +8,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # VAPID
+    vapid_private_key: str | None = None
+    vapid_public_key: str | None = None
+
     bot_token: str
     telegram_proxy_url: str = ""
     webhook_host: str = ""

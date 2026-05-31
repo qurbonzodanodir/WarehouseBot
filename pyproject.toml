@@ -17,6 +17,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "python-multipart>=0.0.27",
     "aiohttp-socks>=0.11.0",
+    "pywebpush>=2.3.0",
 ]
 
 [tool.uv]
