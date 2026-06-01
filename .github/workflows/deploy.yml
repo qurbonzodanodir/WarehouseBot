@@ -10,4 +10,4 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
       - name: Deploy
-        run: sshpass -p 'rz7r-Z@PzCbK9K' ssh -o StrictHostKeyChecking=no root@176.124.200.114 "cd /opt/warehouse_bot && git pull && docker-compose up -d --build frontend"
+        run: sshpass -p 'rz7r-Z@PzCbK9K' ssh -o StrictHostKeyChecking=no root@176.124.200.114 "cd /opt/warehouse_bot && git pull && docker compose build frontend && docker compose stop frontend && docker compose rm -f frontend && docker compose up -d frontend"
