@@ -82,7 +82,7 @@ async def process_customer_return_quantity(
     if not found:
         cart.append({"product_id": product_id, "sku": product.sku, "qty": quantity})
         
-    from app.bot.routers.seller.catalog_ui import _brand
+    from app.bot.routers.seller.order import _brand
     product_names[str(product_id)] = f"{product.sku} / {_brand(product)}"
         
     await state.update_data(cart=cart, product_names=product_names)
