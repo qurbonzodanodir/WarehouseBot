@@ -127,7 +127,10 @@ class NotificationService:
 
         import asyncio
 
-        def _send(sub: PushSubscription):
+        dead_sub_ids: list[int] = []
+
+        def _send(sub: PushSubscription) -> bool:
+            """Returns True if subscription is dead and should be deleted."""
             try:
                 sub_info = {
                     "endpoint": sub.endpoint,
@@ -144,13 +147,28 @@ class NotificationService:
                     ttl=86400,
                     headers={"Urgency": "high"}
                 )
+                return False
             except WebPushException as ex:
+                response = ex.response
+                if response is not None and response.status_code in (410, 404):
+                    # 410 Gone = subscription expired/unsubscribed, 404 = not found
+                    logger.info(f"Removing dead push subscription id={sub.id} (status={response.status_code})")
+                    return True
                 logger.error(f"Web Push failed: {ex}")
-                # We could delete the subscription here if response status is 410 Gone
+                return False
 
         for sub in subscriptions:
-            # We use to_thread because webpush is synchronous
-            await asyncio.to_thread(_send, sub)
+            is_dead = await asyncio.to_thread(_send, sub)
+            if is_dead:
+                dead_sub_ids.append(sub.id)
+
+        # Delete dead subscriptions from DB
+        if dead_sub_ids:
+            from sqlalchemy import delete
+            await self.session.execute(
+                delete(PushSubscription).where(PushSubscription.id.in_(dead_sub_ids))
+            )
+            await self.session.commit()
 
     async def save_order_notifications(
         self,
