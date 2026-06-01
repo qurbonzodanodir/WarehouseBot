@@ -77,113 +77,13 @@ class NotificationService:
         reply_markup: Union[InlineKeyboardMarkup, Callable[[Any], InlineKeyboardMarkup], None] = None,
         push_title: str | None = None,
     ) -> list[tuple[int, int]]:
-        """Send a message to all active warehouse workers, admins, and owners, and a Web Push to WAREHOUSE/ADMIN/OWNER."""
+        """Send a message to all active warehouse workers, admins, and owners."""
         # Send Telegram message to Warehouse workers, Admins, and Owners
         chat_msg_ids = await self._notify_by_role(UserRole.WAREHOUSE, None, text, reply_markup)
         chat_msg_ids += await self._notify_by_role(UserRole.ADMIN, None, text, reply_markup)
         chat_msg_ids += await self._notify_by_role(UserRole.OWNER, None, text, reply_markup)
 
-        import re
-        raw_text = text(Translator("ru")) if callable(text) else text
-        
-        # Strip HTML tags
-        clean_text = re.sub(r'<[^>]+>', '', raw_text).strip()
-        
-        # Determine title and body for the push notification
-        lines = clean_text.split('\n')
-        if not push_title and len(lines) > 1 and len(lines[0]) < 60:
-            # Use the first line as title if it's relatively short
-            push_title = lines[0].strip()
-            # The rest is the body
-            push_body = '\n'.join(lines[1:]).strip()
-        else:
-            push_title = push_title or "Уведомление от склада"
-            push_body = clean_text
-
-        # Send Web Push to Warehouse, Admin, and Owner
-        await self._send_web_push_to_roles(
-            roles=[UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.OWNER],
-            title=push_title,
-            body=push_body,
-            url="/orders" # Default URL to open when clicked
-        )
-
         return chat_msg_ids
-
-    async def _send_web_push_to_roles(self, roles: list[UserRole], title: str, body: str, url: str | None = None) -> None:
-        from app.models.push_subscription import PushSubscription
-        from app.core.config import settings
-
-        logger.info(f"[PUSH] _send_web_push_to_roles called. roles={[r.value for r in roles]} title={title[:50]}")
-
-        if not settings.vapid_private_key:
-            logger.warning("[PUSH] No VAPID private key configured, skipping push")
-            return
-
-        try:
-            stmt = select(PushSubscription).join(User).where(User.role.in_(roles), User.is_active.is_(True))
-            result = await self.session.execute(stmt)
-            subscriptions = result.scalars().all()
-            logger.info(f"[PUSH] Found {len(subscriptions)} push subscriptions")
-        except Exception as e:
-            logger.error(f"[PUSH] Error querying subscriptions: {e}")
-            return
-
-        if not subscriptions:
-            logger.warning("[PUSH] No subscriptions found, nothing to send")
-            return
-
-        payload = json.dumps({
-            "title": title,
-            "body": body,
-            "url": url
-        })
-
-        import asyncio
-
-        dead_sub_ids: list[int] = []
-
-        def _send(sub: PushSubscription) -> bool:
-            """Returns True if subscription is dead and should be deleted."""
-            try:
-                sub_info = {
-                    "endpoint": sub.endpoint,
-                    "keys": {
-                        "p256dh": sub.p256dh,
-                        "auth": sub.auth
-                    }
-                }
-                webpush(
-                    subscription_info=sub_info,
-                    data=payload,
-                    vapid_private_key=settings.vapid_private_key,
-                    vapid_claims={"sub": "mailto:admin@yasham.tj"},
-                    ttl=86400,
-                    headers={"Urgency": "high"}
-                )
-                logger.info(f"[PUSH] Sent OK to sub id={sub.id}")
-                return False
-            except WebPushException as ex:
-                response = ex.response
-                if response is not None and response.status_code in (410, 404):
-                    logger.info(f"[PUSH] Removing dead push subscription id={sub.id} (status={response.status_code})")
-                    return True
-                logger.error(f"[PUSH] Web Push failed for sub id={sub.id}: {ex}")
-                return False
-
-        for sub in subscriptions:
-            is_dead = await asyncio.to_thread(_send, sub)
-            if is_dead:
-                dead_sub_ids.append(sub.id)
-
-        # Delete dead subscriptions from DB
-        if dead_sub_ids:
-            from sqlalchemy import delete
-            await self.session.execute(
-                delete(PushSubscription).where(PushSubscription.id.in_(dead_sub_ids))
-            )
-            await self.session.commit()
-            logger.info(f"[PUSH] Deleted dead subscriptions: {dead_sub_ids}")
 
     async def save_order_notifications(
         self,
