@@ -99,7 +99,7 @@ def customer_return_cart_action_kb(_: Any) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text=_("btn_cart_add_more"), callback_data="customer_return_cart:add_more"),
-        InlineKeyboardButton(text=_("btn_cart_send"), callback_data="customer_return_cart:send"),
+        InlineKeyboardButton(text=_("btn_cart_return"), callback_data="customer_return_cart:send"),
     )
     builder.row(
         InlineKeyboardButton(text=_("btn_cart_clear"), callback_data="customer_return_cart:clear"),

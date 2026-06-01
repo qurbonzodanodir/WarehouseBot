@@ -108,6 +108,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         "btn_cart_add_more": "➕ Добавить ещё",
         "btn_cart_send": "🚀 Отправить заказ",
+        "btn_cart_return": "✅ Оформить возврат",
         "btn_cart_clear": "🗑 Очистить корзину",
         "cart_status": "🛒 <b>Корзина:</b>\n{items}\n\nЧто делаем дальше?",
         "cart_item": "• {sku} — {qty} шт",
@@ -316,6 +317,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
         "btn_cart_add_more": "➕ Иловаи боз",
         "btn_cart_send": "🚀 Фиристодани дархост",
+        "btn_cart_return": "✅ Баргардониданро тасдиқ кардан",
         "btn_cart_clear": "🗑 Тоза кардани сабад",
         "cart_status": "🛒 <b>Сабад:</b>\n{items}\n\nЧӣ кор кунем?",
         "cart_item": "• {sku} — {qty} дона",
