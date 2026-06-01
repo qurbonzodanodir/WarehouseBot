@@ -81,11 +81,28 @@ class NotificationService:
         # Send Telegram message to Warehouse workers
         chat_msg_ids = await self._notify_by_role(UserRole.WAREHOUSE, None, text, reply_markup)
 
+        import re
+        raw_text = text(Translator("ru")) if callable(text) else text
+        
+        # Strip HTML tags
+        clean_text = re.sub(r'<[^>]+>', '', raw_text).strip()
+        
+        # Determine title and body for the push notification
+        lines = clean_text.split('\n')
+        if not push_title and len(lines) > 1 and len(lines[0]) < 60:
+            # Use the first line as title if it's relatively short
+            push_title = lines[0].strip()
+            # The rest is the body
+            push_body = '\n'.join(lines[1:]).strip()
+        else:
+            push_title = push_title or "Уведомление от склада"
+            push_body = clean_text
+
         # Send Web Push to Warehouse, Admin, and Owner
         await self._send_web_push_to_roles(
             roles=[UserRole.WAREHOUSE, UserRole.ADMIN, UserRole.OWNER],
-            title=push_title or "Новое уведомление склада",
-            body=text(Translator("ru")) if callable(text) else text, # use ru by default for web push
+            title=push_title,
+            body=push_body,
             url="/orders" # Default URL to open when clicked
         )
 
