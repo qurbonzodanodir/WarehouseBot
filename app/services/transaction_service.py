@@ -282,7 +282,7 @@ class TransactionService:
             store_id=store_id,
             user_id=user_id,
             amount=-amount,
-            type=FinancialTransactionType.PAYMENT
+            txn_type=FinancialTransactionType.PAYMENT
         )
         
         # 3. Create RETURN_PENDING order directly to warehouse
