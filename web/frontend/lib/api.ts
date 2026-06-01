@@ -194,10 +194,9 @@ export const api = {
   dispatchOrder: (id: number) =>
     request<Order>(`/orders/${id}/dispatch`, { method: "PUT" }),
   dispatchFromWarehouse: (data: { store_id: number; items: { product_id: number; quantity: number }[] }) =>
-    request<Order[]>("/orders/dispatch-from-warehouse", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    request<Order[]>("/orders/dispatch-from-warehouse", { method: "POST", body: JSON.stringify(data) }),
+  createCustomerReturnByAdmin: (data: { store_id: number; items: { product_id: number; quantity: number }[] }) =>
+    request<{ detail: string }>("/orders/customer-return-by-admin", { method: "POST", body: JSON.stringify(data) }),
   rejectOrder: (id: number) =>
     request<Order>(`/orders/${id}/reject`, { method: "PUT" }),
   deliverOrder: (id: number) =>

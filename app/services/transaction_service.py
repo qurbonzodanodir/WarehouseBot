@@ -297,6 +297,36 @@ class TransactionService:
         
         return return_order.id
 
+    async def record_customer_return_by_admin(
+        self,
+        store_id: int,
+        admin_user_id: int,
+        product_id: int,
+        quantity: int,
+        warehouse_store_id: int,
+    ) -> int:
+        """
+        Records a customer return initiated directly by warehouse admin on behalf of a store.
+        It executes both steps: negative sale/cash for the store, 
+        and immediate approval to the warehouse stock.
+        """
+        # 1. Create the pending return using existing logic
+        order_id = await self.record_customer_return_and_dispatch(
+            store_id=store_id,
+            user_id=admin_user_id,
+            product_id=product_id,
+            quantity=quantity,
+        )
+        
+        # 2. Immediately approve it to warehouse stock
+        await self.approve_return(
+            warehouse_store_id=warehouse_store_id,
+            warehouse_user_id=admin_user_id,
+            order_id=order_id,
+        )
+        
+        return order_id
+
     async def approve_return(
         self,
         warehouse_store_id: int,

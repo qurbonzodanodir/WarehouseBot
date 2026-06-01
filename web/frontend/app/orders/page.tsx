@@ -70,6 +70,12 @@ export default function OrdersPage() {
   const [itemQuantity, setItemQuantity] = useState("1");
   const [productSearch, setProductSearch] = useState("");
 
+  // Customer return modal state
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnStoreId, setReturnStoreId] = useState<number | null>(null);
+  const [returnItems, setReturnItems] = useState<{ product_id: number; quantity: number }[]>([]);
+  const [returnLoading, setReturnLoading] = useState(false);
+
   const STATUSES = [
     { key: "", label: t("orders.status_all") },
     { key: "active", label: t("orders.status_active") || "Активные" },
@@ -249,6 +255,72 @@ export default function OrdersPage() {
     }
   }
 
+  // Customer return handlers
+  async function openReturnModal() {
+    setReturnModalOpen(true);
+    setReturnStoreId(null);
+    setReturnItems([]);
+    setSelectedProductId(null);
+    setItemQuantity("1");
+    try {
+      const products = await api.getProducts({ include_inactive: false, page_size: 1000 });
+      setAvailableProducts(products.items || []);
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    }
+  }
+
+  function closeReturnModal() {
+    setReturnModalOpen(false);
+    setReturnStoreId(null);
+    setReturnItems([]);
+    setSelectedProductId(null);
+    setItemQuantity("1");
+    setProductSearch("");
+  }
+
+  function addReturnItem() {
+    if (!selectedProductId || !itemQuantity) return;
+    const qty = parseInt(itemQuantity, 10);
+    if (qty <= 0) return;
+
+    const existing = returnItems.find((item) => item.product_id === selectedProductId);
+    if (existing) {
+      setReturnItems(returnItems.map((item) =>
+        item.product_id === selectedProductId ? { ...item, quantity: item.quantity + qty } : item
+      ));
+    } else {
+      setReturnItems([...returnItems, { product_id: selectedProductId, quantity: qty }]);
+    }
+    setSelectedProductId(null);
+    setItemQuantity("1");
+  }
+
+  function removeReturnItem(product_id: number) {
+    setReturnItems(returnItems.filter((item) => item.product_id !== product_id));
+  }
+
+  async function handleReturnSubmit() {
+    if (!returnStoreId || returnItems.length === 0) {
+      showToast("Выберите магазин и добавьте товары", "error");
+      return;
+    }
+    setReturnLoading(true);
+    try {
+      await api.createCustomerReturnByAdmin({
+        store_id: returnStoreId,
+        items: returnItems,
+      });
+      showToast("Возврат от клиента успешно оформлен", "success");
+      closeReturnModal();
+      await refreshOrders();
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    } finally {
+      setReturnLoading(false);
+    }
+  }
+
   const filtered = orders.filter((o) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -276,10 +348,16 @@ export default function OrdersPage() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {canManage && (
-              <button className="btn btn-primary" onClick={openDispatchModal}>
-                <Package size={14} />
-                Отправить в магазин
-              </button>
+              <>
+                <button className="btn btn-secondary" onClick={openReturnModal} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text)" }}>
+                  <RefreshCw size={14} />
+                  Возврат от клиента
+                </button>
+                <button className="btn btn-primary" onClick={openDispatchModal}>
+                  <Package size={14} />
+                  Отправить в магазин
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -560,6 +638,122 @@ export default function OrdersPage() {
                 disabled={dispatchLoading || !dispatchStoreId || dispatchItems.length === 0}
               >
                 {dispatchLoading ? "Отправка..." : "Отправить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Return Modal */}
+      {returnModalOpen && (
+        <div className="modal-overlay orders-dispatch-overlay">
+          <div className="modal-card orders-dispatch-modal" style={{ borderTop: "4px solid var(--accent)" }}>
+            <div className="modal-header">
+              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><RefreshCw size={18} /> Возврат от клиента</h3>
+              <button className="btn btn-ghost" onClick={closeReturnModal} style={{ padding: 4 }}>
+                <XCircle size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Магазин</label>
+                <select
+                  className="input"
+                  value={returnStoreId ?? ""}
+                  onChange={(e) => setReturnStoreId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">— выбрать —</option>
+                  {stores
+                    .filter(s => s.store_type !== "warehouse")
+                    .map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Товар</label>
+                <input
+                  className="input"
+                  placeholder="Поиск по SKU или бренду"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                />
+                <select
+                  className="input"
+                  style={{ marginTop: 8 }}
+                  value={selectedProductId ?? ""}
+                  onChange={(e) => setSelectedProductId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">— выбрать —</option>
+                  {availableProducts
+                    .filter(p => {
+                      const q = productSearch.toLowerCase();
+                      return !q || p.sku.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q);
+                    })
+                    .slice(0, 100)
+                    .map(p => (
+                      <option key={p.id} value={p.id}>{p.sku} - {p.brand}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Кол-во</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={itemQuantity}
+                    onChange={(e) => setItemQuantity(e.target.value)}
+                  />
+                </div>
+                <button className="btn btn-primary orders-dispatch-add" onClick={addReturnItem}>
+                  <Plus size={14} />
+                </button>
+              </div>
+
+              {returnItems.length > 0 && (
+                <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>
+                    Товары для возврата ({returnItems.length})
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {returnItems.map((item) => {
+                      const product = availableProducts.find(p => p.id === item.product_id);
+                      if (!product) return null;
+                      return (
+                        <div key={item.product_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                          <div>
+                            <span style={{ fontWeight: 600 }}>{product.sku}</span>
+                            <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>{product.brand}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <span style={{ fontWeight: 600 }}>{item.quantity} шт</span>
+                            <button
+                              className="btn btn-ghost"
+                              onClick={() => removeReturnItem(item.product_id)}
+                              style={{ padding: 4, color: "var(--red)" }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-ghost" onClick={closeReturnModal}>Отмена</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleReturnSubmit}
+                disabled={returnLoading || !returnStoreId || returnItems.length === 0}
+              >
+                {returnLoading ? "Оформление..." : "Оформить возврат"}
               </button>
             </div>
           </div>

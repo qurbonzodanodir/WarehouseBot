@@ -291,6 +291,70 @@ async def create_return(
 
 
 @router.post(
+    "/customer-return-by-admin",
+    status_code=status.HTTP_201_CREATED,
+    summary="Оформить возврат от клиента (Кладовщик)",
+)
+async def customer_return_by_admin(
+    body: WarehouseDispatchCreate,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> dict:
+    from app.models.enums import UserRole
+    _ensure_roles(current_user, {UserRole.WAREHOUSE, UserRole.OWNER, UserRole.ADMIN})
+
+    from app.services.store_service import StoreService
+    from app.services.transaction_service import TransactionService
+    from app.models.product import Product
+
+    if not body.items:
+        raise HTTPException(status_code=400, detail="No items provided")
+
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        raise HTTPException(status_code=400, detail="Main warehouse not found")
+
+    txn_svc = TransactionService(session)
+    product_names = []
+    
+    try:
+        for item in body.items:
+            product = await session.get(Product, item.product_id)
+            if not product:
+                raise ValueError(f"Товар ID {item.product_id} не найден.")
+                
+            await txn_svc.record_customer_return_by_admin(
+                store_id=body.store_id,
+                admin_user_id=current_user.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                warehouse_store_id=warehouse_id,
+            )
+            product_names.append(f"{product.sku} - {item.quantity} шт")
+            
+        await session.commit()
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+    # Notify sellers
+    try:
+        from app.bot.bot import bot
+        from app.services.notification_service import NotificationService
+        notif_svc = NotificationService(bot, session)
+        msg_text = lambda _t: _t("return_by_admin_notif", items="\\n".join(product_names))
+        await notif_svc.notify_sellers(store_id=body.store_id, text=msg_text)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to send notif: {e}")
+
+    return {"detail": "Returns recorded successfully"}
+
+@router.post(
     "/dispatch-from-warehouse",
     response_model=list[OrderOut],
     status_code=status.HTTP_201_CREATED,
