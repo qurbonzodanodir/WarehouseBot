@@ -77,9 +77,11 @@ class NotificationService:
         reply_markup: Union[InlineKeyboardMarkup, Callable[[Any], InlineKeyboardMarkup], None] = None,
         push_title: str | None = None,
     ) -> list[tuple[int, int]]:
-        """Send a message to all active warehouse workers, and a Web Push to WAREHOUSE/ADMIN/OWNER."""
-        # Send Telegram message to Warehouse workers
+        """Send a message to all active warehouse workers, admins, and owners, and a Web Push to WAREHOUSE/ADMIN/OWNER."""
+        # Send Telegram message to Warehouse workers, Admins, and Owners
         chat_msg_ids = await self._notify_by_role(UserRole.WAREHOUSE, None, text, reply_markup)
+        chat_msg_ids += await self._notify_by_role(UserRole.ADMIN, None, text, reply_markup)
+        chat_msg_ids += await self._notify_by_role(UserRole.OWNER, None, text, reply_markup)
 
         import re
         raw_text = text(Translator("ru")) if callable(text) else text
