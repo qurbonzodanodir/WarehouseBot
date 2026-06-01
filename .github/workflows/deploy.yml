@@ -1,0 +1,13 @@
+name: Deploy
+on:
+  push:
+    branches:
+      - deploy-trigger
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Deploy
+        run: sshpass -p 'rz7r-Z@PzCbK9K' ssh -o StrictHostKeyChecking=no root@176.124.200.114 "cd /opt/warehouse_bot && git pull && docker-compose up -d --build frontend"
