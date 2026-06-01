@@ -42,6 +42,15 @@ export function PushNotificationManager() {
         updateViaCache: "none",
       });
       const sub = await registration.pushManager.getSubscription();
+      if (sub) {
+        // Sync existing subscription with backend just in case
+        try {
+          const subscriptionInfo = JSON.parse(JSON.stringify(sub));
+          await api.subscribeToPush(subscriptionInfo);
+        } catch (syncErr) {
+          console.error("Failed to sync existing push subscription:", syncErr);
+        }
+      }
       setSubscription(sub);
     } catch (err) {
       console.error("Service Worker registration failed:", err);
