@@ -149,8 +149,7 @@ async def customer_return_cart_send(
                     sku=sku,
                     qty=qty,
                     note=_t("return_notif_wh_instr")
-                ),
-                reply_markup=lambda _t, oid=order_id: warehouse_return_kb(oid, _=_t)
+                )
             )
             
         await session.commit()

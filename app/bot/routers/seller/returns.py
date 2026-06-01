@@ -260,8 +260,7 @@ async def return_enter_quantity(
                     sku=product.sku,
                     qty=q,
                     note="" if is_d else _t("return_notif_wh_instr")
-                ),
-                reply_markup=lambda _t, ret=return_order: warehouse_return_kb(ret.id, _=_t)
+                )
             )
 
         # COMMIT ALL AT ONCE
@@ -373,8 +372,7 @@ async def quick_return_order(
                 sku=original_order.product.sku,
                 qty=quantity,
                 note=_t("return_debt_note") if not is_display else ""
-            ),
-            reply_markup=lambda _t: warehouse_return_kb(return_order.id, _=_t)
+            )
         )
 
     except ValueError as e:

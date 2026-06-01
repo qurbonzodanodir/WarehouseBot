@@ -275,8 +275,7 @@ async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, sess
         )
         
         chat_message_ids = await notif_svc.notify_warehouse(
-            text=lambda _t: _t("order_batch_notif_new", store=store_name, items=items_text),
-            reply_markup=lambda _t: batch_order_action_kb(batch_id, _=_t)
+            text=lambda _t: _t("order_batch_notif_new", store=store_name, items=items_text)
         )
 
         orders = await order_svc.get_batch_orders(batch_id)
@@ -475,8 +474,7 @@ async def return_entire_batch(
                             sku=_p,
                             qty=_q,
                             note=_t("return_debt_note") if not _is_disp else ""
-                        ),
-                        reply_markup=lambda _t, _ret=return_order: warehouse_return_kb(_ret.id, _=_t)
+                        )
                     )
                     await notif_svc.save_order_notifications([return_order.id], cm_ids)
                 else:
@@ -490,8 +488,7 @@ async def return_entire_batch(
                             sku=_p,
                             qty=_q,
                             note=""
-                        ),
-                        reply_markup=lambda _t, _ret=return_order: warehouse_return_kb(_ret.id, _=_t)
+                        )
                     )
                     await notif_svc.save_order_notifications([return_order.id], cm_ids)
                 returned_count += 1
