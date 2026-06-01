@@ -4,7 +4,7 @@ from typing import Any
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -69,37 +69,97 @@ async def process_customer_return_quantity(
         await state.clear()
         return
 
+    cart = data.get("cart", [])
+    product_names = data.get("product_names", {})
+    
+    found = False
+    for item in cart:
+        if item["product_id"] == product_id:
+            item["qty"] += quantity
+            found = True
+            break
+            
+    if not found:
+        cart.append({"product_id": product_id, "sku": product.sku, "qty": quantity})
+        
+    from app.bot.routers.seller.catalog_ui import _brand
+    product_names[str(product_id)] = f"{product.sku} / {_brand(product)}"
+        
+    await state.update_data(cart=cart, product_names=product_names)
+    
+    items_text = "\n".join([f"• {product_names.get(str(i['product_id']), i['sku'])} — {i['qty']} шт" for i in cart])
+    
+    from app.bot.keyboards.inline import customer_return_cart_action_kb
+    await message.answer(
+        _("cart_status", items=items_text),
+        parse_mode="HTML",
+        reply_markup=customer_return_cart_action_kb(_=_)
+    )
+    await state.set_state(CustomerReturnFlow.cart_action)
+
+
+@router.callback_query(CustomerReturnFlow.cart_action, F.data == "customer_return_cart:add_more")
+async def customer_return_cart_add_more(callback: CallbackQuery, state: FSMContext, _: Any) -> None:
+    await callback.message.edit_text(_("customer_return_prompt"), parse_mode="HTML")
+    await state.set_state(CustomerReturnFlow.enter_sku)
+    await callback.answer()
+
+
+@router.callback_query(CustomerReturnFlow.cart_action, F.data == "customer_return_cart:clear")
+async def customer_return_cart_clear(callback: CallbackQuery, state: FSMContext, _: Any) -> None:
+    await state.update_data(cart=[])
+    await callback.message.edit_text(_("cart_cleared"))
+    await state.clear()
+    await callback.answer()
+
+
+@router.callback_query(CustomerReturnFlow.cart_action, F.data == "customer_return_cart:send")
+async def customer_return_cart_send(
+    callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any
+) -> None:
+    from app.bot.keyboards.inline import warehouse_return_kb
+    from app.services.notification_service import NotificationService
+    
+    data = await state.get_data()
+    cart = data.get("cart", [])
+    if not cart:
+        await callback.message.edit_text(_("cart_cleared"))
+        await state.clear()
+        return
+
     txn_svc = TransactionService(session)
+    notif_svc = NotificationService(callback.bot, session)
     
     try:
-        order_id = await txn_svc.record_customer_return_and_dispatch(
-            store_id=user.store_id,
-            user_id=user.id,
-            product_id=product_id,
-            quantity=quantity,
-        )
+        for item in cart:
+            order_id = await txn_svc.record_customer_return_and_dispatch(
+                store_id=user.store_id,
+                user_id=user.id,
+                product_id=item["product_id"],
+                quantity=item["qty"],
+            )
+            
+            # Send notification to warehouse for each item
+            await notif_svc.notify_warehouse(
+                text=lambda _t, oid=order_id, sku=item["sku"], qty=item["qty"]: _t(
+                    "return_notif_wh",
+                    type=_t("return_type_goods"),
+                    store=user.store.name if user.store and user.store.name else _t("store_label"),
+                    id=oid,
+                    sku=sku,
+                    qty=qty,
+                    note=_t("return_notif_wh_instr")
+                ),
+                reply_markup=lambda _t, oid=order_id: warehouse_return_kb(oid, _=_t)
+            )
+            
         await session.commit()
-        await message.answer(_("customer_return_success"), parse_mode="HTML")
+        await callback.message.edit_text(_("customer_return_success"), parse_mode="HTML")
         
-        # Send notification to warehouse
-        from app.services.notification_service import NotificationService
-        from app.bot.keyboards.inline import get_return_approval_keyboard
-        
-        notif_svc = NotificationService(message.bot, session)
-        await notif_svc.notify_warehouse(
-            text=lambda _t: _t(
-                "return_notif_wh",
-                type=_t("return_type_goods"),
-                store=user.store.name if user.store and user.store.name else _t("store_label"),
-                id=order_id,
-                sku=product.sku,
-                qty=quantity,
-                note=_t("return_notif_wh_instr")
-            ),
-            reply_markup=lambda _t: get_return_approval_keyboard(_t, order_id, is_display=False)
-        )
     except Exception as e:
-        logger.exception("Error processing customer return: %s", e)
-        await message.answer(_("sale_system_error"))
+        await session.rollback()
+        logger.exception("Error processing customer return cart: %s", e)
+        await callback.message.edit_text(_("sale_system_error"))
     finally:
         await state.clear()
+        await callback.answer()

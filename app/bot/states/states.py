@@ -23,6 +23,7 @@ class ReturnFlow(StatesGroup):
 class CustomerReturnFlow(StatesGroup):
     enter_sku = State()
     enter_quantity = State()
+    cart_action = State()
 
 
 class RegistrationFlow(StatesGroup):

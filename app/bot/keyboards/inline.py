@@ -95,6 +95,17 @@ def cart_action_kb(_: Any) -> InlineKeyboardMarkup:
     )
     return builder.as_markup()
 
+def customer_return_cart_action_kb(_: Any) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text=_("btn_cart_add_more"), callback_data="customer_return_cart:add_more"),
+        InlineKeyboardButton(text=_("btn_cart_send"), callback_data="customer_return_cart:send"),
+    )
+    builder.row(
+        InlineKeyboardButton(text=_("btn_cart_clear"), callback_data="customer_return_cart:clear"),
+    )
+    return builder.as_markup()
+
 def batch_order_action_kb(batch_id: str, _: Any) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
