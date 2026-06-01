@@ -40,11 +40,10 @@ async def subscribe_push(
     existing = res.scalar_one_or_none()
 
     if existing:
-        if existing.user_id != current_user.id:
-            existing.user_id = current_user.id
-            existing.p256dh = sub.keys.p256dh
-            existing.auth = sub.keys.auth
-            await db.commit()
+        existing.user_id = current_user.id
+        existing.p256dh = sub.keys.p256dh
+        existing.auth = sub.keys.auth
+        await db.commit()
         return {"status": "ok"}
 
     new_sub = PushSubscription(
