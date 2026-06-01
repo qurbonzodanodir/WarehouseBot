@@ -14,9 +14,9 @@ from app.models.enums import UserRole
 
 seller_router = Router(name="seller")
 
-# Restrict ALL seller routers to users with the SELLER role
-seller_router.message.filter(RoleFilter(UserRole.SELLER))
-seller_router.callback_query.filter(RoleFilter(UserRole.SELLER))
+# Restrict ALL seller routers to users with SELLER, ADMIN, or OWNER roles
+seller_router.message.filter(RoleFilter(UserRole.SELLER, UserRole.ADMIN, UserRole.OWNER))
+seller_router.callback_query.filter(RoleFilter(UserRole.SELLER, UserRole.ADMIN, UserRole.OWNER))
 
 seller_router.include_router(common_router)
 seller_router.include_router(order_router)
