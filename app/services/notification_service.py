@@ -112,12 +112,24 @@ class NotificationService:
         from app.models.push_subscription import PushSubscription
         from app.core.config import settings
 
+        logger.info(f"[PUSH] _send_web_push_to_roles called. roles={[r.value for r in roles]} title={title[:50]}")
+
         if not settings.vapid_private_key:
+            logger.warning("[PUSH] No VAPID private key configured, skipping push")
             return
 
-        stmt = select(PushSubscription).join(User).where(User.role.in_(roles), User.is_active.is_(True))
-        result = await self.session.execute(stmt)
-        subscriptions = result.scalars().all()
+        try:
+            stmt = select(PushSubscription).join(User).where(User.role.in_(roles), User.is_active.is_(True))
+            result = await self.session.execute(stmt)
+            subscriptions = result.scalars().all()
+            logger.info(f"[PUSH] Found {len(subscriptions)} push subscriptions")
+        except Exception as e:
+            logger.error(f"[PUSH] Error querying subscriptions: {e}")
+            return
+
+        if not subscriptions:
+            logger.warning("[PUSH] No subscriptions found, nothing to send")
+            return
 
         payload = json.dumps({
             "title": title,
@@ -147,14 +159,14 @@ class NotificationService:
                     ttl=86400,
                     headers={"Urgency": "high"}
                 )
+                logger.info(f"[PUSH] Sent OK to sub id={sub.id}")
                 return False
             except WebPushException as ex:
                 response = ex.response
                 if response is not None and response.status_code in (410, 404):
-                    # 410 Gone = subscription expired/unsubscribed, 404 = not found
-                    logger.info(f"Removing dead push subscription id={sub.id} (status={response.status_code})")
+                    logger.info(f"[PUSH] Removing dead push subscription id={sub.id} (status={response.status_code})")
                     return True
-                logger.error(f"Web Push failed: {ex}")
+                logger.error(f"[PUSH] Web Push failed for sub id={sub.id}: {ex}")
                 return False
 
         for sub in subscriptions:
@@ -169,6 +181,7 @@ class NotificationService:
                 delete(PushSubscription).where(PushSubscription.id.in_(dead_sub_ids))
             )
             await self.session.commit()
+            logger.info(f"[PUSH] Deleted dead subscriptions: {dead_sub_ids}")
 
     async def save_order_notifications(
         self,
