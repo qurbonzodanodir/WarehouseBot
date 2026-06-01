@@ -285,14 +285,12 @@ class TransactionService:
             txn_type=FinancialTransactionType.PAYMENT
         )
         
-        # 3. Create RETURN_PENDING order directly to warehouse
         return_order = Order(
             store_id=store_id,
             product_id=product_id,
             quantity=quantity,
             status=OrderStatus.RETURN_PENDING,
             price_per_item=product.price, # wholesale price
-            is_display=False,
         )
         self.session.add(return_order)
         await self.session.flush()
