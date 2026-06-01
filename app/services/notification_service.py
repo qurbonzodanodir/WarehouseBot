@@ -140,7 +140,9 @@ class NotificationService:
                     subscription_info=sub_info,
                     data=payload,
                     vapid_private_key=settings.vapid_private_key,
-                    vapid_claims={"sub": "mailto:admin@yasham.tj"}
+                    vapid_claims={"sub": "mailto:admin@yasham.tj"},
+                    ttl=86400,
+                    headers={"Urgency": "high"}
                 )
             except WebPushException as ex:
                 logger.error(f"Web Push failed: {ex}")
