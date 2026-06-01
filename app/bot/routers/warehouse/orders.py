@@ -113,25 +113,25 @@ async def dispatch_order_start(
             await notif_svc.notify_sellers(
                 store_id=order.store_id,
                 text=lambda _t: _t("order_dispatch_notif_seller", id=order.id, qty=order.quantity),
-                reply_markup=lambda _t: delivery_confirm_kb(order.id, order.quantity, _=_t),
+                reply_markup=None,
             )
         else:
-            # Propose partial dispatch
+            # Forcible partial dispatch (auto-adjust quantity and dispatch)
             qty_to_send = available_qty
-            order = await order_svc.propose_partial_dispatch(
-                order_id, warehouse_store_id=warehouse_id, proposed_quantity=qty_to_send
+            order.quantity = qty_to_send
+            order = await order_svc.dispatch_order(
+                order_id, warehouse_store_id=warehouse_id
             )
             await session.commit()
             
             await callback.message.edit_text(
-                _("order_partial_wh_msg", id=order.id, requested=requested_qty, available=qty_to_send),
-                parse_mode="HTML"
+                _("order_dispatch_success", id=order.id, qty=order.quantity)
             )
 
             await notif_svc.notify_sellers(
                 store_id=order.store_id,
-                text=lambda _t: _t("order_partial_seller_notif", id=order.id, requested=requested_qty, available=qty_to_send),
-                reply_markup=lambda _t: partial_approval_kb(order.id, _=_t),
+                text=lambda _t: _t("order_dispatch_notif_seller", id=order.id, qty=order.quantity),
+                reply_markup=None,
             )
 
     except ValueError as e:
@@ -295,7 +295,7 @@ async def approve_batch_order(
             await notif_svc.notify_sellers(
                 store_id=store_id,
                 text=lambda _t: _t("order_batch_accepted_seller", items=dispatched_text),
-                reply_markup=lambda _t: batch_delivery_confirm_kb(batch_id, _=_t)
+                reply_markup=None
             )
         else:
             # Propose partial fulfillment to seller.

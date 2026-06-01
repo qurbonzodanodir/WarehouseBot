@@ -360,7 +360,7 @@ async def dispatch_from_warehouse(
             await notif_svc.notify_sellers(
                 store_id=body.store_id,
                 text=lambda _t: _t("order_batch_accepted_seller", items=items_text),
-                reply_markup=lambda _t: batch_delivery_confirm_kb(batch_id, _=_t),
+                reply_markup=None,
             )
         except Exception as e:
             import logging
@@ -398,7 +398,7 @@ async def dispatch_order(
         await notif_svc.notify_sellers(
             store_id=order.store_id,
             text=lambda _t: _t("order_dispatch_notif_seller", id=order.id, qty=order.quantity),
-            reply_markup=lambda _t: delivery_confirm_kb(order.id, order.quantity, _=_t),
+            reply_markup=None,
         )
 
         try:
