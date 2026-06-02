@@ -196,10 +196,6 @@ class OrderService:
 
         order.status = OrderStatus.DISPATCHED
         await self.session.flush()
-        
-        # Auto-deliver the order instantly (deducts from warehouse, adds to store, increases debt)
-        order = await self.deliver_order(order.id)
-        
         return order
 
     async def get_batch_orders(self, batch_id: str) -> list[Order]:
@@ -321,11 +317,6 @@ class OrderService:
                 dispatched_orders.append(order)
                 
         await self.session.flush()
-        
-        # Auto-deliver the orders instantly
-        for order in dispatched_orders:
-            await self.deliver_order(order.id)
-            
         return dispatched_orders
 
     async def reject_batch_order(

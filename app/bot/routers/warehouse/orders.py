@@ -113,7 +113,7 @@ async def dispatch_order_start(
             await notif_svc.notify_sellers(
                 store_id=order.store_id,
                 text=lambda _t: _t("order_dispatch_notif_seller", id=order.id, qty=order.quantity),
-                reply_markup=None,
+                reply_markup=lambda _t: delivery_confirm_kb(order.id, order.quantity, _=_t),
             )
         else:
             # Forcible partial dispatch (auto-adjust quantity and dispatch)
@@ -131,7 +131,7 @@ async def dispatch_order_start(
             await notif_svc.notify_sellers(
                 store_id=order.store_id,
                 text=lambda _t: _t("order_dispatch_notif_seller", id=order.id, qty=order.quantity),
-                reply_markup=None,
+                reply_markup=lambda _t: delivery_confirm_kb(order.id, order.quantity, _=_t),
             )
 
     except ValueError as e:
@@ -295,7 +295,7 @@ async def approve_batch_order(
             await notif_svc.notify_sellers(
                 store_id=store_id,
                 text=lambda _t: _t("order_batch_accepted_seller", items=dispatched_text),
-                reply_markup=None
+                reply_markup=lambda _t: batch_delivery_confirm_kb(batch_id, _=_t)
             )
         else:
             # Propose partial fulfillment to seller.
