@@ -168,9 +168,36 @@ export default function OrdersPage() {
 
   async function handleDeliver(id: number) {
     setActionLoading(id);
-    try { await api.deliverOrder(id); await refreshOrders(); }
+    try { await api.deliverOrder(id); await refreshOrders(); showToast(t("orders.deliver_success"), "success"); }
     catch (error) { showToast(getErrorMessage(error, t("common.error")), "error"); }
     finally { setActionLoading(null); }
+  }
+
+  async function handleSell(id: number) {
+    setActionLoading(id);
+    try {
+      await api.sellOrder(id);
+      await refreshOrders();
+      showToast(t("orders.sell_success"), "success");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReturnDelivered(id: number) {
+    if (!confirm(t("common.reject_confirm"))) return;
+    setActionLoading(id);
+    try {
+      await api.returnDeliveredOrder(id);
+      await refreshOrders();
+      showToast(t("orders.return_success"), "success");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   async function handleApproveReturn(id: number) {
@@ -486,6 +513,21 @@ export default function OrdersPage() {
                                   </button>
                                 </>
                               )}
+                              {(order.status === "dispatched" || order.status === "display_dispatched") && (
+                                <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
+                                  <CheckCircle2 size={14} /> {t("orders.action_deliver") || "Принять"}
+                                </button>
+                              )}
+                              {(order.status === "delivered" || order.status === "display_delivered") && (
+                                <>
+                                  <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleSell(order.id)} disabled={actionLoading === order.id}>
+                                    <ShoppingCart size={14} /> {t("orders.action_sell") || "Продать"}
+                                  </button>
+                                  <button className="btn btn-danger" style={{ padding: "5px 10px" }} onClick={() => handleReturnDelivered(order.id)} disabled={actionLoading === order.id}>
+                                    <RefreshCw size={14} /> {t("orders.action_return") || "Возврат"}
+                                  </button>
+                                </>
+                              )}
                               {isReturn && order.status.toLowerCase().includes("pending") && (
                                 <>
                                   <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleApproveReturn(order.id)} disabled={actionLoading === order.id}>
@@ -501,7 +543,7 @@ export default function OrdersPage() {
                         )}
                         {!canManage && user?.role === "seller" && (
                           <td data-label={t("common.actions")}>
-                            {order.status === "dispatched" && (
+                            {(order.status === "dispatched" || order.status === "display_dispatched") && (
                               <button className="btn btn-success" style={{ padding: "5px 10px", width: "100%", justifyContent: "center" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
                                  <CheckCircle2 size={14} /> {t("orders.action_receive")}
                               </button>

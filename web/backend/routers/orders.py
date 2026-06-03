@@ -499,23 +499,36 @@ async def deliver_order(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> OrderOut:
-    from app.models.enums import UserRole
-    _ensure_roles(current_user, {UserRole.SELLER, UserRole.OWNER, UserRole.ADMIN})
+    from app.models.enums import UserRole, OrderStatus
+    _ensure_roles(current_user, {UserRole.SELLER, UserRole.OWNER, UserRole.ADMIN, UserRole.WAREHOUSE})
     order_check = await session.get(Order, order_id)
     if order_check is None:
         raise HTTPException(status_code=404, detail="Order not found")
     _ensure_order_access(current_user, order_check)
 
-    order_svc = OrderService(session)
-    try:
-        await order_svc.deliver_order(order_id)
-        await session.commit()
-    except ValueError as e:
-        await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail="Internal server error")
+    if order_check.status == OrderStatus.DISPLAY_DISPATCHED:
+        from app.services.transaction_service import TransactionService
+        txn_svc = TransactionService(session)
+        try:
+            await txn_svc.receive_display_items(order_id)
+            await session.commit()
+        except ValueError as e:
+            await session.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception:
+            await session.rollback()
+            raise HTTPException(status_code=500, detail="Internal server error")
+    else:
+        order_svc = OrderService(session)
+        try:
+            await order_svc.deliver_order(order_id)
+            await session.commit()
+        except ValueError as e:
+            await session.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception:
+            await session.rollback()
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     result = await session.execute(
         select(Order)
@@ -523,6 +536,7 @@ async def deliver_order(
         .where(Order.id == order_id)
     )
     return result.scalar_one()
+
 
 
 @router.put(
@@ -692,3 +706,163 @@ async def reject_return(
         .where(Order.id == order_id)
     )
     return result.scalar_one()
+
+
+@router.put(
+    "/{order_id}/sell",
+    response_model=OrderOut,
+    summary="Продать доставленный заказ (Администратор)",
+)
+async def sell_order(
+    order_id: int,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> OrderOut:
+    from app.models.enums import UserRole, OrderStatus
+    _ensure_roles(current_user, {UserRole.OWNER, UserRole.ADMIN, UserRole.WAREHOUSE})
+    
+    order_check = await session.get(Order, order_id)
+    if order_check is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    _ensure_order_access(current_user, order_check)
+    
+    if order_check.status != OrderStatus.DELIVERED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Заказ должен быть в статусе DELIVERED для продажи. Текущий статус: {order_check.status}"
+        )
+        
+    from app.services.transaction_service import TransactionService
+    txn_svc = TransactionService(session)
+    try:
+        await txn_svc.record_sale(
+            store_id=order_check.store_id,
+            user_id=current_user.id,
+            product_id=order_check.product_id,
+            quantity=order_check.quantity,
+            price_per_unit=order_check.price_per_item,
+            order_id=order_check.id,
+        )
+        await session.commit()
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+        
+    result = await session.execute(
+        select(Order)
+        .options(joinedload(Order.store), joinedload(Order.product))
+        .where(Order.id == order_id)
+    )
+    return result.scalar_one()
+
+
+@router.put(
+    "/{order_id}/return_delivered",
+    response_model=OrderOut,
+    summary="Возврат доставленного заказа на склад (Администратор)",
+)
+async def return_delivered_order(
+    order_id: int,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> OrderOut:
+    from app.models.enums import UserRole, OrderStatus
+    _ensure_roles(current_user, {UserRole.OWNER, UserRole.ADMIN, UserRole.WAREHOUSE})
+    
+    order = await session.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    _ensure_order_access(current_user, order)
+    
+    allowed_statuses = {OrderStatus.DELIVERED, OrderStatus.DISPLAY_DELIVERED}
+    if order.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Заказ должен быть в статусе DELIVERED или DISPLAY_DELIVERED. Текущий статус: {order.status}"
+        )
+        
+    from app.services.store_service import StoreService
+    from app.services.transaction_service import TransactionService
+    from app.models.enums import StockMovementType, DebtLedgerReason
+    
+    store_svc = StoreService(session)
+    warehouse_id = await store_svc.get_main_warehouse_id()
+    if not warehouse_id:
+        raise HTTPException(status_code=400, detail="Main warehouse not found")
+        
+    txn_svc = TransactionService(session)
+    try:
+        is_display = order.status == OrderStatus.DISPLAY_DELIVERED
+        
+        if is_display:
+            store_inv = await txn_svc._get_display_inventory(order.store_id, order.product_id, lock=True)
+            if store_inv is None or store_inv.quantity < order.quantity:
+                available = store_inv.quantity if store_inv else 0
+                raise ValueError(f"Недостаточно образцов на витрине: в наличии {available}, нужно {order.quantity}.")
+            store_inv.quantity -= order.quantity
+            if store_inv.quantity <= 0:
+                await session.delete(store_inv)
+                
+            order.status = OrderStatus.DISPLAY_RETURNED
+            
+            await txn_svc.record_stock_movement(
+                product_id=order.product_id,
+                quantity=order.quantity,
+                movement_type=StockMovementType.DISPLAY_RETURN,
+                from_store_id=order.store_id,
+                to_store_id=None,
+                user_id=current_user.id,
+            )
+        else:
+            store_inv = await txn_svc._get_inventory(order.store_id, order.product_id, lock=True)
+            if store_inv is None or store_inv.quantity < order.quantity:
+                available = store_inv.quantity if store_inv else 0
+                raise ValueError(f"Недостаточно товара в магазине: в наличии {available}, нужно {order.quantity}.")
+            store_inv.quantity -= order.quantity
+            
+            warehouse_inv = await txn_svc._get_or_create_inventory(warehouse_id, order.product_id, lock=True)
+            warehouse_inv.quantity += order.quantity
+            
+            order.status = OrderStatus.RETURNED
+            
+            await txn_svc.record_stock_movement(
+                product_id=order.product_id,
+                quantity=order.quantity,
+                movement_type=StockMovementType.RETURN_TO_WAREHOUSE,
+                from_store_id=order.store_id,
+                to_store_id=warehouse_id,
+                user_id=current_user.id,
+            )
+            
+            amount = order.price_per_item * order.quantity
+            if amount > 0:
+                from app.models.product import Product
+                product = await session.get(Product, order.product_id)
+                sku = product.sku if product else f"ID {order.product_id}"
+                await txn_svc.record_debt_ledger(
+                    store_id=order.store_id,
+                    amount_change=-amount,
+                    reason=DebtLedgerReason.RETURN_APPROVED,
+                    description=f"Возврат доставленного товара #{order.id} на склад (SKU: {sku}, {order.quantity} шт.)"
+                )
+                
+        await session.commit()
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+        
+    result = await session.execute(
+        select(Order)
+        .options(joinedload(Order.store), joinedload(Order.product))
+        .where(Order.id == order_id)
+    )
+    return result.scalar_one()
+

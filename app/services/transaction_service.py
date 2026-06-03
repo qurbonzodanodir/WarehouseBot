@@ -101,14 +101,9 @@ class TransactionService:
             raise ValueError(f"Store {store_id} not found")
 
         new_balance = store.current_debt + amount_change
-        if new_balance < 0:
-            # We allow small rounding differences but not negative debt usually
-            if abs(new_balance) < 0.01:
-                new_balance = Decimal("0")
-            else:
-                raise ValueError(
-                    f"Нельзя уменьшить долг ниже нуля. Баланс: {store.current_debt}, Изменение: {amount_change}"
-                )
+        # If the balance is extremely close to zero, clean up rounding differences
+        if abs(new_balance) < 0.01:
+            new_balance = Decimal("0")
 
         store.current_debt = new_balance
         balance_after = new_balance
@@ -291,6 +286,7 @@ class TransactionService:
             quantity=quantity,
             status=OrderStatus.RETURN_PENDING,
             price_per_item=product.price, # wholesale price
+            total_price=product.price * quantity, # FIX: Set total price correctly!
         )
         self.session.add(return_order)
         await self.session.flush()

@@ -201,6 +201,10 @@ export const api = {
     request<Order>(`/orders/${id}/reject`, { method: "PUT" }),
   deliverOrder: (id: number) =>
     request<Order>(`/orders/${id}/deliver`, { method: "PUT" }),
+  sellOrder: (id: number) =>
+    request<Order>(`/orders/${id}/sell`, { method: "PUT" }),
+  returnDeliveredOrder: (id: number) =>
+    request<Order>(`/orders/${id}/return_delivered`, { method: "PUT" }),
   approveReturn: (id: number) =>
     request<Order>(`/orders/${id}/approve_return`, { method: "PUT" }),
   rejectReturn: (id: number) =>

@@ -67,11 +67,17 @@ export const tj = {
     col_date: "Сана / Вақт",
     action_dispatch: "Ирсол",
     action_receive: "Қабул",
+    action_sell: "Фурӯхтан",
+    action_return: "Бозгашт",
+    action_deliver: "Қабул кардан",
     no_orders: "Фармоишҳо ёфт нашуданд",
     dispatch_success: "Фармоиш ирсол шуд",
     reject_success: "Фармоиш рад шуд",
     return_approved: "Бозгашт қабул шуд",
-    return_rejected: "Бозгашт рад шуд"
+    return_rejected: "Бозгашт рад шуд",
+    sell_success: "Фармоиш бо муваффақият фурӯхта шуд",
+    return_success: "Фармоиш бо муваффақият баргардонида шуд",
+    deliver_success: "Фармоиш бо муваффақият қабул карда шуд"
   },
 
   // API status values → human-readable

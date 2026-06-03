@@ -344,8 +344,9 @@ class OrderService:
         if order is None or order.status != OrderStatus.PENDING:
             raise ValueError(f"Order #{order_id} is not in PENDING status.")
 
+        # Lock warehouse inventory to prevent concurrent reservation conflicts
         inv = await self._get_or_create_inventory(
-            warehouse_store_id, order.product_id
+            warehouse_store_id, order.product_id, lock=True
         )
         if inv.quantity < proposed_quantity:
             raise ValueError(
@@ -414,9 +415,9 @@ class OrderService:
         if order is None or order.status != OrderStatus.PARTIAL_APPROVAL_PENDING:
             raise ValueError(f"Order #{order_id} is not waiting for partial approval.")
 
-        # Return reserved inventory to warehouse
+        # Return reserved inventory to warehouse with lock to prevent race conditions
         inv = await self._get_or_create_inventory(
-            warehouse_store_id, order.product_id
+            warehouse_store_id, order.product_id, lock=True
         )
         inv.quantity += order.quantity
 
@@ -464,9 +465,9 @@ class OrderService:
         if order is None or order.status != OrderStatus.DISPATCHED:
             raise ValueError(f"Order #{order_id} is not in DISPATCHED status.")
 
-        # Credit to store inventory
+        # Credit to store inventory with lock to prevent race conditions
         inv = await self._get_or_create_inventory(
-            order.store_id, order.product_id
+            order.store_id, order.product_id, lock=True
         )
         inv.quantity += order.quantity
 
@@ -504,6 +505,24 @@ class OrderService:
             raise ValueError(
                 f"Order #{order_id} cannot be rejected from status {order.status}."
             )
+            
+        # FIX: If it is PARTIAL_APPROVAL_PENDING, we MUST return the reserved stock to the warehouse!
+        if order.status == OrderStatus.PARTIAL_APPROVAL_PENDING:
+            from app.services.store_service import StoreService
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            store_svc = StoreService(self.session)
+            warehouse_store_id = await store_svc.get_main_warehouse_id()
+            if warehouse_store_id:
+                # Lock row to prevent race conditions
+                inv = await self._get_or_create_inventory(
+                    warehouse_store_id, order.product_id, lock=True
+                )
+                inv.quantity += order.quantity
+            else:
+                logger.error(f"Cannot return stock for Order #{order_id}: Main warehouse not found.")
+                
         order.status = OrderStatus.REJECTED
         await self.session.flush()
         return order

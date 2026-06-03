@@ -69,11 +69,17 @@ export const ru = {
     col_date: "Дата / Время",
     action_dispatch: "Отгрузить",
     action_receive: "Принять",
+    action_sell: "Продать",
+    action_return: "Возврат",
+    action_deliver: "Принять",
     no_orders: "Заказов не найдено",
     dispatch_success: "Заказ отгружен",
     reject_success: "Заказ отклонен",
     return_approved: "Возврат принят",
-    return_rejected: "Возврат отклонен"
+    return_rejected: "Возврат отклонен",
+    sell_success: "Заказ успешно продан",
+    return_success: "Заказ успешно возвращен",
+    deliver_success: "Заказ успешно принят"
   },
 
   // API status values → human-readable
