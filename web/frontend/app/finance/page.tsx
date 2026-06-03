@@ -281,20 +281,20 @@ export default function FinancePage() {
             </div>
 
             {/* Main Workspace */}
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_2fr] gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1.7fr] gap-8">
               
               {/* Left Column: Collection Form */}
               {/* Left Column: Collection Form */}
               <div className="flex flex-col gap-6 sticky top-6 h-fit">
                 
                 {/* Card 1: Полное списание */}
-                <div className="card p-0" style={{ borderColor: "var(--border)" }}>
+                <div className="card p-0" style={{ borderColor: "var(--border)", borderRadius: "16px", boxShadow: "var(--shadow)" }}>
                   <div className="flex items-center gap-3 px-6 py-5 border-b" style={{ borderColor: "var(--border)" }}>
-                    <div className="p-2.5 rounded-lg" style={{ background: "rgba(34, 197, 94, 0.1)", color: "var(--green)" }}>
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className="p-3 rounded-xl" style={{ background: "rgba(34, 197, 94, 0.1)", color: "var(--green)" }}>
+                      <CheckCircle2 className="w-6 h-6" />
                     </div>
                     <div>
-                      <h2 className="text-base font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+                      <h2 className="text-lg font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
                         {t("finance.full_collect_title")}
                       </h2>
                       <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
@@ -303,14 +303,14 @@ export default function FinancePage() {
                     </div>
                   </div>
 
-                  <div className="p-6 flex flex-col gap-4">
+                  <div className="p-6 flex flex-col gap-5">
                     {/* Search store */}
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
                       <input
                         type="text"
                         placeholder="Поиск магазина..."
-                        className="input w-full pl-9 py-2 text-sm"
+                        className="input w-full pl-10 h-11 text-sm rounded-xl"
                         value={fullSearch}
                         onChange={(e) => setFullSearch(e.target.value)}
                       />
@@ -318,15 +318,15 @@ export default function FinancePage() {
 
                     {/* Select All */}
                     {filteredFullDebtors.length > 0 && (
-                      <div className="flex justify-between items-center text-xs pb-1">
+                      <div className="flex justify-between items-center text-xs pb-1 font-semibold" style={{ color: "var(--text-secondary)" }}>
                         <button
                           type="button"
-                          className="text-xs hover:underline flex items-center gap-2"
-                          style={{ color: "var(--accent)" }}
+                          className="hover:underline flex items-center gap-2"
+                          style={{ color: "var(--accent)", cursor: "pointer" }}
                           onClick={toggleSelectAll}
                         >
                           <div 
-                            className="w-4 h-4 rounded border flex items-center justify-center transition-all"
+                            className="w-4 h-4 rounded-md border flex items-center justify-center transition-all"
                             style={{
                               borderColor: allFilteredSelected ? "var(--accent)" : "var(--border)",
                               background: allFilteredSelected ? "var(--accent)" : "transparent"
@@ -336,16 +336,16 @@ export default function FinancePage() {
                           </div>
                           Выбрать все ({filteredFullDebtors.length})
                         </button>
-                        <span style={{ color: "var(--text-muted)" }}>
+                        <span>
                           Выбрано: {selectedFullStoreIds.length}
                         </span>
                       </div>
                     )}
 
                     {/* Store List */}
-                    <div className="flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ maxHeight: "200px" }}>
+                    <div className="flex flex-col gap-2.5 overflow-y-auto pr-1" style={{ maxHeight: "300px" }}>
                       {filteredFullDebtors.length === 0 ? (
-                        <div className="text-center py-6 text-xs text-muted" style={{ color: "var(--text-muted)" }}>
+                        <div className="text-center py-8 text-xs text-muted" style={{ color: "var(--text-muted)" }}>
                           Нет магазинов с долгом
                         </div>
                       ) : (
@@ -355,12 +355,14 @@ export default function FinancePage() {
                             <button
                               key={d.store_id}
                               type="button"
-                              className="flex items-center justify-between px-3 py-2 rounded-lg text-left text-sm transition-all"
+                              className="flex items-center justify-between px-4 py-3 rounded-xl text-left text-sm transition-all"
                               style={{
-                                border: isChecked ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid var(--border)",
+                                border: isChecked ? "2px solid var(--green)" : "1px solid var(--border)",
                                 background: isChecked ? "rgba(34, 197, 94, 0.05)" : "var(--bg)",
                                 color: isChecked ? "var(--text-primary)" : "var(--text-secondary)",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                transform: isChecked ? "translateY(-0.5px)" : "none",
+                                boxShadow: isChecked ? "0 4px 12px rgba(34, 197, 94, 0.05)" : "none"
                               }}
                               onClick={() => {
                                 if (isChecked) {
@@ -370,19 +372,19 @@ export default function FinancePage() {
                                 }
                               }}
                             >
-                              <div className="flex items-center gap-2.5">
+                              <div className="flex items-center gap-3">
                                 <div 
-                                  className="w-4 h-4 rounded border flex items-center justify-center transition-all"
+                                  className="w-5 h-5 rounded-md border flex items-center justify-center transition-all"
                                   style={{
                                     borderColor: isChecked ? "var(--green)" : "var(--border)",
                                     background: isChecked ? "var(--green)" : "transparent"
                                   }}
                                 >
-                                  {isChecked && <Check className="w-3 h-3 text-white" />}
+                                  {isChecked && <Check className="w-3.5 h-3.5 text-white" />}
                                 </div>
-                                <span className="font-medium">{d.store_name}</span>
+                                <span className="font-semibold text-[14px]">{d.store_name}</span>
                               </div>
-                              <span className="font-bold text-xs" style={{ color: isChecked ? "var(--green)" : "var(--text-muted)" }}>
+                              <span className="font-mono font-bold text-sm" style={{ color: isChecked ? "var(--green)" : "var(--text-primary)" }}>
                                 {Number(d.current_debt).toLocaleString()} TJS
                               </span>
                             </button>
@@ -394,7 +396,15 @@ export default function FinancePage() {
                     <form onSubmit={handleFullCollectMultiple}>
                       <button
                         type="submit"
-                        className="btn btn-success w-full py-2.5 mt-2 text-[14px] font-semibold justify-center gap-2"
+                        className="btn w-full py-3 mt-1 text-[14px] font-bold justify-center gap-2 transition-all"
+                        style={{
+                          background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          color: "#ffffff",
+                          boxShadow: "0 4px 14px rgba(16, 185, 129, 0.2)",
+                          border: "none",
+                          borderRadius: "10px",
+                          cursor: selectedFullStoreIds.length === 0 ? "not-allowed" : "pointer"
+                        }}
                         disabled={submitting || selectedFullStoreIds.length === 0}
                       >
                         {submitting ? (
@@ -412,13 +422,13 @@ export default function FinancePage() {
                 </div>
 
                 {/* Card 2: Частичное списание */}
-                <div className="card p-0" style={{ borderColor: "var(--border)" }}>
+                <div className="card p-0" style={{ borderColor: "var(--border)", borderRadius: "16px", boxShadow: "var(--shadow)" }}>
                   <div className="flex items-center gap-3 px-6 py-5 border-b" style={{ borderColor: "var(--border)" }}>
-                    <div className="p-2.5 rounded-lg" style={{ background: "var(--accent-muted)", color: "var(--accent)" }}>
-                      <Receipt className="w-5 h-5" />
+                    <div className="p-3 rounded-xl" style={{ background: "var(--accent-muted)", color: "var(--accent)" }}>
+                      <Receipt className="w-6 h-6" />
                     </div>
                     <div>
-                      <h2 className="text-base font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+                      <h2 className="text-lg font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
                         {t("finance.partial_collect_title")}
                       </h2>
                       <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
@@ -427,23 +437,23 @@ export default function FinancePage() {
                     </div>
                   </div>
 
-                  <div className="p-6 flex flex-col gap-4">
+                  <div className="p-6 flex flex-col gap-5">
                     {/* Search store */}
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
                       <input
                         type="text"
                         placeholder="Поиск магазина..."
-                        className="input w-full pl-9 py-2 text-sm"
+                        className="input w-full pl-10 h-11 text-sm rounded-xl"
                         value={partialSearch}
                         onChange={(e) => setPartialSearch(e.target.value)}
                       />
                     </div>
 
                     {/* Store List */}
-                    <div className="flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ maxHeight: "160px" }}>
+                    <div className="flex flex-col gap-2.5 overflow-y-auto pr-1" style={{ maxHeight: "220px" }}>
                       {filteredPartialDebtors.length === 0 ? (
-                        <div className="text-center py-6 text-xs text-muted" style={{ color: "var(--text-muted)" }}>
+                        <div className="text-center py-8 text-xs text-muted" style={{ color: "var(--text-muted)" }}>
                           Нет магазинов с долгом
                         </div>
                       ) : (
@@ -453,20 +463,22 @@ export default function FinancePage() {
                             <button
                               key={d.store_id}
                               type="button"
-                              className="flex justify-between items-center px-3 py-2 rounded-lg text-left text-sm transition-all"
+                              className="flex justify-between items-center px-4 py-3 rounded-xl text-left text-sm transition-all"
                               style={{
-                                border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                border: isSelected ? "2px solid var(--accent)" : "1px solid var(--border)",
                                 background: isSelected ? "var(--accent-muted)" : "var(--bg)",
                                 color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                transform: isSelected ? "scale(1.01)" : "none",
+                                boxShadow: isSelected ? "0 4px 12px rgba(108, 99, 255, 0.1)" : "none"
                               }}
                               onClick={() => {
                                 setPartialStoreId(d.store_id);
                                 setPartialAmount("");
                               }}
                             >
-                              <span className="font-medium">{d.store_name}</span>
-                              <span className="font-bold text-xs" style={{ color: isSelected ? "var(--accent)" : "var(--text-muted)" }}>
+                              <span className="font-semibold text-[14px]">{d.store_name}</span>
+                              <span className="font-mono font-bold text-sm" style={{ color: isSelected ? "var(--accent)" : "var(--text-primary)" }}>
                                 {Number(d.current_debt).toLocaleString()} TJS
                               </span>
                             </button>
@@ -475,25 +487,25 @@ export default function FinancePage() {
                       )}
                     </div>
 
-                    <form onSubmit={handlePartialCollect} className="flex flex-col gap-4">
+                    <form onSubmit={handlePartialCollect} className="flex flex-col gap-5">
                       {partialStoreId && selectedPartialStore && (
-                        <div className="flex flex-col gap-3 p-3 rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--bg-hover)" }}>
-                          <div className="flex justify-between text-xs">
+                        <div className="flex flex-col gap-4 p-4 rounded-xl border" style={{ borderColor: "var(--border)", background: "var(--bg-hover)" }}>
+                          <div className="flex justify-between text-xs font-semibold">
                             <span style={{ color: "var(--text-secondary)" }}>{t("finance.debt")}:</span>
-                            <span className="font-bold" style={{ color: "var(--text-primary)" }}>
+                            <span className="font-bold font-mono text-sm text-red-400" style={{ color: "var(--red)" }}>
                               {Number(selectedPartialStore.current_debt).toLocaleString()} TJS
                             </span>
                           </div>
 
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
                               {t("finance.amount")}
                             </label>
                             <div className="relative">
                               <input
                                 type="number"
-                                className="input w-full font-semibold"
-                                style={{ paddingRight: 60 }}
+                                className="input w-full font-bold h-11 rounded-xl text-[16px]"
+                                style={{ paddingRight: 70 }}
                                 placeholder={t("finance.amount_ph")}
                                 step="0.01"
                                 min="0.01"
@@ -503,7 +515,7 @@ export default function FinancePage() {
                               />
                               <button
                                 type="button"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold px-2 py-1 rounded hover:opacity-85"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold px-3 py-1.5 rounded-lg hover:opacity-85"
                                 style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
                                 onClick={() => setPartialAmount(selectedPartialStore.current_debt.toString())}
                               >
@@ -513,9 +525,9 @@ export default function FinancePage() {
                           </div>
 
                           {partialAmount && (
-                            <div className="flex justify-between text-xs pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+                            <div className="flex justify-between text-xs pt-2 border-t font-semibold" style={{ borderColor: "var(--border)" }}>
                               <span style={{ color: "var(--text-muted)" }}>Остаток долга:</span>
-                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                              <span className="font-bold font-mono" style={{ color: "var(--text-primary)" }}>
                                 {Math.max(0, Number(selectedPartialStore.current_debt) - (Number(partialAmount) || 0)).toLocaleString()} TJS
                               </span>
                             </div>
@@ -525,7 +537,15 @@ export default function FinancePage() {
 
                       <button
                         type="submit"
-                        className="btn btn-primary w-full py-2.5 text-[14px] font-semibold justify-center gap-2"
+                        className="btn w-full py-3 text-[14px] font-bold justify-center gap-2 transition-all"
+                        style={{
+                          background: "linear-gradient(135deg, var(--accent) 0%, #5a52e8 100%)",
+                          color: "#ffffff",
+                          boxShadow: "0 4px 14px rgba(108, 99, 255, 0.2)",
+                          border: "none",
+                          borderRadius: "10px",
+                          cursor: (!partialStoreId || !partialAmount) ? "not-allowed" : "pointer"
+                        }}
                         disabled={submitting || !partialStoreId || !partialAmount}
                       >
                         {submitting ? (
