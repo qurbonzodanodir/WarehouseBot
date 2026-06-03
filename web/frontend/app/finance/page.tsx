@@ -41,8 +41,9 @@ export default function FinancePage() {
   const [history, setHistory] = useState<CashCollectionHistoryItem[]>([]);
 
   // Form State
-  const [selectedStoreId, setSelectedStoreId] = useState<number | "">("");
-  const [amount, setAmount] = useState<string>("");
+  const [fullStoreId, setFullStoreId] = useState<number | "">("");
+  const [partialStoreId, setPartialStoreId] = useState<number | "">("");
+  const [partialAmount, setPartialAmount] = useState<string>("");
   const errorText = "";
   const successText = "";
 
@@ -93,33 +94,60 @@ export default function FinancePage() {
     };
   }, [router, showToast, t]);
 
-  const selectedStore = debtors.find((d) => d.store_id === Number(selectedStoreId));
   const totalDebt = debtors.reduce((acc, curr) => acc + Number(curr.current_debt), 0);
+  const selectedFullStore = debtors.find((d) => d.store_id === Number(fullStoreId));
+  const selectedPartialStore = debtors.find((d) => d.store_id === Number(partialStoreId));
 
-  const handleMaxAmount = () => {
-    if (selectedStore) {
-      setAmount(selectedStore.current_debt.toString());
-    }
-  };
-
-  const handleCollect = async (e: React.FormEvent) => {
+  const handleFullCollect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStoreId || !amount) {
+    if (!fullStoreId) {
       showToast(t("finance.err_req"), "error");
       return;
     }
-    const val = parseFloat(amount);
-    if (isNaN(val) || val <= 0) {
+    const store = debtors.find((d) => d.store_id === Number(fullStoreId));
+    if (!store) return;
+    const val = Number(store.current_debt);
+    if (val <= 0) {
       showToast(t("finance.err_zero"), "error");
       return;
     }
 
     try {
       setSubmitting(true);
-      await api.collectCash(Number(selectedStoreId), val);
+      await api.collectCash(Number(fullStoreId), val);
       showToast(t("finance.success_collected", { amount: val }), "success");
-      setSelectedStoreId("");
-      setAmount("");
+      setFullStoreId("");
+      await fetchData(); // Refresh data
+    } catch (error) {
+      showToast(getErrorMessage(error, t("finance.err_collect")), "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePartialCollect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!partialStoreId || !partialAmount) {
+      showToast(t("finance.err_req"), "error");
+      return;
+    }
+    const val = parseFloat(partialAmount);
+    if (isNaN(val) || val <= 0) {
+      showToast(t("finance.err_zero"), "error");
+      return;
+    }
+    const store = debtors.find((d) => d.store_id === Number(partialStoreId));
+    if (store && val > Number(store.current_debt)) {
+      showToast("Сумма не может превышать текущий долг магазина.", "error");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await api.collectCash(Number(partialStoreId), val);
+      showToast(t("finance.success_collected", { amount: val }), "success");
+      setPartialStoreId("");
+      setPartialAmount("");
       await fetchData(); // Refresh data
     } catch (error) {
       showToast(getErrorMessage(error, t("finance.err_collect")), "error");
@@ -210,76 +238,163 @@ export default function FinancePage() {
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_2fr] gap-8">
               
               {/* Left Column: Collection Form */}
-              <div className="card h-fit sticky top-6 p-0" style={{ borderColor: "var(--accent-muted)" }}>
-                <div className="flex items-center gap-3 px-6 py-5 border-b" style={{ borderColor: "var(--border)" }}>
-                  <div className="p-2.5 rounded-lg" style={{ background: "var(--accent-muted)", color: "var(--accent)" }}>
-                    <Wallet className="w-5 h-5" />
+              {/* Left Column: Collection Form */}
+              <div className="flex flex-col gap-6 sticky top-6 h-fit">
+                
+                {/* Card 1: Полное списание */}
+                <div className="card p-0" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-3 px-6 py-5 border-b" style={{ borderColor: "var(--border)" }}>
+                    <div className="p-2.5 rounded-lg" style={{ background: "rgba(34, 197, 94, 0.1)", color: "var(--green)" }}>
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+                        {t("finance.full_collect_title")}
+                      </h2>
+                      <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                        {t("finance.full_collect_desc")}
+                      </p>
+                    </div>
                   </div>
-                  <h2 className="text-xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("finance.collect_action")}</h2>
+
+                  <div className="p-6">
+                    <form onSubmit={handleFullCollect} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                          {t("finance.select_store")}
+                        </label>
+                        <select
+                          className="input"
+                          value={fullStoreId}
+                          onChange={(e) => setFullStoreId(e.target.value ? Number(e.target.value) : "")}
+                        >
+                          <option value="" disabled>-- {t("finance.select_store")} --</option>
+                          {debtors.map((d) => (
+                            <option key={d.store_id} value={d.store_id}>
+                              {d.store_name} ({d.current_debt} TJS)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="btn btn-success w-full py-2.5 mt-2 text-[14px] font-semibold justify-center gap-2"
+                        disabled={submitting || !fullStoreId}
+                      >
+                        {submitting ? (
+                          <div className="spinner" style={{ width: 16, height: 16 }} />
+                        ) : selectedFullStore ? (
+                          <>
+                            {t("finance.full_collect_btn")}: {selectedFullStore.current_debt.toLocaleString()} TJS
+                          </>
+                        ) : (
+                          t("finance.select_store")
+                        )}
+                      </button>
+                    </form>
+                  </div>
                 </div>
 
-                <div className="p-6">
-                  <form onSubmit={handleCollect} className="flex flex-col gap-5">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
-                        {t("finance.select_store")}
-                      </label>
-                      <select
-                        className="input"
-                        value={selectedStoreId}
-                        onChange={(e) => {
-                          setSelectedStoreId(e.target.value ? Number(e.target.value) : "");
-                          setAmount("");
-                        }}
-                      >
-                        <option value="" disabled>-- {t("finance.select_store")} --</option>
-                        {debtors.map((d) => (
-                          <option key={d.store_id} value={d.store_id}>
-                            {d.store_name} ({t("finance.debt")}: {d.current_debt} TJS)
-                          </option>
-                        ))}
-                      </select>
-                      
+                {/* Card 2: Частичное списание */}
+                <div className="card p-0" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center gap-3 px-6 py-5 border-b" style={{ borderColor: "var(--border)" }}>
+                    <div className="p-2.5 rounded-lg" style={{ background: "var(--accent-muted)", color: "var(--accent)" }}>
+                      <Receipt className="w-5 h-5" />
                     </div>
+                    <div>
+                      <h2 className="text-base font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+                        {t("finance.partial_collect_title")}
+                      </h2>
+                      <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                        {t("finance.partial_collect_desc")}
+                      </p>
+                    </div>
+                  </div>
 
-                  {selectedStoreId && (
-                    <div className="flex flex-col gap-2">
-                      <label className="flex justify-between items-center text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
-                        <span>{t("finance.amount")}</span>
-                        <button 
-                          type="button"
-                          className="hover:underline"
-                          style={{ color: "var(--accent)" }}
-                          onClick={handleMaxAmount}
+                  <div className="p-6">
+                    <form onSubmit={handlePartialCollect} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                          {t("finance.select_store")}
+                        </label>
+                        <select
+                          className="input"
+                          value={partialStoreId}
+                          onChange={(e) => {
+                            setPartialStoreId(e.target.value ? Number(e.target.value) : "");
+                            setPartialAmount("");
+                          }}
                         >
-                          {t("finance.max")}
-                        </button>
-                      </label>
-                      <input
-                        type="number"
-                        className="input font-medium text-lg"
-                        placeholder={t("finance.amount_ph")}
-                        step="0.01"
-                        min="0"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                      />
-                      {selectedStore && (
-                        <div className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-                          {t("finance.debt")}: <span style={{ color: "var(--text-primary)" }}>{Math.max(0, selectedStore.current_debt - (Number(amount) || 0))} TJS</span>
+                          <option value="" disabled>-- {t("finance.select_store")} --</option>
+                          {debtors.map((d) => (
+                            <option key={d.store_id} value={d.store_id}>
+                              {d.store_name} ({d.current_debt} TJS)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {partialStoreId && selectedPartialStore && (
+                        <div className="flex flex-col gap-3 p-3 rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--bg-hover)" }}>
+                          <div className="flex justify-between text-xs">
+                            <span style={{ color: "var(--text-secondary)" }}>{t("finance.debt")}:</span>
+                            <span className="font-bold" style={{ color: "var(--text-primary)" }}>
+                              {selectedPartialStore.current_debt.toLocaleString()} TJS
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                              {t("finance.amount")}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                className="input w-full font-semibold"
+                                style={{ paddingRight: 60 }}
+                                placeholder={t("finance.amount_ph")}
+                                step="0.01"
+                                min="0.01"
+                                max={selectedPartialStore.current_debt}
+                                value={partialAmount}
+                                onChange={(e) => setPartialAmount(e.target.value)}
+                              />
+                              <button
+                                type="button"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold px-2 py-1 rounded hover:opacity-85"
+                                style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
+                                onClick={() => setPartialAmount(selectedPartialStore.current_debt.toString())}
+                              >
+                                {t("finance.max")}
+                              </button>
+                            </div>
+                          </div>
+
+                          {partialAmount && (
+                            <div className="flex justify-between text-xs pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+                              <span style={{ color: "var(--text-muted)" }}>Остаток долга:</span>
+                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                                {Math.max(0, Number(selectedPartialStore.current_debt) - (Number(partialAmount) || 0)).toLocaleString()} TJS
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
 
-                  <button
-                    type="submit"
-                    className="btn btn-primary w-full py-3 mt-2 text-[15px] font-semibold justify-center"
-                    disabled={submitting || !selectedStoreId || !amount}
-                  >
-                    {submitting ? t("common.loading") : t("finance.btn_collect")}
-                  </button>
-                  </form>
+                      <button
+                        type="submit"
+                        className="btn btn-primary w-full py-2.5 mt-1 text-[14px] font-semibold justify-center gap-2"
+                        disabled={submitting || !partialStoreId || !partialAmount}
+                      >
+                        {submitting ? (
+                          <div className="spinner" style={{ width: 16, height: 16 }} />
+                        ) : (
+                          t("finance.partial_collect_btn")
+                        )}
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </div>
 
