@@ -513,12 +513,12 @@ export default function OrdersPage() {
                                   </button>
                                 </>
                               )}
-                              {(order.status === "dispatched" || order.status === "display_dispatched") && (
+                              {order.status === "dispatched" && (
                                 <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
                                   <CheckCircle2 size={14} /> {t("orders.action_deliver") || "Принять"}
                                 </button>
                               )}
-                              {(order.status === "delivered" || order.status === "display_delivered") && (
+                              {order.status === "delivered" && (
                                 <>
                                   <button className="btn btn-success" style={{ padding: "5px 10px" }} onClick={() => handleSell(order.id)} disabled={actionLoading === order.id}>
                                     <ShoppingCart size={14} /> {t("orders.action_sell") || "Продать"}
@@ -543,7 +543,7 @@ export default function OrdersPage() {
                         )}
                         {!canManage && user?.role === "seller" && (
                           <td data-label={t("common.actions")}>
-                            {(order.status === "dispatched" || order.status === "display_dispatched") && (
+                            {order.status === "dispatched" && (
                               <button className="btn btn-success" style={{ padding: "5px 10px", width: "100%", justifyContent: "center" }} onClick={() => handleDeliver(order.id)} disabled={actionLoading === order.id}>
                                  <CheckCircle2 size={14} /> {t("orders.action_receive")}
                               </button>

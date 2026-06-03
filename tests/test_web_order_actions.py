@@ -103,7 +103,7 @@ async def test_deliver_order_regular_success():
 
 
 @pytest.mark.asyncio
-async def test_deliver_order_display_success():
+async def test_deliver_order_display_fails():
     async with async_session_factory() as session:
         store, product, users = await get_or_create_test_entities(session)
         
@@ -119,16 +119,10 @@ async def test_deliver_order_display_success():
         session.add(order)
         await session.flush()
         
-        # Warehouse user receives it
-        res = await deliver_order(order_id=order.id, session=session, current_user=users[UserRole.WAREHOUSE])
-        assert res.status == OrderStatus.DISPLAY_DELIVERED
-        
-        # Check display inventory is added
-        res_inv = await session.execute(
-            select(DisplayInventory).where(DisplayInventory.store_id == store.id, DisplayInventory.product_id == product.id)
-        )
-        inv = res_inv.scalar_one()
-        assert inv.quantity >= 1
+        # Try to deliver display order — should fail with 400 bad request
+        with pytest.raises(HTTPException) as exc_info:
+            await deliver_order(order_id=order.id, session=session, current_user=users[UserRole.WAREHOUSE])
+        assert exc_info.value.status_code == 400
 
 
 @pytest.mark.asyncio
@@ -211,7 +205,7 @@ async def test_return_delivered_regular_success():
 
 
 @pytest.mark.asyncio
-async def test_return_delivered_display_success():
+async def test_return_delivered_display_fails():
     async with async_session_factory() as session:
         store, product, users = await get_or_create_test_entities(session)
         
@@ -225,29 +219,12 @@ async def test_return_delivered_display_success():
             status=OrderStatus.DISPLAY_DELIVERED
         )
         session.add(order)
-        
-        # Setup store display inventory
-        res_inv = await session.execute(
-            select(DisplayInventory).where(DisplayInventory.store_id == store.id, DisplayInventory.product_id == product.id)
-        )
-        inv = res_inv.scalar_one_or_none()
-        if not inv:
-            inv = DisplayInventory(store_id=store.id, product_id=product.id, quantity=1)
-            session.add(inv)
-        else:
-            inv.quantity = 1
         await session.flush()
         
-        # Perform return
-        res = await return_delivered_order(order_id=order.id, session=session, current_user=users[UserRole.OWNER])
-        assert res.status == OrderStatus.DISPLAY_RETURNED
-        
-        # Display inventory row should be deleted or 0
-        res_inv_after = await session.execute(
-            select(DisplayInventory).where(DisplayInventory.store_id == store.id, DisplayInventory.product_id == product.id)
-        )
-        inv_after = res_inv_after.scalar_one_or_none()
-        assert inv_after is None or inv_after.quantity == 0
+        # Perform return — should fail with 400 Bad Request
+        with pytest.raises(HTTPException) as exc_info:
+            await return_delivered_order(order_id=order.id, session=session, current_user=users[UserRole.OWNER])
+        assert exc_info.value.status_code == 400
 
 
 @pytest.mark.asyncio

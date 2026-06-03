@@ -499,36 +499,23 @@ async def deliver_order(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> OrderOut:
-    from app.models.enums import UserRole, OrderStatus
+    from app.models.enums import UserRole
     _ensure_roles(current_user, {UserRole.SELLER, UserRole.OWNER, UserRole.ADMIN, UserRole.WAREHOUSE})
     order_check = await session.get(Order, order_id)
     if order_check is None:
         raise HTTPException(status_code=404, detail="Order not found")
     _ensure_order_access(current_user, order_check)
 
-    if order_check.status == OrderStatus.DISPLAY_DISPATCHED:
-        from app.services.transaction_service import TransactionService
-        txn_svc = TransactionService(session)
-        try:
-            await txn_svc.receive_display_items(order_id)
-            await session.commit()
-        except ValueError as e:
-            await session.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception:
-            await session.rollback()
-            raise HTTPException(status_code=500, detail="Internal server error")
-    else:
-        order_svc = OrderService(session)
-        try:
-            await order_svc.deliver_order(order_id)
-            await session.commit()
-        except ValueError as e:
-            await session.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception:
-            await session.rollback()
-            raise HTTPException(status_code=500, detail="Internal server error")
+    order_svc = OrderService(session)
+    try:
+        await order_svc.deliver_order(order_id)
+        await session.commit()
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     result = await session.execute(
         select(Order)
@@ -779,11 +766,10 @@ async def return_delivered_order(
         
     _ensure_order_access(current_user, order)
     
-    allowed_statuses = {OrderStatus.DELIVERED, OrderStatus.DISPLAY_DELIVERED}
-    if order.status not in allowed_statuses:
+    if order.status != OrderStatus.DELIVERED:
         raise HTTPException(
             status_code=400,
-            detail=f"Заказ должен быть в статусе DELIVERED или DISPLAY_DELIVERED. Текущий статус: {order.status}"
+            detail=f"Заказ должен быть в статусе DELIVERED. Текущий статус: {order.status}"
         )
         
     from app.services.store_service import StoreService
@@ -797,59 +783,37 @@ async def return_delivered_order(
         
     txn_svc = TransactionService(session)
     try:
-        is_display = order.status == OrderStatus.DISPLAY_DELIVERED
+        store_inv = await txn_svc._get_inventory(order.store_id, order.product_id, lock=True)
+        if store_inv is None or store_inv.quantity < order.quantity:
+            available = store_inv.quantity if store_inv else 0
+            raise ValueError(f"Недостаточно товара в магазине: в наличии {available}, нужно {order.quantity}.")
+        store_inv.quantity -= order.quantity
         
-        if is_display:
-            store_inv = await txn_svc._get_display_inventory(order.store_id, order.product_id, lock=True)
-            if store_inv is None or store_inv.quantity < order.quantity:
-                available = store_inv.quantity if store_inv else 0
-                raise ValueError(f"Недостаточно образцов на витрине: в наличии {available}, нужно {order.quantity}.")
-            store_inv.quantity -= order.quantity
-            if store_inv.quantity <= 0:
-                await session.delete(store_inv)
-                
-            order.status = OrderStatus.DISPLAY_RETURNED
-            
-            await txn_svc.record_stock_movement(
-                product_id=order.product_id,
-                quantity=order.quantity,
-                movement_type=StockMovementType.DISPLAY_RETURN,
-                from_store_id=order.store_id,
-                to_store_id=None,
-                user_id=current_user.id,
+        warehouse_inv = await txn_svc._get_or_create_inventory(warehouse_id, order.product_id, lock=True)
+        warehouse_inv.quantity += order.quantity
+        
+        order.status = OrderStatus.RETURNED
+        
+        await txn_svc.record_stock_movement(
+            product_id=order.product_id,
+            quantity=order.quantity,
+            movement_type=StockMovementType.RETURN_TO_WAREHOUSE,
+            from_store_id=order.store_id,
+            to_store_id=warehouse_id,
+            user_id=current_user.id,
+        )
+        
+        amount = order.price_per_item * order.quantity
+        if amount > 0:
+            from app.models.product import Product
+            product = await session.get(Product, order.product_id)
+            sku = product.sku if product else f"ID {order.product_id}"
+            await txn_svc.record_debt_ledger(
+                store_id=order.store_id,
+                amount_change=-amount,
+                reason=DebtLedgerReason.RETURN_APPROVED,
+                description=f"Возврат доставленного товара #{order.id} на склад (SKU: {sku}, {order.quantity} шт.)"
             )
-        else:
-            store_inv = await txn_svc._get_inventory(order.store_id, order.product_id, lock=True)
-            if store_inv is None or store_inv.quantity < order.quantity:
-                available = store_inv.quantity if store_inv else 0
-                raise ValueError(f"Недостаточно товара в магазине: в наличии {available}, нужно {order.quantity}.")
-            store_inv.quantity -= order.quantity
-            
-            warehouse_inv = await txn_svc._get_or_create_inventory(warehouse_id, order.product_id, lock=True)
-            warehouse_inv.quantity += order.quantity
-            
-            order.status = OrderStatus.RETURNED
-            
-            await txn_svc.record_stock_movement(
-                product_id=order.product_id,
-                quantity=order.quantity,
-                movement_type=StockMovementType.RETURN_TO_WAREHOUSE,
-                from_store_id=order.store_id,
-                to_store_id=warehouse_id,
-                user_id=current_user.id,
-            )
-            
-            amount = order.price_per_item * order.quantity
-            if amount > 0:
-                from app.models.product import Product
-                product = await session.get(Product, order.product_id)
-                sku = product.sku if product else f"ID {order.product_id}"
-                await txn_svc.record_debt_ledger(
-                    store_id=order.store_id,
-                    amount_change=-amount,
-                    reason=DebtLedgerReason.RETURN_APPROVED,
-                    description=f"Возврат доставленного товара #{order.id} на склад (SKU: {sku}, {order.quantity} шт.)"
-                )
                 
         await session.commit()
     except ValueError as e:
