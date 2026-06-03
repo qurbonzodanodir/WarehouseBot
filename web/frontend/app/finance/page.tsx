@@ -310,7 +310,8 @@ export default function FinancePage() {
                       <input
                         type="text"
                         placeholder="Поиск магазина..."
-                        className="input w-full pl-10 h-11 text-sm rounded-xl"
+                        className="input w-full h-11 text-sm rounded-xl"
+                        style={{ paddingLeft: "40px" }}
                         value={fullSearch}
                         onChange={(e) => setFullSearch(e.target.value)}
                       />
@@ -444,7 +445,8 @@ export default function FinancePage() {
                       <input
                         type="text"
                         placeholder="Поиск магазина..."
-                        className="input w-full pl-10 h-11 text-sm rounded-xl"
+                        className="input w-full h-11 text-sm rounded-xl"
+                        style={{ paddingLeft: "40px" }}
                         value={partialSearch}
                         onChange={(e) => setPartialSearch(e.target.value)}
                       />
