@@ -17,6 +17,8 @@ import {
   AlertCircle,
   CheckCircle2,
   History,
+  Check,
+  Search,
 } from "lucide-react";
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -40,10 +42,14 @@ export default function FinancePage() {
   const [debtors, setDebtors] = useState<CashCollectionSummary[]>([]);
   const [history, setHistory] = useState<CashCollectionHistoryItem[]>([]);
 
-  // Form State
-  const [fullStoreId, setFullStoreId] = useState<number | "">("");
+  // Form State - Full Collection (Multi-select)
+  const [selectedFullStoreIds, setSelectedFullStoreIds] = useState<number[]>([]);
+  const [fullSearch, setFullSearch] = useState("");
+
+  // Form State - Partial Collection (Single-select)
   const [partialStoreId, setPartialStoreId] = useState<number | "">("");
   const [partialAmount, setPartialAmount] = useState<string>("");
+  const [partialSearch, setPartialSearch] = useState("");
   const errorText = "";
   const successText = "";
 
@@ -95,34 +101,45 @@ export default function FinancePage() {
   }, [router, showToast, t]);
 
   const totalDebt = debtors.reduce((acc, curr) => acc + Number(curr.current_debt), 0);
-  const selectedFullStore = debtors.find((d) => d.store_id === Number(fullStoreId));
   const selectedPartialStore = debtors.find((d) => d.store_id === Number(partialStoreId));
 
-  const handleFullCollect = async (e: React.FormEvent) => {
+  const handleFullCollectMultiple = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullStoreId) {
+    if (selectedFullStoreIds.length === 0) {
       showToast(t("finance.err_req"), "error");
       return;
     }
-    const store = debtors.find((d) => d.store_id === Number(fullStoreId));
-    if (!store) return;
-    const val = Number(store.current_debt);
-    if (val <= 0) {
-      showToast(t("finance.err_zero"), "error");
-      return;
+
+    setSubmitting(true);
+    let successCount = 0;
+    let totalCollected = 0;
+    const errors: string[] = [];
+
+    for (const storeId of selectedFullStoreIds) {
+      const store = debtors.find((d) => d.store_id === storeId);
+      if (!store) continue;
+      const val = Number(store.current_debt);
+      if (val <= 0) continue;
+
+      try {
+        await api.collectCash(storeId, val);
+        successCount++;
+        totalCollected += val;
+      } catch (err) {
+        errors.push(`${store.store_name}: ${getErrorMessage(err, "ошибка")}`);
+      }
     }
 
-    try {
-      setSubmitting(true);
-      await api.collectCash(Number(fullStoreId), val);
-      showToast(t("finance.success_collected", { amount: val }), "success");
-      setFullStoreId("");
-      await fetchData(); // Refresh data
-    } catch (error) {
-      showToast(getErrorMessage(error, t("finance.err_collect")), "error");
-    } finally {
-      setSubmitting(false);
+    if (successCount > 0) {
+      showToast(`Успешно списано ${totalCollected.toLocaleString()} TJS у ${successCount} маг.`, "success");
     }
+    if (errors.length > 0) {
+      showToast(`Ошибки при списании: ${errors.join(", ")}`, "error");
+    }
+
+    setSelectedFullStoreIds([]);
+    await fetchData(); // Refresh data
+    setSubmitting(false);
   };
 
   const handlePartialCollect = async (e: React.FormEvent) => {
@@ -155,6 +172,35 @@ export default function FinancePage() {
       setSubmitting(false);
     }
   };
+
+  const filteredFullDebtors = debtors.filter(d => 
+    d.store_name.toLowerCase().includes(fullSearch.toLowerCase())
+  );
+
+  const filteredPartialDebtors = debtors.filter(d => 
+    d.store_name.toLowerCase().includes(partialSearch.toLowerCase())
+  );
+
+  const allFilteredSelected = filteredFullDebtors.length > 0 && filteredFullDebtors.every(d => selectedFullStoreIds.includes(d.store_id));
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      const filteredIds = filteredFullDebtors.map(d => d.store_id);
+      setSelectedFullStoreIds(selectedFullStoreIds.filter(id => !filteredIds.includes(id)));
+    } else {
+      const newIds = [...selectedFullStoreIds];
+      filteredFullDebtors.forEach(d => {
+        if (!newIds.includes(d.store_id)) {
+          newIds.push(d.store_id);
+        }
+      });
+      setSelectedFullStoreIds(newIds);
+    }
+  };
+
+  const totalSelectedFullAmount = debtors
+    .filter((d) => selectedFullStoreIds.includes(d.store_id))
+    .reduce((sum, d) => sum + Number(d.current_debt), 0);
 
   return (
     <div style={{ display: "flex" }}>
@@ -257,39 +303,108 @@ export default function FinancePage() {
                     </div>
                   </div>
 
-                  <div className="p-6">
-                    <form onSubmit={handleFullCollect} className="flex flex-col gap-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
-                          {t("finance.select_store")}
-                        </label>
-                        <select
-                          className="input"
-                          value={fullStoreId}
-                          onChange={(e) => setFullStoreId(e.target.value ? Number(e.target.value) : "")}
-                        >
-                          <option value="" disabled>-- {t("finance.select_store")} --</option>
-                          {debtors.map((d) => (
-                            <option key={d.store_id} value={d.store_id}>
-                              {d.store_name} ({d.current_debt} TJS)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                  <div className="p-6 flex flex-col gap-4">
+                    {/* Search store */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                      <input
+                        type="text"
+                        placeholder="Поиск магазина..."
+                        className="input w-full pl-9 py-2 text-sm"
+                        value={fullSearch}
+                        onChange={(e) => setFullSearch(e.target.value)}
+                      />
+                    </div>
 
+                    {/* Select All */}
+                    {filteredFullDebtors.length > 0 && (
+                      <div className="flex justify-between items-center text-xs pb-1">
+                        <button
+                          type="button"
+                          className="text-xs hover:underline flex items-center gap-2"
+                          style={{ color: "var(--accent)" }}
+                          onClick={toggleSelectAll}
+                        >
+                          <div 
+                            className="w-4 h-4 rounded border flex items-center justify-center transition-all"
+                            style={{
+                              borderColor: allFilteredSelected ? "var(--accent)" : "var(--border)",
+                              background: allFilteredSelected ? "var(--accent)" : "transparent"
+                            }}
+                          >
+                            {allFilteredSelected && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          Выбрать все ({filteredFullDebtors.length})
+                        </button>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          Выбрано: {selectedFullStoreIds.length}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Store List */}
+                    <div className="flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ maxHeight: "200px" }}>
+                      {filteredFullDebtors.length === 0 ? (
+                        <div className="text-center py-6 text-xs text-muted" style={{ color: "var(--text-muted)" }}>
+                          Нет магазинов с долгом
+                        </div>
+                      ) : (
+                        filteredFullDebtors.map(d => {
+                          const isChecked = selectedFullStoreIds.includes(d.store_id);
+                          return (
+                            <button
+                              key={d.store_id}
+                              type="button"
+                              className="flex items-center justify-between px-3 py-2 rounded-lg text-left text-sm transition-all"
+                              style={{
+                                border: isChecked ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid var(--border)",
+                                background: isChecked ? "rgba(34, 197, 94, 0.05)" : "var(--bg)",
+                                color: isChecked ? "var(--text-primary)" : "var(--text-secondary)",
+                                cursor: "pointer"
+                              }}
+                              onClick={() => {
+                                if (isChecked) {
+                                  setSelectedFullStoreIds(selectedFullStoreIds.filter(id => id !== d.store_id));
+                                } else {
+                                  setSelectedFullStoreIds([...selectedFullStoreIds, d.store_id]);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div 
+                                  className="w-4 h-4 rounded border flex items-center justify-center transition-all"
+                                  style={{
+                                    borderColor: isChecked ? "var(--green)" : "var(--border)",
+                                    background: isChecked ? "var(--green)" : "transparent"
+                                  }}
+                                >
+                                  {isChecked && <Check className="w-3 h-3 text-white" />}
+                                </div>
+                                <span className="font-medium">{d.store_name}</span>
+                              </div>
+                              <span className="font-bold text-xs" style={{ color: isChecked ? "var(--green)" : "var(--text-muted)" }}>
+                                {Number(d.current_debt).toLocaleString()} TJS
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <form onSubmit={handleFullCollectMultiple}>
                       <button
                         type="submit"
                         className="btn btn-success w-full py-2.5 mt-2 text-[14px] font-semibold justify-center gap-2"
-                        disabled={submitting || !fullStoreId}
+                        disabled={submitting || selectedFullStoreIds.length === 0}
                       >
                         {submitting ? (
                           <div className="spinner" style={{ width: 16, height: 16 }} />
-                        ) : selectedFullStore ? (
+                        ) : selectedFullStoreIds.length > 0 ? (
                           <>
-                            {t("finance.full_collect_btn")}: {selectedFullStore.current_debt.toLocaleString()} TJS
+                            {t("finance.full_collect_btn")}: {totalSelectedFullAmount.toLocaleString()} TJS
                           </>
                         ) : (
-                          t("finance.select_store")
+                          "Выберите магазины"
                         )}
                       </button>
                     </form>
@@ -312,35 +427,61 @@ export default function FinancePage() {
                     </div>
                   </div>
 
-                  <div className="p-6">
-                    <form onSubmit={handlePartialCollect} className="flex flex-col gap-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
-                          {t("finance.select_store")}
-                        </label>
-                        <select
-                          className="input"
-                          value={partialStoreId}
-                          onChange={(e) => {
-                            setPartialStoreId(e.target.value ? Number(e.target.value) : "");
-                            setPartialAmount("");
-                          }}
-                        >
-                          <option value="" disabled>-- {t("finance.select_store")} --</option>
-                          {debtors.map((d) => (
-                            <option key={d.store_id} value={d.store_id}>
-                              {d.store_name} ({d.current_debt} TJS)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                  <div className="p-6 flex flex-col gap-4">
+                    {/* Search store */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                      <input
+                        type="text"
+                        placeholder="Поиск магазина..."
+                        className="input w-full pl-9 py-2 text-sm"
+                        value={partialSearch}
+                        onChange={(e) => setPartialSearch(e.target.value)}
+                      />
+                    </div>
 
+                    {/* Store List */}
+                    <div className="flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ maxHeight: "160px" }}>
+                      {filteredPartialDebtors.length === 0 ? (
+                        <div className="text-center py-6 text-xs text-muted" style={{ color: "var(--text-muted)" }}>
+                          Нет магазинов с долгом
+                        </div>
+                      ) : (
+                        filteredPartialDebtors.map(d => {
+                          const isSelected = partialStoreId === d.store_id;
+                          return (
+                            <button
+                              key={d.store_id}
+                              type="button"
+                              className="flex justify-between items-center px-3 py-2 rounded-lg text-left text-sm transition-all"
+                              style={{
+                                border: isSelected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                background: isSelected ? "var(--accent-muted)" : "var(--bg)",
+                                color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
+                                cursor: "pointer"
+                              }}
+                              onClick={() => {
+                                setPartialStoreId(d.store_id);
+                                setPartialAmount("");
+                              }}
+                            >
+                              <span className="font-medium">{d.store_name}</span>
+                              <span className="font-bold text-xs" style={{ color: isSelected ? "var(--accent)" : "var(--text-muted)" }}>
+                                {Number(d.current_debt).toLocaleString()} TJS
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <form onSubmit={handlePartialCollect} className="flex flex-col gap-4">
                       {partialStoreId && selectedPartialStore && (
                         <div className="flex flex-col gap-3 p-3 rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--bg-hover)" }}>
                           <div className="flex justify-between text-xs">
                             <span style={{ color: "var(--text-secondary)" }}>{t("finance.debt")}:</span>
                             <span className="font-bold" style={{ color: "var(--text-primary)" }}>
-                              {selectedPartialStore.current_debt.toLocaleString()} TJS
+                              {Number(selectedPartialStore.current_debt).toLocaleString()} TJS
                             </span>
                           </div>
 
@@ -384,7 +525,7 @@ export default function FinancePage() {
 
                       <button
                         type="submit"
-                        className="btn btn-primary w-full py-2.5 mt-1 text-[14px] font-semibold justify-center gap-2"
+                        className="btn btn-primary w-full py-2.5 text-[14px] font-semibold justify-center gap-2"
                         disabled={submitting || !partialStoreId || !partialAmount}
                       >
                         {submitting ? (
