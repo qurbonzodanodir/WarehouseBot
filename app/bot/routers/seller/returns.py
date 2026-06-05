@@ -102,26 +102,13 @@ async def return_search_product(
 
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
-    clean_query = clean_search_query(message.text)
-    
-    exact_matches = [item for item in items if clean_search_query(item.product.sku) == clean_query]
-    exact_match = exact_matches[0] if len(exact_matches) == 1 else None
-    
-    partial_matches = [item for item in items if product_matches(item.product, message.text)]
+    matches = [item for item in items if product_matches(item.product, message.text)]
 
-    if exact_match:
-        await state.update_data(product_id=exact_match.product.id)
-        await message.answer(
-            product_card(exact_match.product, _, exact_match.quantity) + "\n\n" + _("return_enter_qty", qty=exact_match.quantity),
-            parse_mode="HTML"
-        )
-        await state.set_state(ReturnFlow.enter_quantity)
-        return
-    elif partial_matches:
+    if matches:
         await send_catalog_page(
             message,
             _("return_search_found"),
-            partial_matches,
+            matches,
             page=0,
             callback_prefix="return:page",
             item_callback_prefix="return:select",

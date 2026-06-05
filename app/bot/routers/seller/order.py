@@ -94,27 +94,16 @@ async def search_product(
         await message.answer(_("order_not_found_search"))
         return
 
-    # If exactly one match, select it
-    if len(matches) == 1:
-        product = matches[0]
-        await state.update_data(product_id=product.id)
-        await message.answer(
-            product_card(product, _) + "\n\n" + _("order_enter_qty"),
-            parse_mode="HTML",
-        )
-        await state.set_state(OrderFlow.enter_quantity)
-        return
-    else:
-        await send_catalog_page(
-            message,
-            _("order_search_found"),
-            matches,
-            page=0,
-            callback_prefix="order:page",
-            item_callback_prefix="order:select",
-            _=_,
-        )
-        return
+    await send_catalog_page(
+        message,
+        _("order_search_found"),
+        matches,
+        page=0,
+        callback_prefix="order:page",
+        item_callback_prefix="order:select",
+        _=_,
+    )
+    return
 
 
 @router.callback_query(OrderFlow.select_product, F.data.startswith("order:page:"))
