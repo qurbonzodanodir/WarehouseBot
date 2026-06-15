@@ -432,7 +432,7 @@ async def add_invoice(supplier_id: int, body: SupplierInvoiceCreate, session: Se
 
     # Calculate total from product prices × quantities
     total_amount = sum(
-        products_map[item.product_id].price * item.quantity
+        products_map[item.product_id].effective_store_price * item.quantity
         for item in body.items
     )
 
@@ -466,15 +466,15 @@ async def add_invoice(supplier_id: int, body: SupplierInvoiceCreate, session: Se
                 invoice_id=invoice.id,
                 product_id=product.id,
                 quantity=item.quantity,
-                price_per_unit=product.price,
+                price_per_unit=product.effective_store_price,
             )
             session.add(line)
             line_items_out.append(SupplierInvoiceLineItemOut(
                 product_id=product.id,
                 sku=product.sku,
                 quantity=item.quantity,
-                price_per_unit=product.price,
-                line_total=product.price * item.quantity,
+                price_per_unit=product.effective_store_price,
+                line_total=product.effective_store_price * item.quantity,
             ))
 
         await session.commit()
@@ -549,7 +549,7 @@ async def add_return(supplier_id: int, body: SupplierReturnCreate, session: Sess
     if not warehouse_id:
         raise HTTPException(status_code=404, detail="Главный склад не найден")
 
-    total_amount = sum(products_map[item.product_id].price * item.quantity for item in body.items)
+    total_amount = sum(products_map[item.product_id].effective_store_price * item.quantity for item in body.items)
 
     try:
         ret = SupplierReturn(
@@ -578,15 +578,15 @@ async def add_return(supplier_id: int, body: SupplierReturnCreate, session: Sess
                 return_id=ret.id,
                 product_id=product.id,
                 quantity=item.quantity,
-                price_per_unit=product.price,
+                price_per_unit=product.effective_store_price,
             )
             session.add(line)
             line_items_out.append(SupplierReturnLineItemOut(
                 product_id=product.id,
                 sku=product.sku,
                 quantity=item.quantity,
-                price_per_unit=product.price,
-                line_total=product.price * item.quantity,
+                price_per_unit=product.effective_store_price,
+                line_total=product.effective_store_price * item.quantity,
             ))
 
         await session.commit()
@@ -625,7 +625,7 @@ async def add_receipt(supplier_id: int, body: SupplierReceiptCreate, session: Se
     if not warehouse_id:
         raise HTTPException(status_code=404, detail="Главный склад не найден")
 
-    total_amount = sum(products_map[item.product_id].price * item.quantity for item in body.items)
+    total_amount = sum(products_map[item.product_id].effective_store_price * item.quantity for item in body.items)
 
     try:
         receipt = SupplierReceipt(
@@ -651,15 +651,15 @@ async def add_receipt(supplier_id: int, body: SupplierReceiptCreate, session: Se
                 receipt_id=receipt.id,
                 product_id=product.id,
                 quantity=item.quantity,
-                price_per_unit=product.price,
+                price_per_unit=product.effective_store_price,
             )
             session.add(line)
             line_items_out.append(SupplierReceiptLineItemOut(
                 product_id=product.id,
                 sku=product.sku,
                 quantity=item.quantity,
-                price_per_unit=product.price,
-                line_total=product.price * item.quantity,
+                price_per_unit=product.effective_store_price,
+                line_total=product.effective_store_price * item.quantity,
             ))
 
         await session.commit()
@@ -756,7 +756,7 @@ async def add_outgoing_return(supplier_id: int, body: SupplierOutgoingReturnCrea
                 detail=f"Нельзя вернуть {product.sku}: доступно к возврату {available_to_return} шт., указано {item.quantity} шт.",
             )
 
-    total_amount = sum(products_map[item.product_id].price * item.quantity for item in body.items)
+    total_amount = sum(products_map[item.product_id].effective_store_price * item.quantity for item in body.items)
 
     try:
         outgoing_return = SupplierOutgoingReturn(
@@ -782,15 +782,15 @@ async def add_outgoing_return(supplier_id: int, body: SupplierOutgoingReturnCrea
                 return_id=outgoing_return.id,
                 product_id=product.id,
                 quantity=item.quantity,
-                price_per_unit=product.price,
+                price_per_unit=product.effective_store_price,
             )
             session.add(line)
             line_items_out.append(SupplierOutgoingReturnLineItemOut(
                 product_id=product.id,
                 sku=product.sku,
                 quantity=item.quantity,
-                price_per_unit=product.price,
-                line_total=product.price * item.quantity,
+                price_per_unit=product.effective_store_price,
+                line_total=product.effective_store_price * item.quantity,
             ))
 
         await session.commit()
