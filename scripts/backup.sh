@@ -10,7 +10,12 @@ cd "${PROJECT_DIR}"
 
 # Загружаем переменные окружения из .env
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Игнорируем комментарии и пустые строки
+        [[ "$line" =~ ^# ]] && continue
+        [[ -z "$line" ]] && continue
+        export "$line"
+    done < .env
 fi
 
 # Проверяем наличие токена
