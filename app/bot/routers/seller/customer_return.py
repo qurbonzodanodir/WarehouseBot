@@ -34,9 +34,10 @@ async def process_customer_return_sku(
     sku = message.text.strip()
     
     # Check if a product with this SKU exists
-    stmt = select(Product).where(Product.sku == sku)
+    # Use scalars().first() to safely handle cases where multiple products share the same SKU
+    stmt = select(Product).where(Product.sku == sku).limit(1)
     res = await session.execute(stmt)
-    product = res.scalar_one_or_none()
+    product = res.scalars().first()
 
     if not product or product.price <= 0:
         await message.answer(_("customer_return_not_found"))
