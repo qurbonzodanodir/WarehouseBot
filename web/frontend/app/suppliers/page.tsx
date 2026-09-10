@@ -275,9 +275,14 @@ export default function SuppliersPage() {
       list = list.filter(p => receivedProductIds.has(p.id));
     }
 
-    return list.filter(p =>
-      p.sku.toLowerCase().includes(productSearch.toLowerCase())
-    );
+    return list.filter((p) => {
+      const q = productSearch.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        p.sku.toLowerCase().includes(q) ||
+        (p.brand || "").toLowerCase().includes(q)
+      );
+    });
   }, [detailCache, outgoingReturnModal, productOptions, productSearch, returnModal]);
 
   // Max returnable quantity per product (total invoiced - total already returned)
@@ -352,7 +357,7 @@ export default function SuppliersPage() {
     api.getProductOptions({
       search: productSearch,
       productIds,
-      limit: 50,
+      limit: 100,
     })
       .then((items) => {
         if (isActive) {
@@ -1259,7 +1264,7 @@ export default function SuppliersPage() {
                   <input
                     className="input"
                     style={{ width: "100%", paddingLeft: 32, fontSize: 13 }}
-                    placeholder="Поиск по SKU..."
+                    placeholder="Поиск по SKU или бренду..."
                     value={productSearch}
                     onChange={e => setProductSearch(e.target.value)}
                     autoFocus
@@ -1290,7 +1295,8 @@ export default function SuppliersPage() {
                       >
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(Number(p.price))} TJS / шт.</div>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{p.brand || "—"}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{fmt(Number(p.price))} TJS / шт.</div>
                         </div>
                         {inCart ? (
                           <span style={{ fontSize: 11, background: "var(--accent)", color: "#fff", borderRadius: 20, padding: "2px 8px" }}>{inCart.quantity} шт.</span>
@@ -1316,6 +1322,7 @@ export default function SuppliersPage() {
                     <div key={c.product.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
                         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(Number(c.product.price))} × {c.quantity} = <strong>{fmt(Number(c.product.price) * c.quantity)}</strong> TJS</div>
                       </div>
                       <input
@@ -1379,7 +1386,7 @@ export default function SuppliersPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10, overflow: "hidden" }}>
                 <div style={{ position: "relative" }}>
                   <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-                  <input className="input" style={{ width: "100%", paddingLeft: 32, fontSize: 13 }} placeholder="Поиск по SKU..." value={productSearch} onChange={e => setProductSearch(e.target.value)} autoFocus />
+                  <input className="input" style={{ width: "100%", paddingLeft: 32, fontSize: 13 }} placeholder="Поиск по SKU или бренду..." value={productSearch} onChange={e => setProductSearch(e.target.value)} autoFocus />
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", borderRadius: 8, border: "1px solid var(--border)" }}>
                   {productsLoading ? (
@@ -1392,7 +1399,8 @@ export default function SuppliersPage() {
                       <div key={p.id} onClick={() => addToCart(p)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", cursor: "pointer", background: inCart ? "rgba(59,130,246,0.08)" : "transparent", borderBottom: "1px solid var(--border)" }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(Number(p.price))} TJS / шт.</div>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{p.brand || "—"}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{fmt(Number(p.price))} TJS / шт.</div>
                         </div>
                         {inCart ? <span style={{ fontSize: 11, background: "#3b82f6", color: "#fff", borderRadius: 20, padding: "2px 8px" }}>{inCart.quantity} шт.</span> : <Plus size={16} color="var(--text-muted)" />}
                       </div>
@@ -1413,6 +1421,7 @@ export default function SuppliersPage() {
                     <div key={c.product.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
                         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(Number(c.product.price))} × {c.quantity} = <strong>{fmt(Number(c.product.price) * c.quantity)}</strong> TJS</div>
                       </div>
                       <input type="number" min="1" style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13, textAlign: "center" }} value={c.quantity} onChange={e => updateCartQty(c.product.id, parseInt(e.target.value) || 0)} />
@@ -1520,7 +1529,7 @@ export default function SuppliersPage() {
                     <input
                       className="input"
                       style={{ paddingLeft: 32, fontSize: 13 }}
-                      placeholder={t("products.search")}
+                      placeholder="Поиск по SKU или бренду..."
                       value={productSearch}
                       onChange={e => setProductSearch(e.target.value)}
                     />
@@ -1544,8 +1553,9 @@ export default function SuppliersPage() {
                         style={{ padding: "8px 12px", borderRadius: 8, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, background: "var(--bg-card)", border: "1px solid var(--border)" }}
                       >
                         <div>
-                          <span style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</span>
-                          <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>макс. {maxQty} шт.</span>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{p.brand || "—"}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>макс. {maxQty} шт.</div>
                         </div>
                         <Plus size={14} color="var(--accent)" />
                       </div>
@@ -1569,6 +1579,7 @@ export default function SuppliersPage() {
                         <div key={c.product.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--bg-card)", padding: 10, borderRadius: 10, marginBottom: 8, border: "1px solid var(--border)" }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
                             <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(c.product.price)} TJS · макс. {max} шт.</div>
                           </div>
                           <input
@@ -1648,7 +1659,7 @@ export default function SuppliersPage() {
                 <div style={{ padding: 12, borderBottom: "1px solid var(--border)" }}>
                   <div style={{ position: "relative" }}>
                     <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
-                    <input className="input" style={{ paddingLeft: 32, fontSize: 13 }} placeholder={t("products.search")} value={productSearch} onChange={e => setProductSearch(e.target.value)} />
+                    <input className="input" style={{ paddingLeft: 32, fontSize: 13 }} placeholder="Поиск по SKU или бренду..." value={productSearch} onChange={e => setProductSearch(e.target.value)} />
                   </div>
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
@@ -1661,8 +1672,9 @@ export default function SuppliersPage() {
                     return (
                       <div key={p.id} onClick={() => addToOutgoingReturnCart(p)} style={{ padding: "8px 12px", borderRadius: 8, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
                         <div>
-                          <span style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</span>
-                          <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>макс. {maxQty} шт.</span>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{p.brand || "—"}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>макс. {maxQty} шт.</div>
                         </div>
                         <Plus size={14} color="#8b5cf6" />
                       </div>
@@ -1684,6 +1696,7 @@ export default function SuppliersPage() {
                       <div key={c.product.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--bg-card)", padding: 10, borderRadius: 10, marginBottom: 8, border: "1px solid var(--border)" }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
                           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(c.product.price)} TJS · макс. {max} шт.</div>
                         </div>
                         <input type="number" className="input" min={1} max={max} style={{ width: 60, padding: "4px 8px", textAlign: "center" }} value={c.quantity} onChange={e => updateOutgoingReturnCartQty(c.product.id, parseInt(e.target.value) || 0)} />

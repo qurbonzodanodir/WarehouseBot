@@ -214,7 +214,7 @@ async def list_product_options(
     search: str | None = Query(None),
     product_ids: str | None = Query(None),
     include_inactive: bool = Query(False),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=300),
 ) -> list[ProductPickerOut]:
     stmt = select(Product)
 
