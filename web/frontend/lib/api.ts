@@ -274,6 +274,7 @@ export const api = {
       page_size: number;
       total_pages: number;
       total_value: number;
+      display_value: number;
     }>(`/inventory/${store_id}?${qs.toString()}`);
   },
   getAllInventory: () => request<Record<string, StoreInventory>>("/inventory"),
@@ -312,8 +313,14 @@ export const api = {
     return request<CashCollectionSummary[]>("/finance/debtors");
   },
 
-  getFinanceHistory(limit: number = 50): Promise<CashCollectionHistoryItem[]> {
-    return request<CashCollectionHistoryItem[]>(`/finance/history?limit=${limit}`);
+  getFinanceHistory(page: number = 1, pageSize: number = 15): Promise<{
+    items: CashCollectionHistoryItem[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+  }> {
+    return request(`/finance/history?page=${page}&page_size=${pageSize}`);
   },
 
   collectCash(storeId: number, amount: number): Promise<CashCollectionHistoryItem> {
@@ -372,6 +379,7 @@ export interface PaginatedInventoryResponse {
   page_size: number;
   total_pages: number;
   total_value: number;
+  display_value: number;
 }
 
 export interface UserMe {
@@ -471,6 +479,7 @@ export interface StoreCatalogCard {
   address: string;
   total_items: number;
   total_value: number;
+  display_value: number;
 }
 
 export interface ProductInventoryOut {

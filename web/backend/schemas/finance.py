@@ -22,6 +22,14 @@ class CashCollectionHistoryItem(BaseModel):
         from_attributes = True
 
 
+class PaginatedCashCollectionHistory(BaseModel):
+    items: list[CashCollectionHistoryItem]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class CashCollectionSummary(BaseModel):
     store_id: int
     store_name: str

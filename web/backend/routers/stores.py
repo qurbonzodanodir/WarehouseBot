@@ -86,7 +86,8 @@ async def get_store_catalog(
             Store.name,
             Store.address,
             (func.coalesce(inv_sub.c.qty, 0) + func.coalesce(disp_sub.c.qty, 0)).label("total_items"),
-            (func.coalesce(inv_sub.c.val, Decimal("0")) + func.coalesce(disp_sub.c.val, Decimal("0"))).label("total_value")
+            func.coalesce(inv_sub.c.val, Decimal("0")).label("total_value"),
+            func.coalesce(disp_sub.c.val, Decimal("0")).label("display_value"),
         )
         .outerjoin(inv_sub, Store.id == inv_sub.c.store_id)
         .outerjoin(disp_sub, Store.id == disp_sub.c.store_id)
@@ -106,7 +107,8 @@ async def get_store_catalog(
             name=row.name,
             address=row.address,
             total_items=int(row.total_items),
-            total_value=Decimal(row.total_value),
+            total_value=Decimal(row.total_value or 0),
+            display_value=Decimal(row.display_value or 0),
         )
         for row in rows
     ]

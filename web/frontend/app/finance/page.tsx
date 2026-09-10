@@ -19,16 +19,20 @@ import {
   History,
   Check,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-async function requestFinanceData() {
+const HISTORY_PAGE_SIZE = 15;
+
+async function requestFinanceData(historyPage = 1) {
   const [debtData, histData] = await Promise.all([
     api.getDebtors(),
-    api.getFinanceHistory(30),
+    api.getFinanceHistory(historyPage, HISTORY_PAGE_SIZE),
   ]);
   return { debtData, histData };
 }
@@ -41,6 +45,9 @@ export default function FinancePage() {
   const [submitting, setSubmitting] = useState(false);
   const [debtors, setDebtors] = useState<CashCollectionSummary[]>([]);
   const [history, setHistory] = useState<CashCollectionHistoryItem[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(0);
 
   // Form State - Full Collection (Multi-select)
   const [selectedFullStoreIds, setSelectedFullStoreIds] = useState<number[]>([]);
@@ -53,12 +60,15 @@ export default function FinancePage() {
   const errorText = "";
   const successText = "";
 
-  async function fetchData() {
+  async function fetchData(page = historyPage) {
     try {
       setLoading(true);
-      const { debtData, histData } = await requestFinanceData();
+      const { debtData, histData } = await requestFinanceData(page);
       setDebtors(debtData);
-      setHistory(histData);
+      setHistory(histData.items);
+      setHistoryTotal(histData.total);
+      setHistoryTotalPages(histData.total_pages);
+      setHistoryPage(histData.page);
     } catch (error) {
       showToast(`${t("common.error")} : ${getErrorMessage(error, t("common.error"))}`, "error");
     } finally {
@@ -77,10 +87,13 @@ export default function FinancePage() {
     async function loadFinance() {
       try {
         setLoading(true);
-        const { debtData, histData } = await requestFinanceData();
+        const { debtData, histData } = await requestFinanceData(1);
         if (isActive) {
           setDebtors(debtData);
-          setHistory(histData);
+          setHistory(histData.items);
+          setHistoryTotal(histData.total);
+          setHistoryTotalPages(histData.total_pages);
+          setHistoryPage(histData.page);
         }
       } catch (error) {
         if (isActive) {
@@ -99,6 +112,18 @@ export default function FinancePage() {
       isActive = false;
     };
   }, [router, showToast, t]);
+
+  async function loadHistoryPage(page: number) {
+    try {
+      const histData = await api.getFinanceHistory(page, HISTORY_PAGE_SIZE);
+      setHistory(histData.items);
+      setHistoryTotal(histData.total);
+      setHistoryTotalPages(histData.total_pages);
+      setHistoryPage(histData.page);
+    } catch (error) {
+      showToast(`${t("common.error")} : ${getErrorMessage(error, t("common.error"))}`, "error");
+    }
+  }
 
   const totalDebt = debtors.reduce((acc, curr) => acc + Number(curr.current_debt), 0);
   const selectedPartialStore = debtors.find((d) => d.store_id === Number(partialStoreId));
@@ -138,7 +163,7 @@ export default function FinancePage() {
     }
 
     setSelectedFullStoreIds([]);
-    await fetchData(); // Refresh data
+    await fetchData(1); // Refresh data
     setSubmitting(false);
   };
 
@@ -165,7 +190,7 @@ export default function FinancePage() {
       showToast(t("finance.success_collected", { amount: val }), "success");
       setPartialStoreId("");
       setPartialAmount("");
-      await fetchData(); // Refresh data
+      await fetchData(1); // Refresh data
     } catch (error) {
       showToast(getErrorMessage(error, t("finance.err_collect")), "error");
     } finally {
@@ -275,7 +300,7 @@ export default function FinancePage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{t("finance.collect_action")}</p>
-                  <p className="text-3xl font-bold mt-1">{history.length}</p>
+                  <p className="text-3xl font-bold mt-1">{historyTotal}</p>
                 </div>
               </div>
             </div>
@@ -577,6 +602,7 @@ export default function FinancePage() {
                     <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>{t("finance.history_desc")}</p>
                   </div>
                 ) : (
+                  <>
                   <div className="table-wrap rounded-xl overflow-hidden border" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
                     <table className="w-full text-left">
                       <thead>
@@ -624,6 +650,35 @@ export default function FinancePage() {
                       </tbody>
                     </table>
                   </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      {t("finance.history_title")}: {historyTotal} · {HISTORY_PAGE_SIZE} / стр.
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px" }}
+                        disabled={historyPage <= 1}
+                        onClick={() => void loadHistoryPage(historyPage - 1)}
+                      >
+                        <ChevronLeft size={16} /> {t("common.back")}
+                      </button>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>
+                        {historyPage} / {Math.max(historyTotalPages, 1)}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px" }}
+                        disabled={historyPage >= Math.max(historyTotalPages, 1)}
+                        onClick={() => void loadHistoryPage(historyPage + 1)}
+                      >
+                        {t("common.next")} <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  </>
                 )}
               </div>
             </div>

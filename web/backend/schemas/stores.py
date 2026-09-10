@@ -21,6 +21,7 @@ class StoreCatalogCard(BaseModel):
     address: str
     total_items: int
     total_value: Decimal
+    display_value: Decimal = Decimal(0)
 
 
 class StoreCreate(BaseModel):
@@ -99,3 +100,4 @@ class PaginatedInventoryResponse(BaseModel):
     page_size: int
     total_pages: int
     total_value: Decimal = Decimal(0)
+    display_value: Decimal = Decimal(0)

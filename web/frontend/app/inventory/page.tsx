@@ -75,6 +75,7 @@ export default function InventoryPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalValue, setTotalValue] = useState(0);
+  const [displayValue, setDisplayValue] = useState(0);
 
   const [catalog, setCatalog] = useState<StoreCatalogCard[]>([]);
   const [userRole, setUserRole] = useState<string>("seller");
@@ -130,6 +131,8 @@ export default function InventoryPage() {
           setItems([]);
           setTotalItems(0);
           setTotalPages(0);
+          setTotalValue(0);
+          setDisplayValue(0);
         }
       } else {
         api.getInventory(selectedStore, currentPage, pageSize, debouncedSearch, selectedBrand)
@@ -139,6 +142,7 @@ export default function InventoryPage() {
               setTotalItems(data.total);
               setTotalPages(data.total_pages);
               setTotalValue(data.total_value || 0);
+              setDisplayValue(data.display_value || 0);
             }
           })
           .catch(console.error)
@@ -171,6 +175,7 @@ export default function InventoryPage() {
         setTotalItems(data.total);
         setTotalPages(data.total_pages);
         setTotalValue(data.total_value || 0);
+        setDisplayValue(data.display_value || 0);
       });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Ошибка сохранения", "error");
@@ -184,6 +189,7 @@ export default function InventoryPage() {
 
   const totalQuantity = selectedStore ? totalItems : catalog.reduce((s, c) => s + c.total_items, 0);
   const computedTotalValue = selectedStore ? totalValue : catalog.reduce((s, c) => s + Number(c.total_value || 0), 0);
+  const computedDisplayValue = selectedStore ? displayValue : catalog.reduce((s, c) => s + Number(c.display_value || 0), 0);
 
   return (
     <div style={{ display: "flex" }}>
@@ -199,6 +205,9 @@ export default function InventoryPage() {
               <span>{t("inventory.found", { count: totalQuantity })}</span>
               <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", background: "var(--bg-secondary)", borderRadius: 6, border: "1px solid var(--border)", fontWeight: 600, color: "var(--text-primary)" }}>
                 Сумма: {new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(computedTotalValue)} TJS
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", background: "var(--bg-secondary)", borderRadius: 6, border: "1px solid var(--border)", fontWeight: 600, color: "var(--text-primary)" }}>
+                Витрина: {new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(computedDisplayValue)} TJS
               </span>
             </div>
           </div>
@@ -326,6 +335,8 @@ export default function InventoryPage() {
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Стоимость</div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>{fmt(store.total_value)} TJS</div>
+                      <div style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 4 }}>Витрина</div>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{fmt(store.display_value || 0)} TJS</div>
                     </div>
                   </div>
                 </div>

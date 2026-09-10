@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+import math
+
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from app.models.enums import FinancialTransactionType
@@ -11,6 +13,7 @@ from web.backend.schemas.finance import (
     CashCollectionHistoryItem,
     CashCollectionRequest,
     CashCollectionSummary,
+    PaginatedCashCollectionHistory,
 )
 
 router = APIRouter(prefix="/finance", tags=["Finance"])
@@ -46,37 +49,55 @@ async def get_debtors(
 
 @router.get(
     "/history",
-    response_model=list[CashCollectionHistoryItem],
+    response_model=PaginatedCashCollectionHistory,
     summary="История инкассаций",
-    description="Возвращает последние операции по сбору наличных (CASH_COLLECTION).",
+    description="Возвращает операции по сбору наличных (CASH_COLLECTION) с пагинацией.",
 )
 async def get_collection_history(
     session: SessionDep,
     current_user: AdminUser,
-    limit: int = 50,
-) -> list[CashCollectionHistoryItem]:
+    page: int = Query(1, ge=1),
+    page_size: int = Query(15, ge=1, le=100),
+) -> PaginatedCashCollectionHistory:
+    base_filter = FinancialTransaction.type == FinancialTransactionType.COLLECTION
+
+    total_res = await session.execute(
+        select(func.count(FinancialTransaction.id)).where(base_filter)
+    )
+    total = int(total_res.scalar() or 0)
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+
     stmt = (
         select(FinancialTransaction)
         .options(joinedload(FinancialTransaction.store), joinedload(FinancialTransaction.user))
-        .where(FinancialTransaction.type == FinancialTransactionType.COLLECTION)
+        .where(base_filter)
         .order_by(FinancialTransaction.created_at.desc())
-        .limit(limit)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
     result = await session.execute(stmt)
     txns = result.scalars().all()
 
-    return [
-        {
-            "id": txn.id,
-            "store_id": txn.store_id,
-            "store_name": txn.store.name if txn.store else "—",
-            "user_id": txn.user_id,
-            "user_name": txn.user.name if txn.user else "—",
-            "amount": txn.amount,
-            "created_at": txn.created_at,
-        }
+    items = [
+        CashCollectionHistoryItem(
+            id=txn.id,
+            store_id=txn.store_id,
+            store_name=txn.store.name if txn.store else "—",
+            user_id=txn.user_id,
+            user_name=txn.user.name if txn.user else "—",
+            amount=txn.amount,
+            created_at=txn.created_at,
+        )
         for txn in txns
     ]
+
+    return PaginatedCashCollectionHistory(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.post(

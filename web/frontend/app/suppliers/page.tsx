@@ -36,6 +36,8 @@ export default function SuppliersPage() {
   const [mounted, setMounted] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
+  const [openRecvHistory, setOpenRecvHistory] = useState(false);
+  const [openPayHistory, setOpenPayHistory] = useState(false);
   const [detailCache, setDetailCache] = useState<Record<number, SupplierDetail>>({});
   const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
 
@@ -94,8 +96,12 @@ export default function SuppliersPage() {
     setMounted(true);
   }, [router, fetchSuppliers]);
 
+  useEffect(() => {
+    setOpenRecvHistory(false);
+    setOpenPayHistory(false);
+  }, [expandedId]);
+
   const handleExpand = async (id: number) => {
-    if (expandedId === id) { setExpandedId(null); return; }
     setExpandedId(id);
     if (!detailCache[id]) {
       setDetailLoading(prev => ({ ...prev, [id]: true }));
@@ -109,6 +115,20 @@ export default function SuppliersPage() {
       }
     }
   };
+
+  useEffect(() => {
+    if (expandedId == null && suppliers.length > 0) {
+      void handleExpand(suppliers[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suppliers, expandedId]);
+
+  useEffect(() => {
+    if (expandedId != null && !detailCache[expandedId] && !detailLoading[expandedId]) {
+      void handleExpand(expandedId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedId, detailCache, detailLoading]);
 
   const handleCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -507,11 +527,9 @@ export default function SuppliersPage() {
   const totalDebt = suppliers.reduce((acc, s) => acc + Number(s.current_debt), 0);
   const totalPayable = suppliers.reduce((acc, s) => acc + Number(s.payable_debt || 0), 0);
   const netBalance = suppliers.reduce((acc, s) => acc + Number(s.net_balance || 0), 0);
-  const renderAmount = (value: number, color: string, sign = "") => (
-    <span className="partner-history-amount" style={{ color }}>
-      {sign}{fmt(Math.abs(value))} TJS
-    </span>
-  );
+  const selectedSupplier = suppliers.find((s) => s.id === expandedId) || null;
+  const selectedDetail = expandedId ? detailCache[expandedId] : null;
+
   const toggleHistory = (key: string) => {
     setExpandedHistory(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -528,6 +546,124 @@ export default function SuppliersPage() {
         ))}
       </div>
     );
+  };
+
+  type TimelineRow = {
+    key: string;
+    date: string;
+    label: string;
+    qty?: string;
+    amount: number;
+    color: string;
+    items?: { sku: string; quantity: number; price_per_unit: number; line_total: number }[];
+  };
+
+  const buildReceivableTimeline = (detail: SupplierDetail): TimelineRow[] => {
+    const rows: (TimelineRow & { ts: number })[] = [];
+    for (const inv of detail.invoices || []) {
+      const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      rows.push({
+        key: `invoice-${inv.id}`,
+        date: new Date(inv.created_at).toLocaleDateString("ru-RU"),
+        label: t("suppliers.invoices_title"),
+        qty: `${totalQty} шт.`,
+        amount: Number(inv.total_amount),
+        color: "var(--red)",
+        items: inv.items,
+        ts: new Date(inv.created_at).getTime(),
+      });
+    }
+    for (const pay of detail.payments || []) {
+      rows.push({
+        key: `payment-${pay.id}`,
+        date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
+        label: t("suppliers.payments_title"),
+        amount: -Number(pay.amount),
+        color: "var(--green)",
+        ts: new Date(pay.created_at).getTime(),
+      });
+    }
+    for (const ret of detail.returns || []) {
+      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      rows.push({
+        key: `return-${ret.id}`,
+        date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
+        label: t("suppliers.returns_title"),
+        qty: `${totalQty} шт.`,
+        amount: -Number(ret.total_amount),
+        color: "var(--green)",
+        items: ret.items,
+        ts: new Date(ret.created_at).getTime(),
+      });
+    }
+    return rows.sort((a, b) => b.ts - a.ts);
+  };
+
+  const buildPayableTimeline = (detail: SupplierDetail): TimelineRow[] => {
+    const rows: (TimelineRow & { ts: number })[] = [];
+    for (const receipt of detail.receipts || []) {
+      const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      rows.push({
+        key: `receipt-${receipt.id}`,
+        date: new Date(receipt.created_at).toLocaleDateString("ru-RU"),
+        label: t("suppliers.receipts_title"),
+        qty: `${totalQty} шт.`,
+        amount: Number(receipt.total_amount),
+        color: "var(--green)",
+        items: receipt.items,
+        ts: new Date(receipt.created_at).getTime(),
+      });
+    }
+    for (const payout of detail.payouts || []) {
+      rows.push({
+        key: `payout-${payout.id}`,
+        date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
+        label: t("suppliers.payouts_title"),
+        amount: -Number(payout.amount),
+        color: "var(--red)",
+        ts: new Date(payout.created_at).getTime(),
+      });
+    }
+    for (const ret of detail.outgoing_returns || []) {
+      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      rows.push({
+        key: `outgoing-return-${ret.id}`,
+        date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
+        label: t("suppliers.outgoing_returns_title"),
+        qty: `${totalQty} шт.`,
+        amount: -Number(ret.total_amount),
+        color: "var(--red)",
+        items: ret.items,
+        ts: new Date(ret.created_at).getTime(),
+      });
+    }
+    return rows.sort((a, b) => b.ts - a.ts);
+  };
+
+  const renderTimeline = (rows: TimelineRow[]) => {
+    if (rows.length === 0) {
+      return <p className="partner-history-empty" style={{ padding: "18px 8px", textAlign: "center" }}>{t("common.empty")}</p>;
+    }
+    return rows.map((row) => (
+      <div key={row.key}>
+        <button
+          type="button"
+          className="partner-history-row"
+          style={{ cursor: row.items ? "pointer" : "default" }}
+          onClick={() => row.items && toggleHistory(row.key)}
+        >
+          <span className="partner-history-toggle">
+            {row.items ? (expandedHistory[row.key] ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : " "}
+          </span>
+          <span className="partner-history-date">{row.date}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{row.label}{row.qty ? ` · ${row.qty}` : ""}</span>
+          <span className="partner-history-amount" style={{ color: row.color }}>
+            {row.amount > 0 ? "+" : "−"}{fmt(Math.abs(row.amount))} TJS
+          </span>
+        </button>
+        {expandedHistory[row.key] && renderLineItems(row.items)}
+      </div>
+    ));
   };
 
   return (
@@ -582,7 +718,7 @@ export default function SuppliersPage() {
           </div>
         </div>
 
-        {/* Suppliers Table */}
+        {/* Partners split layout */}
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><div className="spinner" /></div>
         ) : suppliers.length === 0 ? (
@@ -591,175 +727,152 @@ export default function SuppliersPage() {
             <p style={{ color: "var(--text-secondary)", fontSize: 16 }}>{t("suppliers.empty")}</p>
           </div>
         ) : (
-          <div className="card" style={{ padding: 0 }}>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("suppliers.col_name")}</th>
-                    <th>{t("suppliers.col_contact")}</th>
-                    <th style={{ textAlign: "right" }}>{t("suppliers.total_debt")}</th>
-                    <th style={{ textAlign: "right" }}>{t("suppliers.total_payable")}</th>
-                    <th style={{ textAlign: "right" }}>{t("suppliers.net_balance")}</th>
-                    <th style={{ textAlign: "center" }}>{t("common.actions")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {suppliers.map(s => (
-                    <React.Fragment key={s.id}>
-                      <tr
-                        style={{ cursor: "pointer", background: expandedId === s.id ? "var(--bg-hover)" : "transparent" }}
-                        onClick={() => handleExpand(s.id)}
+          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "minmax(240px, 300px) 1fr", gap: 14, alignItems: "start" }}>
+            <section className="card" style={{ padding: 0, overflow: "hidden" }}>
+              <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", fontSize: 13, fontWeight: 700 }}>
+                {t("suppliers.col_name")}
+              </div>
+              {suppliers.map((s) => {
+                const active = expandedId === s.id;
+                const net = Number(s.net_balance || 0);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => void handleExpand(s.id)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
+                      borderBottom: "1px solid var(--border)",
+                      background: active ? "var(--bg-hover)" : "transparent",
+                      color: "var(--text-primary)",
+                      padding: "14px 16px",
+                      cursor: "pointer",
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: "var(--accent-muted)", color: "var(--accent)",
+                      display: "grid", placeItems: "center", fontWeight: 700,
+                    }}>
+                      {s.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                        {net >= 0 ? "+" : "−"}{fmt(Math.abs(net))} TJS
+                      </div>
+                    </div>
+                    {active ? <ChevronDown size={16} color="var(--text-muted)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
+                  </button>
+                );
+              })}
+            </section>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {selectedSupplier && (
+                <div className="card" style={{ padding: "16px 18px", display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("suppliers.col_name")}</div>
+                    <h2 style={{ margin: 0, fontSize: 22 }}>{selectedSupplier.name}</h2>
+                    <div style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
+                      {t("suppliers.col_contact")}: {selectedSupplier.contact_info || "—"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {expandedId != null && detailLoading[expandedId] ? (
+                <div className="card" style={{ padding: 40, display: "flex", justifyContent: "center" }}><div className="spinner" /></div>
+              ) : selectedSupplier && selectedDetail ? (
+                <>
+                  <section className="partner-detail-panel">
+                    <div className="partner-detail-header">
+                      <div>
+                        <h3 className="partner-detail-title">{t("suppliers.current_debt")}</h3>
+                        <div className="partner-detail-subtitle">{t("suppliers.btn_invoice")} · {t("suppliers.btn_pay")} · {t("suppliers.btn_return")}</div>
+                      </div>
+                      <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
+                        {fmt(Number(selectedDetail.receivable_debt || 0))} TJS
+                      </div>
+                    </div>
+                    <div className="partner-detail-body">
+                      <div className="partner-actions">
+                        <button className="partner-action-btn" onClick={() => openInvoiceModal(selectedSupplier)}>
+                          <ArrowDownCircle size={14} /> {t("suppliers.btn_invoice")}
+                        </button>
+                        <button className="partner-action-btn" disabled={Number(selectedSupplier.current_debt) <= 0} onClick={() => { setPaymentModal(selectedSupplier); setPaymentAmount(""); setPaymentNotes(""); }}>
+                          <ArrowUpCircle size={14} /> {t("suppliers.btn_pay")}
+                        </button>
+                        <button className="partner-action-btn" onClick={() => openReturnModal(selectedSupplier)}>
+                          <History size={14} /> {t("suppliers.btn_return")}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="partner-action-btn"
+                        style={{ width: "100%", justifyContent: "space-between", marginTop: 4 }}
+                        onClick={() => setOpenRecvHistory((v) => !v)}
                       >
-                        <td data-label={t("suppliers.col_name")}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {expandedId === s.id ? <ChevronDown size={14} color="var(--text-muted)" /> : <ChevronRight size={14} color="var(--text-muted)" />}
-                            <span style={{ fontWeight: 600 }}>{s.name}</span>
-                          </div>
-                        </td>
-                        <td data-label={t("suppliers.col_contact")} style={{ color: "var(--text-secondary)", fontSize: 13 }}>{s.contact_info || "—"}</td>
-                        <td data-label={t("suppliers.total_debt")} style={{ textAlign: "right" }}>
-                          <span style={{ fontWeight: 700, color: Number(s.current_debt) > 0 ? "var(--green)" : "var(--text-secondary)" }}>
-                            {fmt(Number(s.current_debt))} TJS
-                          </span>
-                        </td>
-                        <td data-label={t("suppliers.total_payable")} style={{ textAlign: "right" }}>
-                          <span style={{ fontWeight: 700, color: Number(s.payable_debt || 0) > 0 ? "var(--red)" : "var(--text-secondary)" }}>
-                            {fmt(Number(s.payable_debt || 0))} TJS
-                          </span>
-                        </td>
-                        <td data-label={t("suppliers.net_balance")} style={{ textAlign: "right" }}>
-                          <span style={{ fontWeight: 700, color: Number(s.net_balance || 0) >= 0 ? "var(--green)" : "var(--red)" }}>
-                            {Number(s.net_balance || 0) >= 0 ? "+" : "−"}{fmt(Math.abs(Number(s.net_balance || 0)))} TJS
-                          </span>
-                        </td>
-                        <td data-label={t("common.actions")} style={{ textAlign: "center" }}>
-                          <button
-                            className="btn btn-ghost"
-                            style={{ height: 30, padding: "0 10px", fontSize: 12 }}
-                            onClick={(e) => { e.stopPropagation(); void handleExpand(s.id); }}
-                          >
-                            {expandedId === s.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                          </button>
-                        </td>
-                      </tr>
-
-                      {/* Expanded Detail Row */}
-                      {expandedId === s.id && (
-                        <tr className="expanded-row-mobile" style={{ background: "var(--bg-hover)" }}>
-                          <td colSpan={6} style={{ padding: 0, display: "block" }}>
-                            <div style={{ padding: "16px", borderTop: "1px dashed rgba(139,143,168,0.2)" }}>
-                              {detailLoading[s.id] ? (
-                                <div className="spinner" style={{ width: 16, height: 16 }} />
-                              ) : detailCache[s.id] ? (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-                                  <section className="partner-detail-panel">
-                                    <div className="partner-detail-header">
-                                      <div>
-                                        <h3 className="partner-detail-title">{t("suppliers.current_debt")}</h3>
-                                        <div className="partner-detail-subtitle">{t("suppliers.btn_invoice")} / {t("suppliers.btn_pay")} / {t("suppliers.btn_return")}</div>
-                                      </div>
-                                      <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
-                                        {fmt(Number(detailCache[s.id].receivable_debt || 0))} TJS
-                                      </div>
-                                    </div>
-                                    <div className="partner-detail-body">
-                                      <div className="partner-actions" onClick={e => e.stopPropagation()}>
-                                        <button className="partner-action-btn" style={{ borderColor: "#ef4444", color: "#ef4444", background: "rgba(239,68,68,0.08)" }} onClick={() => openInvoiceModal(s)}>
-                                          <ArrowDownCircle size={14} /> {t("suppliers.btn_invoice")}
-                                        </button>
-                                        <button className="partner-action-btn" style={{ borderColor: "#22c55e", color: "#22c55e", background: "rgba(34,197,94,0.08)" }} disabled={Number(s.current_debt) <= 0} onClick={() => { setPaymentModal(s); setPaymentAmount(""); setPaymentNotes(""); }}>
-                                          <ArrowUpCircle size={14} /> {t("suppliers.btn_pay")}
-                                        </button>
-                                        <button className="partner-action-btn" style={{ borderColor: "#d97706", color: "#d97706", background: "rgba(217,119,6,0.08)" }} onClick={() => openReturnModal(s)}>
-                                          <History size={14} /> {t("suppliers.btn_return")}
-                                        </button>
-                                      </div>
-                                      <div className="partner-history-grid">
-                                        <div className="partner-history-box">
-                                          <h4 className="partner-history-title"><Receipt size={13} /> {t("suppliers.invoices_title")}</h4>
-                                          {detailCache[s.id].invoices.length === 0 ? <p className="partner-history-empty">{t("suppliers.no_invoices")}</p> : detailCache[s.id].invoices.slice(0, 4).map(inv => {
-                                            const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            const rowKey = `invoice-${inv.id}`;
-                                            return <div key={inv.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(inv.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(inv.total_amount), "var(--green)", "+")}</button>{expandedHistory[rowKey] && renderLineItems(inv.items)}</div>;
-                                          })}
-                                        </div>
-                                        <div className="partner-history-box">
-                                          <h4 className="partner-history-title"><Wallet size={13} /> {t("suppliers.payments_title")}</h4>
-                                          {detailCache[s.id].payments.length === 0 ? <p className="partner-history-empty">{t("suppliers.no_payments")}</p> : detailCache[s.id].payments.slice(0, 4).map(pay => (
-                                            <button key={pay.id} type="button" className="partner-history-row" style={{ cursor: "default" }}><span className="partner-history-toggle"> </span><span className="partner-history-date">{new Date(pay.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(pay.amount), "var(--green)", "−")}</button>
-                                          ))}
-                                        </div>
-                                        <div className="partner-history-box">
-                                          <h4 className="partner-history-title"><History size={13} /> {t("suppliers.returns_title")}</h4>
-                                          {(detailCache[s.id].returns?.length || 0) === 0 ? <p className="partner-history-empty">{t("suppliers.no_returns")}</p> : detailCache[s.id].returns?.slice(0, 4).map(ret => {
-                                            const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            const rowKey = `return-${ret.id}`;
-                                            return <div key={ret.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "var(--green)", "−")}</button>{expandedHistory[rowKey] && renderLineItems(ret.items)}</div>;
-                                          })}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </section>
-
-                                  <section className="partner-detail-panel">
-                                    <div className="partner-detail-header">
-                                      <div>
-                                        <h3 className="partner-detail-title">{t("suppliers.current_payable")}</h3>
-                                        <div className="partner-detail-subtitle">{t("suppliers.btn_receipt")} / {t("suppliers.btn_payout")} / {t("suppliers.btn_return_to_partner")}</div>
-                                      </div>
-                                      <div className="partner-detail-amount" style={{ color: "var(--red)" }}>
-                                        {fmt(Number(detailCache[s.id].payable_debt || 0))} TJS
-                                      </div>
-                                    </div>
-                                    <div className="partner-detail-body">
-                                      <div className="partner-actions" onClick={e => e.stopPropagation()}>
-                                        <button className="partner-action-btn" style={{ borderColor: "#3b82f6", color: "#3b82f6", background: "rgba(59,130,246,0.08)" }} onClick={() => openReceiptModal(s)}>
-                                          <ArrowUpCircle size={14} /> {t("suppliers.btn_receipt")}
-                                        </button>
-                                        <button className="partner-action-btn" style={{ borderColor: "#22c55e", color: "#22c55e", background: "rgba(34,197,94,0.08)" }} disabled={Number(s.payable_debt || 0) <= 0} onClick={() => { setPayoutModal(s); setPayoutAmount(""); setPayoutNotes(""); }}>
-                                          <Wallet size={14} /> {t("suppliers.btn_payout")}
-                                        </button>
-                                        <button className="partner-action-btn" style={{ borderColor: "#8b5cf6", color: "#8b5cf6", background: "rgba(139,92,246,0.08)" }} onClick={() => openOutgoingReturnModal(s)}>
-                                          <History size={14} /> {t("suppliers.btn_return_to_partner")}
-                                        </button>
-                                      </div>
-                                      <div className="partner-history-grid">
-                                        <div className="partner-history-box">
-                                          <h4 className="partner-history-title"><ArrowUpCircle size={13} /> {t("suppliers.receipts_title")}</h4>
-                                          {(detailCache[s.id].receipts?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].receipts?.slice(0, 4).map(receipt => {
-                                            const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            const rowKey = `receipt-${receipt.id}`;
-                                            return <div key={receipt.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(receipt.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(receipt.total_amount), "var(--red)", "+")}</button>{expandedHistory[rowKey] && renderLineItems(receipt.items)}</div>;
-                                          })}
-                                        </div>
-                                        <div className="partner-history-box">
-                                          <h4 className="partner-history-title"><Wallet size={13} /> {t("suppliers.payouts_title")}</h4>
-                                          {(detailCache[s.id].payouts?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].payouts?.slice(0, 4).map(payout => (
-                                            <button key={payout.id} type="button" className="partner-history-row" style={{ cursor: "default" }}><span className="partner-history-toggle"> </span><span className="partner-history-date">{new Date(payout.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">—</span>{renderAmount(Number(payout.amount), "var(--green)", "−")}</button>
-                                          ))}
-                                        </div>
-                                        <div className="partner-history-box">
-                                          <h4 className="partner-history-title"><History size={13} /> {t("suppliers.outgoing_returns_title")}</h4>
-                                          {(detailCache[s.id].outgoing_returns?.length || 0) === 0 ? <p className="partner-history-empty">{t("common.empty")}</p> : detailCache[s.id].outgoing_returns?.slice(0, 4).map(ret => {
-                                            const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
-                                            const rowKey = `outgoing-return-${ret.id}`;
-                                            return <div key={ret.id}><button type="button" className="partner-history-row" onClick={() => toggleHistory(rowKey)}><span className="partner-history-toggle">{expandedHistory[rowKey] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span><span className="partner-history-date">{new Date(ret.created_at).toLocaleDateString("ru-RU")}</span><span className="partner-history-qty">{totalQty} шт.</span>{renderAmount(Number(ret.total_amount), "#8b5cf6", "−")}</button>{expandedHistory[rowKey] && renderLineItems(ret.items)}</div>;
-                                          })}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </section>
-                                </div>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
+                        <span>"История"</span>
+                        <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
+                          {buildReceivableTimeline(selectedDetail).length} · {openRecvHistory ? "▴" : "▾"}
+                        </span>
+                      </button>
+                      {openRecvHistory && (
+                        <div className="partner-history-box" style={{ marginTop: 10 }}>
+                          {renderTimeline(buildReceivableTimeline(selectedDetail))}
+                        </div>
                       )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
+                    </div>
+                  </section>
+
+                  <section className="partner-detail-panel">
+                    <div className="partner-detail-header">
+                      <div>
+                        <h3 className="partner-detail-title">{t("suppliers.current_payable")}</h3>
+                        <div className="partner-detail-subtitle">{t("suppliers.btn_receipt")} · {t("suppliers.btn_payout")} · {t("suppliers.btn_return_to_partner")}</div>
+                      </div>
+                      <div className="partner-detail-amount" style={{ color: "var(--red)" }}>
+                        {fmt(Number(selectedDetail.payable_debt || 0))} TJS
+                      </div>
+                    </div>
+                    <div className="partner-detail-body">
+                      <div className="partner-actions">
+                        <button className="partner-action-btn" onClick={() => openReceiptModal(selectedSupplier)}>
+                          <ArrowUpCircle size={14} /> {t("suppliers.btn_receipt")}
+                        </button>
+                        <button className="partner-action-btn" disabled={Number(selectedSupplier.payable_debt || 0) <= 0} onClick={() => { setPayoutModal(selectedSupplier); setPayoutAmount(""); setPayoutNotes(""); }}>
+                          <Wallet size={14} /> {t("suppliers.btn_payout")}
+                        </button>
+                        <button className="partner-action-btn" onClick={() => openOutgoingReturnModal(selectedSupplier)}>
+                          <History size={14} /> {t("suppliers.btn_return_to_partner")}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="partner-action-btn"
+                        style={{ width: "100%", justifyContent: "space-between", marginTop: 4 }}
+                        onClick={() => setOpenPayHistory((v) => !v)}
+                      >
+                        <span>"История"</span>
+                        <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
+                          {buildPayableTimeline(selectedDetail).length} · {openPayHistory ? "▴" : "▾"}
+                        </span>
+                      </button>
+                      {openPayHistory && (
+                        <div className="partner-history-box" style={{ marginTop: 10 }}>
+                          {renderTimeline(buildPayableTimeline(selectedDetail))}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </>
+              ) : null}
             </div>
           </div>
         )}

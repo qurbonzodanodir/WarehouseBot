@@ -115,25 +115,43 @@ async def get_store_inventory(
     items_list = list(merged.values())
     items_list.sort(key=lambda x: x.product_sku)
 
-    # Apply search filter (case-insensitive substring over SKU or brand)
-    if search:
-        q = search.strip().lower()
-        if q:
-            items_list = [
-                it for it in items_list
-                if q in it.product_sku.lower() or q in it.product_brand.lower()
-            ]
+    search_q = (search or "").strip().lower()
+    brand_norm = (brand or "").strip().lower().replace(" ", "").replace("-", "")
 
-    if brand:
-        normalized = brand.strip().lower().replace(" ", "").replace("-", "")
-        if normalized:
-            items_list = [
-                it for it in items_list
-                if it.product_brand.strip().lower().replace(" ", "").replace("-", "") == normalized
-            ]
+    def _matches(sku: str, brand_name: str) -> bool:
+        if search_q and search_q not in sku.lower() and search_q not in brand_name.lower():
+            return False
+        if brand_norm:
+            bn = brand_name.strip().lower().replace(" ", "").replace("-", "")
+            if bn != brand_norm:
+                return False
+        return True
 
-    # Calculate total value before pagination
-    total_value = sum(Decimal(str(it.quantity)) * it.product_price for it in items_list)
+    # Apply search/brand filter to merged list (for table)
+    if search_q or brand_norm:
+        items_list = [
+            it for it in items_list
+            if _matches(it.product_sku, it.product_brand)
+        ]
+
+    # Regular vs display value calculated separately (before merge)
+    total_value = Decimal(0)
+    for inv in items_reg:
+        sku = inv.product.sku if inv.product else ""
+        brand_name = (inv.product.brand or "") if inv.product else ""
+        if not _matches(sku, brand_name):
+            continue
+        price = inv.product.price if inv.product and inv.product.price is not None else Decimal(0)
+        total_value += Decimal(str(inv.quantity)) * price
+
+    display_value = Decimal(0)
+    for inv in items_disp:
+        sku = inv.product.sku if inv.product else ""
+        brand_name = (inv.product.brand or "") if inv.product else ""
+        if not _matches(sku, brand_name):
+            continue
+        price = inv.product.price if inv.product and inv.product.price is not None else Decimal(0)
+        display_value += Decimal(str(inv.quantity)) * price
 
     # Apply pagination
     total = len(items_list)
@@ -147,7 +165,8 @@ async def get_store_inventory(
         page=page,
         page_size=page_size,
         total_pages=total_pages,
-        total_value=total_value
+        total_value=total_value,
+        display_value=display_value,
     )
 
 
