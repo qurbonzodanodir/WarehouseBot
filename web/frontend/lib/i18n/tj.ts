@@ -375,7 +375,16 @@ export const tj = {
     current_debt: "Ӯ ба мо қарздор",
     current_payable: "Мо ба ӯ қарздор",
     notes: "Эзоҳ",
-    notes_ph: "Ихтиёрӣ..."
+    notes_ph: "Ихтиёрӣ...",
+    export_excel: "Export Excel",
+    export_success: "Excel зеркашӣ шуд",
+    export_empty: "Аввал шарикро кушоед",
+    export_period_title: "Давра барои Excel",
+    export_period_all: "Тамоми давра",
+    export_period_month: "Як моҳ",
+    export_month: "Моҳ",
+    export_year: "Сол",
+    export_download: "Зеркашӣ",
   },
 
   settings: {

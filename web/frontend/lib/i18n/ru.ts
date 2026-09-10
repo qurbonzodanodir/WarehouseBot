@@ -378,7 +378,16 @@ export const ru = {
     current_debt: "Он должен нам",
     current_payable: "Мы должны ему",
     notes: "Заметка",
-    notes_ph: "Необязательно..."
+    notes_ph: "Необязательно...",
+    export_excel: "Export Excel",
+    export_success: "Excel скачан",
+    export_empty: "Сначала откройте партнёра",
+    export_period_title: "Период для Excel",
+    export_period_all: "Весь период",
+    export_period_month: "Один месяц",
+    export_month: "Месяц",
+    export_year: "Год",
+    export_download: "Скачать",
   },
 
   settings: {

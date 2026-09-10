@@ -7,10 +7,11 @@ import { api, ProductPicker, Supplier, SupplierDetail } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
 import { createPortal } from "react-dom";
+import * as XLSX from "xlsx";
 import {
   Truck, Plus, AlertCircle, ChevronRight, ChevronDown,
   Receipt, Wallet, X, History, ArrowDownCircle, ArrowUpCircle,
-  Search, Trash2, ShoppingCart
+  Search, Trash2, ShoppingCart, FileSpreadsheet
 } from "lucide-react";
 
 function fmt(n: number) {
@@ -77,6 +78,11 @@ export default function SuppliersPage() {
   const [outgoingReturnModal, setOutgoingReturnModal] = useState<Supplier | null>(null);
   const [outgoingReturnNotes, setOutgoingReturnNotes] = useState("");
   const [savingOutgoingReturn, setSavingOutgoingReturn] = useState(false);
+
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportPeriodMode, setExportPeriodMode] = useState<"all" | "month">("month");
+  const [exportMonth, setExportMonth] = useState(() => new Date().getMonth());
+  const [exportYear, setExportYear] = useState(() => new Date().getFullYear());
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -685,6 +691,268 @@ export default function SuppliersPage() {
     );
   };
 
+  const MONTHS_RU = [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+  ];
+
+  const exportPartnerExcel = (
+    detail: SupplierDetail,
+    period: { mode: "all" } | { mode: "month"; year: number; month: number },
+  ) => {
+    const exportedAt = new Date();
+    const dateStr = exportedAt.toLocaleDateString("ru-RU");
+
+    const periodStart =
+      period.mode === "month" ? new Date(period.year, period.month, 1, 0, 0, 0, 0).getTime() : null;
+    const periodEnd =
+      period.mode === "month" ? new Date(period.year, period.month + 1, 0, 23, 59, 59, 999).getTime() : null;
+
+    const inSelectedPeriod = (ts: number) => {
+      if (periodStart == null || periodEnd == null) return true;
+      return ts >= periodStart && ts <= periodEnd;
+    };
+    const beforePeriod = (ts: number) => periodStart != null && ts < periodStart;
+
+    const periodLabel =
+      period.mode === "all"
+        ? "Весь период"
+        : `${MONTHS_RU[period.month]} ${period.year} (01.${String(period.month + 1).padStart(2, "0")}.${period.year} – ${String(new Date(period.year, period.month + 1, 0).getDate()).padStart(2, "0")}.${String(period.month + 1).padStart(2, "0")}.${period.year})`;
+
+    type ExportOp = {
+      ts: number;
+      date: string;
+      side: string;
+      type: string;
+      qty: string;
+      amount: number;
+      notes: string;
+      items?: { sku: string; quantity: number; price_per_unit: number; line_total: number }[];
+      recvDelta: number;
+      payDelta: number;
+    };
+
+    const allOps: ExportOp[] = [];
+
+    for (const inv of detail.invoices || []) {
+      const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      const amount = Number(inv.total_amount);
+      allOps.push({
+        ts: new Date(inv.created_at).getTime(),
+        date: new Date(inv.created_at).toLocaleDateString("ru-RU"),
+        side: "Он должен нам",
+        type: "Отдали товар",
+        qty: totalQty ? `${totalQty} шт.` : "",
+        amount,
+        notes: inv.notes || "",
+        items: inv.items,
+        recvDelta: amount,
+        payDelta: 0,
+      });
+    }
+    for (const pay of detail.payments || []) {
+      const note = (pay.notes || "").toLowerCase();
+      const amount = Number(pay.amount);
+      allOps.push({
+        ts: new Date(pay.created_at).getTime(),
+        date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
+        side: "Он должен нам",
+        type: note.includes("закрыт") ? "Закрытие долга" : "Оплата от партнёра",
+        qty: "",
+        amount: -amount,
+        notes: pay.notes || "",
+        recvDelta: -amount,
+        payDelta: 0,
+      });
+    }
+    for (const ret of detail.returns || []) {
+      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      const amount = Number(ret.total_amount);
+      allOps.push({
+        ts: new Date(ret.created_at).getTime(),
+        date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
+        side: "Он должен нам",
+        type: "Возврат нам",
+        qty: totalQty ? `${totalQty} шт.` : "",
+        amount: -amount,
+        notes: ret.notes || "",
+        items: ret.items,
+        recvDelta: -amount,
+        payDelta: 0,
+      });
+    }
+    for (const receipt of detail.receipts || []) {
+      const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      const amount = Number(receipt.total_amount);
+      allOps.push({
+        ts: new Date(receipt.created_at).getTime(),
+        date: new Date(receipt.created_at).toLocaleDateString("ru-RU"),
+        side: "Мы должны ему",
+        type: "Приняли товар",
+        qty: totalQty ? `${totalQty} шт.` : "",
+        amount,
+        notes: receipt.notes || "",
+        items: receipt.items,
+        recvDelta: 0,
+        payDelta: amount,
+      });
+    }
+    for (const payout of detail.payouts || []) {
+      const amount = Number(payout.amount);
+      allOps.push({
+        ts: new Date(payout.created_at).getTime(),
+        date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
+        side: "Мы должны ему",
+        type: "Наша оплата",
+        qty: "",
+        amount: -amount,
+        notes: payout.notes || "",
+        recvDelta: 0,
+        payDelta: -amount,
+      });
+    }
+    for (const ret of detail.outgoing_returns || []) {
+      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      const amount = Number(ret.total_amount);
+      allOps.push({
+        ts: new Date(ret.created_at).getTime(),
+        date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
+        side: "Мы должны ему",
+        type: "Вернули партнёру",
+        qty: totalQty ? `${totalQty} шт.` : "",
+        amount: -amount,
+        notes: ret.notes || "",
+        items: ret.items,
+        recvDelta: 0,
+        payDelta: -amount,
+      });
+    }
+
+    allOps.sort((a, b) => a.ts - b.ts);
+
+    let recvOpen = 0;
+    let payOpen = 0;
+    for (const op of allOps) {
+      if (beforePeriod(op.ts)) {
+        recvOpen += op.recvDelta;
+        payOpen += op.payDelta;
+      }
+    }
+
+    const ops = allOps.filter((op) => inSelectedPeriod(op.ts));
+    const recvTurnover = ops.reduce((acc, op) => acc + op.recvDelta, 0);
+    const payTurnover = ops.reduce((acc, op) => acc + op.payDelta, 0);
+    const recvClose = period.mode === "all" ? Number(detail.receivable_debt || 0) : recvOpen + recvTurnover;
+    const payClose = period.mode === "all" ? Number(detail.payable_debt || 0) : payOpen + payTurnover;
+    const netClose = recvClose - payClose;
+
+    const sumByType = (type: string) =>
+      ops.filter((op) => op.type === type || (type === "Оплата от партнёра" && op.type === "Закрытие долга"))
+        .reduce((acc, op) => acc + Math.abs(op.amount), 0);
+
+    const summaryRows: (string | number)[][] = [
+      ["Взаиморасчёты с партнёром"],
+      ["Партнёр", detail.name],
+      ["Контакт", detail.contact_info || "—"],
+      ["Адрес", detail.address || "—"],
+      ["Период", periodLabel],
+      ["Дата выгрузки", `${dateStr} ${exportedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`],
+      [],
+      ["Баланс на конец периода"],
+      ["Он должен нам (TJS)", recvClose],
+      ["Мы должны ему (TJS)", payClose],
+      ["Итог: кто кому должен", netClose > 0 ? `Партнёр должен нам ${netClose} TJS` : netClose < 0 ? `Мы должны партнёру ${Math.abs(netClose)} TJS` : "Взаимный долг закрыт"],
+      ["Чистый баланс (TJS)", netClose],
+    ];
+
+    if (period.mode === "month") {
+      summaryRows.push(
+        [],
+        ["На начало месяца"],
+        ["Он должен нам (TJS)", recvOpen],
+        ["Мы должны ему (TJS)", payOpen],
+      );
+    }
+
+    summaryRows.push(
+      [],
+      ["Обороты за период"],
+      ["Отдали товар", sumByType("Отдали товар")],
+      ["Оплаты от партнёра", sumByType("Оплата от партнёра")],
+      ["Возвраты нам", sumByType("Возврат нам")],
+      ["Приняли товар", sumByType("Приняли товар")],
+      ["Наши оплаты", sumByType("Наша оплата")],
+      ["Вернули партнёру", sumByType("Вернули партнёру")],
+    );
+
+    const opsRows: (string | number)[][] = [
+      ["Дата", "Сторона", "Операция", "Кол-во", "Сумма (TJS)", "Примечание"],
+      ...(ops.length
+        ? ops.map((op) => [op.date, op.side, op.type, op.qty, op.amount, op.notes])
+        : [["—", "—", "Нет операций за выбранный период", "—", "—", "—"]]),
+    ];
+
+    const goodsRows: (string | number)[][] = [
+      ["Дата", "Сторона", "Операция", "SKU", "Кол-во", "Цена", "Сумма строки (TJS)"],
+    ];
+    for (const op of ops) {
+      if (!op.items?.length) continue;
+      for (const item of op.items) {
+        goodsRows.push([
+          op.date,
+          op.side,
+          op.type,
+          item.sku,
+          item.quantity,
+          Number(item.price_per_unit),
+          Number(item.line_total),
+        ]);
+      }
+    }
+    if (goodsRows.length === 1) {
+      goodsRows.push(["—", "—", "Нет товарных позиций", "—", "—", "—", "—"]);
+    }
+
+    const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+    wsSummary["!cols"] = [{ wch: 28 }, { wch: 48 }];
+    const wsOps = XLSX.utils.aoa_to_sheet(opsRows);
+    wsOps["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 22 }, { wch: 10 }, { wch: 14 }, { wch: 28 }];
+    const wsGoods = XLSX.utils.aoa_to_sheet(goodsRows);
+    wsGoods["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Сводка");
+    XLSX.utils.book_append_sheet(wb, wsOps, "Операции");
+    XLSX.utils.book_append_sheet(wb, wsGoods, "Товары");
+
+    const safeName = detail.name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "partner";
+    const periodFile =
+      period.mode === "all"
+        ? "all"
+        : `${period.year}-${String(period.month + 1).padStart(2, "0")}`;
+    XLSX.writeFile(wb, `partner_${safeName}_${periodFile}.xlsx`);
+    showToast(t("suppliers.export_success"), "success");
+    setExportModalOpen(false);
+  };
+
+  const exportYearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = new Set<number>([currentYear]);
+    if (selectedDetail) {
+      const dates = [
+        ...(selectedDetail.invoices || []).map((x) => x.created_at),
+        ...(selectedDetail.payments || []).map((x) => x.created_at),
+        ...(selectedDetail.returns || []).map((x) => x.created_at),
+        ...(selectedDetail.receipts || []).map((x) => x.created_at),
+        ...(selectedDetail.payouts || []).map((x) => x.created_at),
+        ...(selectedDetail.outgoing_returns || []).map((x) => x.created_at),
+      ];
+      for (const d of dates) years.add(new Date(d).getFullYear());
+    }
+    for (let y = currentYear - 2; y <= currentYear + 1; y++) years.add(y);
+    return Array.from(years).sort((a, b) => b - a);
+  }, [selectedDetail]);
+
   return (
     <div style={{ display: "flex" }}>
       <Sidebar />
@@ -802,6 +1070,25 @@ export default function SuppliersPage() {
                       {t("suppliers.col_contact")}: {selectedSupplier.contact_info || "—"}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={!selectedDetail}
+                    onClick={() => {
+                      if (!selectedDetail) {
+                        showToast(t("suppliers.export_empty"), "error");
+                        return;
+                      }
+                      const d = new Date();
+                      setExportPeriodMode("month");
+                      setExportMonth(d.getMonth());
+                      setExportYear(d.getFullYear());
+                      setExportModalOpen(true);
+                    }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", border: "1px solid var(--border)" }}
+                  >
+                    <FileSpreadsheet size={15} /> {t("suppliers.export_excel")}
+                  </button>
                 </div>
               )}
 
@@ -896,6 +1183,99 @@ export default function SuppliersPage() {
           </div>
         )}
       </main>
+
+      {/* Export period modal */}
+      {mounted && exportModalOpen && selectedDetail && createPortal(
+        <div className="modal-overlay" onClick={() => setExportModalOpen(false)}>
+          <div className="modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
+              <h3 style={{ margin: 0 }}>{t("suppliers.export_period_title")}</h3>
+              <button onClick={() => setExportModalOpen(false)} style={{ background: "transparent", border: "none", color: "var(--text-primary)" }}>
+                <X size={22} />
+              </button>
+            </div>
+            <div style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
+              {selectedDetail.name}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="export-period"
+                  checked={exportPeriodMode === "all"}
+                  onChange={() => setExportPeriodMode("all")}
+                />
+                <span>{t("suppliers.export_period_all")}</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="export-period"
+                  checked={exportPeriodMode === "month"}
+                  onChange={() => setExportPeriodMode("month")}
+                />
+                <span>{t("suppliers.export_period_month")}</span>
+              </label>
+            </div>
+            {exportPeriodMode === "month" && (
+              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10, marginBottom: 18 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 5 }}>{t("suppliers.export_month")}</label>
+                  <select
+                    className="input"
+                    style={{ width: "100%" }}
+                    value={exportMonth}
+                    onChange={(e) => setExportMonth(Number(e.target.value))}
+                  >
+                    {MONTHS_RU.map((name, idx) => (
+                      <option key={name} value={idx}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 5 }}>{t("suppliers.export_year")}</label>
+                  <select
+                    className="input"
+                    style={{ width: "100%" }}
+                    value={exportYear}
+                    onChange={(e) => setExportYear(Number(e.target.value))}
+                  >
+                    {exportYearOptions.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            {exportPeriodMode === "month" && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+                {`01.${String(exportMonth + 1).padStart(2, "0")}.${exportYear} – ${String(new Date(exportYear, exportMonth + 1, 0).getDate()).padStart(2, "0")}.${String(exportMonth + 1).padStart(2, "0")}.${exportYear}`}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setExportModalOpen(false)}>
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                onClick={() => {
+                  exportPartnerExcel(
+                    selectedDetail,
+                    exportPeriodMode === "all"
+                      ? { mode: "all" }
+                      : { mode: "month", year: exportYear, month: exportMonth },
+                  );
+                }}
+              >
+                <FileSpreadsheet size={15} /> {t("suppliers.export_download")}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Add Supplier Modal */}
       {mounted && addSupplierOpen && createPortal(
