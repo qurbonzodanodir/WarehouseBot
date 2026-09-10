@@ -539,8 +539,12 @@ export default function SuppliersPage() {
       <div className="partner-history-items">
         {items.map((item, index) => (
           <div key={`${item.sku}-${index}`} className="partner-history-item">
-            <span>{item.sku}</span>
-            <span>{item.quantity} шт. × {fmt(Number(item.price_per_unit))}</span>
+            <div>
+              <div style={{ fontWeight: 650 }}>{item.sku}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
+                {item.quantity} шт. × {fmt(Number(item.price_per_unit))} TJS
+              </div>
+            </div>
             <strong>{fmt(Number(item.line_total))} TJS</strong>
           </div>
         ))}
@@ -552,9 +556,10 @@ export default function SuppliersPage() {
     key: string;
     date: string;
     label: string;
+    badge: string;
     qty?: string;
     amount: number;
-    color: string;
+    tone: "give" | "take";
     items?: { sku: string; quantity: number; price_per_unit: number; line_total: number }[];
   };
 
@@ -568,18 +573,22 @@ export default function SuppliersPage() {
         label: t("suppliers.invoices_title"),
         qty: `${totalQty} шт.`,
         amount: Number(inv.total_amount),
-        color: "var(--red)",
+        badge: "Отдали товар",
+        tone: "give",
         items: inv.items,
         ts: new Date(inv.created_at).getTime(),
       });
     }
     for (const pay of detail.payments || []) {
+      const note = (pay.notes || "").toLowerCase();
+      const badge = note.includes("закрыт") ? "Закрытие долга" : "Оплата от партнёра";
       rows.push({
         key: `payment-${pay.id}`,
         date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
         label: t("suppliers.payments_title"),
         amount: -Number(pay.amount),
-        color: "var(--green)",
+        badge,
+        tone: "take",
         ts: new Date(pay.created_at).getTime(),
       });
     }
@@ -591,7 +600,8 @@ export default function SuppliersPage() {
         label: t("suppliers.returns_title"),
         qty: `${totalQty} шт.`,
         amount: -Number(ret.total_amount),
-        color: "var(--green)",
+        badge: "Возврат нам",
+        tone: "take",
         items: ret.items,
         ts: new Date(ret.created_at).getTime(),
       });
@@ -609,7 +619,8 @@ export default function SuppliersPage() {
         label: t("suppliers.receipts_title"),
         qty: `${totalQty} шт.`,
         amount: Number(receipt.total_amount),
-        color: "var(--green)",
+        badge: "Приняли товар",
+        tone: "take",
         items: receipt.items,
         ts: new Date(receipt.created_at).getTime(),
       });
@@ -620,7 +631,8 @@ export default function SuppliersPage() {
         date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
         label: t("suppliers.payouts_title"),
         amount: -Number(payout.amount),
-        color: "var(--red)",
+        badge: "Наша оплата",
+        tone: "give",
         ts: new Date(payout.created_at).getTime(),
       });
     }
@@ -632,7 +644,8 @@ export default function SuppliersPage() {
         label: t("suppliers.outgoing_returns_title"),
         qty: `${totalQty} шт.`,
         amount: -Number(ret.total_amount),
-        color: "var(--red)",
+        badge: "Вернули партнёру",
+        tone: "give",
         items: ret.items,
         ts: new Date(ret.created_at).getTime(),
       });
@@ -644,26 +657,32 @@ export default function SuppliersPage() {
     if (rows.length === 0) {
       return <p className="partner-history-empty" style={{ padding: "18px 8px", textAlign: "center" }}>{t("common.empty")}</p>;
     }
-    return rows.map((row) => (
-      <div key={row.key}>
-        <button
-          type="button"
-          className="partner-history-row"
-          style={{ cursor: row.items ? "pointer" : "default" }}
-          onClick={() => row.items && toggleHistory(row.key)}
-        >
-          <span className="partner-history-toggle">
-            {row.items ? (expandedHistory[row.key] ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : " "}
-          </span>
-          <span className="partner-history-date">{row.date}</span>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{row.label}{row.qty ? ` · ${row.qty}` : ""}</span>
-          <span className="partner-history-amount" style={{ color: row.color }}>
-            {row.amount > 0 ? "+" : "−"}{fmt(Math.abs(row.amount))} TJS
-          </span>
-        </button>
-        {expandedHistory[row.key] && renderLineItems(row.items)}
+    return (
+      <div className="partner-timeline">
+        {rows.map((row) => {
+          const open = !!expandedHistory[row.key];
+          return (
+            <div key={row.key} className="partner-tl-item">
+              <button
+                type="button"
+                className={`partner-tl-main${row.items ? "" : " is-static"}`}
+                onClick={() => row.items && toggleHistory(row.key)}
+              >
+                <span className="partner-tl-date">{row.date}</span>
+                <div className="partner-tl-mid">
+                  <div className="partner-tl-title">{row.badge}</div>
+                  {row.qty ? <div className="partner-tl-sub">{row.qty}</div> : null}
+                </div>
+                <div className={`partner-tl-amount ${row.tone}`}>
+                  {row.amount > 0 ? "+" : "−"}{fmt(Math.abs(row.amount))} TJS
+                </div>
+              </button>
+              {open && renderLineItems(row.items)}
+            </div>
+          );
+        })}
       </div>
-    ));
+    );
   };
 
   return (
@@ -818,9 +837,9 @@ export default function SuppliersPage() {
                         style={{ width: "100%", justifyContent: "space-between", marginTop: 4 }}
                         onClick={() => setOpenRecvHistory((v) => !v)}
                       >
-                        <span>"История"</span>
+                        <span>История</span>
                         <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
-                          {buildReceivableTimeline(selectedDetail).length} · {openRecvHistory ? "▴" : "▾"}
+                          {buildReceivableTimeline(selectedDetail).length} записей · {openRecvHistory ? "скрыть ▴" : "показать ▾"}
                         </span>
                       </button>
                       {openRecvHistory && (
@@ -859,9 +878,9 @@ export default function SuppliersPage() {
                         style={{ width: "100%", justifyContent: "space-between", marginTop: 4 }}
                         onClick={() => setOpenPayHistory((v) => !v)}
                       >
-                        <span>"История"</span>
+                        <span>История</span>
                         <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
-                          {buildPayableTimeline(selectedDetail).length} · {openPayHistory ? "▴" : "▾"}
+                          {buildPayableTimeline(selectedDetail).length} записей · {openPayHistory ? "скрыть ▴" : "показать ▾"}
                         </span>
                       </button>
                       {openPayHistory && (

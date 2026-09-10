@@ -204,9 +204,77 @@ h3 { font-size: 1rem; font-weight: 600; }
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
-  padding: 12px;
-  min-height: 112px;
+  padding: 0;
+  min-height: 0;
+  overflow: hidden;
 }
+
+.partner-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.partner-tl-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.partner-tl-item:last-child {
+  border-bottom: 0;
+}
+
+.partner-tl-main {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  cursor: pointer;
+  text-align: left;
+}
+
+.partner-tl-main:hover {
+  background: var(--bg-hover);
+}
+
+.partner-tl-main.is-static {
+  cursor: default;
+}
+
+.partner-tl-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+
+.partner-tl-mid {
+  min-width: 0;
+}
+
+.partner-tl-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.partner-tl-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.partner-tl-amount {
+  font-size: 14px;
+  font-weight: 750;
+  white-space: nowrap;
+  padding-top: 1px;
+}
+
+.partner-tl-amount.give { color: var(--red); }
+.partner-tl-amount.take { color: var(--green); }
 
 .partner-history-title {
   margin: 0 0 10px;
@@ -258,25 +326,31 @@ h3 { font-size: 1rem; font-weight: 600; }
 }
 
 .partner-history-items {
-  margin: 0 0 8px 28px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
+  margin: 0;
+  padding: 0 14px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .partner-history-item {
-  display: grid;
-  grid-template-columns: minmax(70px, 1fr) auto auto;
-  gap: 10px;
-  align-items: center;
-  padding: 5px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.partner-history-item + .partner-history-item {
+  margin-top: 8px;
 }
 
 .partner-history-item:last-child {
-  border-bottom: 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-header {
