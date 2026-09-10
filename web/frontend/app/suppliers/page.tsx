@@ -841,11 +841,11 @@ export default function SuppliersPage() {
 
     const debtResult =
       recvClose > 0 && payClose === 0
-        ? `Партнёр должен нам: ${fmtMoney(recvClose)}`
+        ? `Вы должны нам: ${fmtMoney(recvClose)}`
         : payClose > 0 && recvClose === 0
-          ? `Мы должны партнёру: ${fmtMoney(payClose)}`
+          ? `Мы должны вам: ${fmtMoney(payClose)}`
           : recvClose > 0 && payClose > 0
-            ? `Партнёр должен нам ${fmtMoney(recvClose)}; мы должны партнёру ${fmtMoney(payClose)}`
+            ? `Вы должны нам ${fmtMoney(recvClose)}; мы должны вам ${fmtMoney(payClose)}`
             : "Долгов нет — всё закрыто";
 
     const gaveGoods = ops.filter((o) => o.type === "Отдали товар").reduce((a, o) => a + Math.abs(o.amount), 0);
@@ -885,8 +885,8 @@ export default function SuppliersPage() {
       ["Дата выгрузки", dateStr],
       [],
       ["СКОЛЬКО КТО ДОЛЖЕН"],
-      ["Вы (партнёр) должны нам", fmtMoney(recvClose)],
-      ["Мы должны вам (партнёру)", fmtMoney(payClose)],
+      ["Вы должны нам", fmtMoney(recvClose)],
+      ["Мы должны вам", fmtMoney(payClose)],
       ["ИТОГ", debtResult],
       [],
       ["ПОЯСНЕНИЕ"],
