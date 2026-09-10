@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.models.enums import OrderStatus
 
 
@@ -38,13 +38,13 @@ class OrderOut(BaseModel):
 class OrderCreate(BaseModel):
     store_id: int
     product_id: int
-    quantity: int
+    quantity: int = Field(..., gt=0, le=500)
     batch_id: str | None = None
 
 
 class WarehouseDispatchItem(BaseModel):
     product_id: int
-    quantity: int
+    quantity: int = Field(..., gt=0, le=500)
 
 
 class WarehouseDispatchCreate(BaseModel):
@@ -55,7 +55,7 @@ class WarehouseDispatchCreate(BaseModel):
 class ReturnRequestCreate(BaseModel):
     product_id: int
     from_store_id: int
-    quantity: int
+    quantity: int = Field(..., gt=0, le=500)
     prefer_display: bool = True
 
 

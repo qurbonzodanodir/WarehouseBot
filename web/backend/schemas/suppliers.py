@@ -28,7 +28,7 @@ class SupplierOut(BaseModel):
 
 class SupplierInvoiceLineItemIn(BaseModel):
     product_id: int
-    quantity: int = Field(..., gt=0)
+    quantity: int = Field(..., gt=0, le=500)
 
 
 class SupplierInvoiceLineItemOut(BaseModel):

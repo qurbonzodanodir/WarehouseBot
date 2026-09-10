@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.quantity import validate_transaction_quantity
 from app.models.display_inventory import DisplayInventory
 from app.models.enums import OrderStatus
 from app.models.inventory import Inventory
@@ -143,6 +144,8 @@ class OrderService:
         product = await self.session.get(Product, product_id)
         if not product:
             raise ValueError(f"Product #{product_id} not found.")
+
+        validate_transaction_quantity(quantity)
 
         # EXTRA SECURITY: Check if product is in VITRINE
         regular_qty, display_qty = await self.get_store_vitrine_product_stock(store_id, product_id)
@@ -586,6 +589,7 @@ class OrderService:
         for item in items:
             product_id = int(item["product_id"])
             quantity = int(item["quantity"])
+            validate_transaction_quantity(quantity)
             if quantity <= 0:
                 raise ValueError(f"Invalid quantity for product #{product_id}.")
 

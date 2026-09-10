@@ -5,6 +5,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core.quantity import (
+    validate_transaction_amount,
+    validate_transaction_quantity,
+)
 from app.models.enums import (
     DebtLedgerReason,
     FinancialTransactionType,
@@ -72,6 +76,9 @@ class TransactionService:
         price_per_item: Decimal,
         order_id: int | None = None,
     ) -> Sale:
+        abs_qty = abs(int(quantity))
+        validate_transaction_quantity(abs_qty)
+        validate_transaction_amount(abs_qty, price_per_item)
         sale = Sale(
             store_id=store_id,
             user_id=user_id,
@@ -130,6 +137,8 @@ class TransactionService:
         price_per_unit: Decimal,
         order_id: int = None,
     ) -> FinancialTransaction:
+        validate_transaction_quantity(quantity)
+        validate_transaction_amount(quantity, price_per_unit)
         effective_price = price_per_unit
 
         # CRITICAL: Lock inventory rows to prevent race conditions (double selling)
@@ -259,8 +268,11 @@ class TransactionService:
         product = await self.session.get(Product, product_id)
         if not product:
             raise ValueError("Товар не найден.")
+
+        validate_transaction_quantity(quantity)
             
         price_per_unit = product.effective_store_price
+        validate_transaction_amount(quantity, price_per_unit)
             
         # 1. Record negative sale to balance statistics
         await self.record_sale_entry(

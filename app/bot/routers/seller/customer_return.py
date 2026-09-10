@@ -52,11 +52,19 @@ async def process_customer_return_sku(
 async def process_customer_return_quantity(
     message: Message, user: User, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
-    if not message.text.isdigit() or int(message.text) <= 0:
+    from app.core.quantity import MAX_TRANSACTION_QUANTITY, parse_positive_int
+
+    quantity = parse_positive_int(message.text)
+    if quantity is None:
         await message.answer(_("sale_invalid_qty"))
         return
+    if quantity > MAX_TRANSACTION_QUANTITY:
+        await message.answer(
+            _("sale_qty_too_large", max=MAX_TRANSACTION_QUANTITY),
+            parse_mode="HTML",
+        )
+        return
 
-    quantity = int(message.text)
     data = await state.get_data()
     product_id = data.get("product_id")
 
@@ -76,7 +84,14 @@ async def process_customer_return_quantity(
     found = False
     for item in cart:
         if item["product_id"] == product_id:
-            item["qty"] += quantity
+            new_qty = item["qty"] + quantity
+            if new_qty > MAX_TRANSACTION_QUANTITY:
+                await message.answer(
+                    _("sale_qty_too_large", max=MAX_TRANSACTION_QUANTITY),
+                    parse_mode="HTML",
+                )
+                return
+            item["qty"] = new_qty
             found = True
             break
             
