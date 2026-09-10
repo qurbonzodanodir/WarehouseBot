@@ -835,26 +835,86 @@ export default function SuppliersPage() {
         ? Number(detail.payable_debt || 0)
         : payOpen + ops.reduce((acc, op) => acc + op.payDelta, 0);
 
-    const fmtAmount = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${Math.abs(n)}`;
+    const fmtMoney = (n: number) => `${Math.round(Math.abs(n)).toLocaleString("ru-RU")} TJS`;
+    const fmtSigned = (n: number) =>
+      `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.round(Math.abs(n)).toLocaleString("ru-RU")}`;
+
+    const debtResult =
+      recvClose > 0 && payClose === 0
+        ? `Партнёр должен нам: ${fmtMoney(recvClose)}`
+        : payClose > 0 && recvClose === 0
+          ? `Мы должны партнёру: ${fmtMoney(payClose)}`
+          : recvClose > 0 && payClose > 0
+            ? `Партнёр должен нам ${fmtMoney(recvClose)}; мы должны партнёру ${fmtMoney(payClose)}`
+            : "Долгов нет — всё закрыто";
+
+    const gaveGoods = ops.filter((o) => o.type === "Отдали товар").reduce((a, o) => a + Math.abs(o.amount), 0);
+    const partnerPaid = ops
+      .filter((o) => o.type === "Оплата от партнёра" || o.type === "Закрытие долга")
+      .reduce((a, o) => a + Math.abs(o.amount), 0);
+    const returnsToUs = ops.filter((o) => o.type === "Возврат нам").reduce((a, o) => a + Math.abs(o.amount), 0);
+    const receivedGoods = ops.filter((o) => o.type === "Приняли товар").reduce((a, o) => a + Math.abs(o.amount), 0);
+    const wePaid = ops.filter((o) => o.type === "Наша оплата").reduce((a, o) => a + Math.abs(o.amount), 0);
+    const returnedToPartner = ops.filter((o) => o.type === "Вернули партнёру").reduce((a, o) => a + Math.abs(o.amount), 0);
+
+    const partnerLabel = (type: string) => {
+      switch (type) {
+        case "Отдали товар":
+          return "Товар вам (ваш долг +)";
+        case "Оплата от партнёра":
+          return "Ваша оплата (ваш долг −)";
+        case "Закрытие долга":
+          return "Закрытие вашего долга (−)";
+        case "Возврат нам":
+          return "Возврат товара от вас (ваш долг −)";
+        case "Приняли товар":
+          return "Товар от вас (наш долг +)";
+        case "Наша оплата":
+          return "Наша оплата вам (наш долг −)";
+        case "Вернули партнёру":
+          return "Мы вернули товар вам (наш долг −)";
+        default:
+          return type;
+      }
+    };
 
     const rows: (string | number)[][] = [
+      ["ВЗАИМОРАСЧЁТЫ С ПАРТНЁРОМ"],
       ["Партнёр", detail.name],
       ["Период", periodLabel],
       ["Дата выгрузки", dateStr],
       [],
-      ["Он должен нам (TJS)", recvClose],
-      ["Мы должны ему (TJS)", payClose],
+      ["СКОЛЬКО КТО ДОЛЖЕН"],
+      ["Вы (партнёр) должны нам", fmtMoney(recvClose)],
+      ["Мы должны вам (партнёру)", fmtMoney(payClose)],
+      ["ИТОГ", debtResult],
       [],
-      ["История"],
-      ["Дата", "Операция", "Кол-во", "Сумма (TJS)"],
+      ["ПОЯСНЕНИЕ"],
+      ["«Товар вам»", "Мы отдали товар — ваш долг вырос"],
+      ["«Ваша оплата»", "Вы заплатили — ваш долг уменьшился"],
+      ["«Товар от вас»", "Мы приняли ваш товар — наш долг вырос"],
+      ["«Наша оплата»", "Мы заплатили вам — наш долг уменьшился"],
+      [],
+      ["ИСТОРИЯ ОПЕРАЦИЙ"],
+      ["Дата", "Что произошло", "Кол-во", "Сумма (TJS)"],
       ...(ops.length
-        ? ops.map((op) => [op.date, op.type, op.qty || "—", fmtAmount(op.amount)])
+        ? ops.map((op) => [op.date, partnerLabel(op.type), op.qty || "—", fmtSigned(op.amount)])
         : [["—", "Нет операций за выбранный период", "—", "—"]]),
+      [],
+      ["ИТОГО ЗА ПЕРИОД", "", "", ""],
+      ["Товар вам (отдали)", "", "", fmtMoney(gaveGoods)],
+      ["Ваши оплаты / закрытие долга", "", "", fmtMoney(partnerPaid)],
+      ["Возврат товара от вас", "", "", fmtMoney(returnsToUs)],
+      ["Товар от вас (приняли)", "", "", fmtMoney(receivedGoods)],
+      ["Наши оплаты вам", "", "", fmtMoney(wePaid)],
+      ["Вернули товар вам", "", "", fmtMoney(returnedToPartner)],
+      [],
+      ["ИТОГ ДОЛГА СЕЙЧАС", debtResult, "", ""],
     ];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 14 }];
+    ws["!cols"] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 16 }];
     XLSX.utils.book_append_sheet(wb, ws, "Взаиморасчёты");
 
     const safeName = detail.name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "partner";
