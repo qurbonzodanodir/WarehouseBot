@@ -717,17 +717,14 @@ export default function SuppliersPage() {
     const periodLabel =
       period.mode === "all"
         ? "Весь период"
-        : `${MONTHS_RU[period.month]} ${period.year} (01.${String(period.month + 1).padStart(2, "0")}.${period.year} – ${String(new Date(period.year, period.month + 1, 0).getDate()).padStart(2, "0")}.${String(period.month + 1).padStart(2, "0")}.${period.year})`;
+        : `${MONTHS_RU[period.month]} ${period.year}`;
 
     type ExportOp = {
       ts: number;
       date: string;
-      side: string;
       type: string;
       qty: string;
       amount: number;
-      notes: string;
-      items?: { sku: string; quantity: number; price_per_unit: number; line_total: number }[];
       recvDelta: number;
       payDelta: number;
     };
@@ -740,12 +737,9 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(inv.created_at).getTime(),
         date: new Date(inv.created_at).toLocaleDateString("ru-RU"),
-        side: "Он должен нам",
         type: "Отдали товар",
         qty: totalQty ? `${totalQty} шт.` : "",
         amount,
-        notes: inv.notes || "",
-        items: inv.items,
         recvDelta: amount,
         payDelta: 0,
       });
@@ -756,11 +750,9 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(pay.created_at).getTime(),
         date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
-        side: "Он должен нам",
         type: note.includes("закрыт") ? "Закрытие долга" : "Оплата от партнёра",
         qty: "",
         amount: -amount,
-        notes: pay.notes || "",
         recvDelta: -amount,
         payDelta: 0,
       });
@@ -771,12 +763,9 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(ret.created_at).getTime(),
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
-        side: "Он должен нам",
         type: "Возврат нам",
         qty: totalQty ? `${totalQty} шт.` : "",
         amount: -amount,
-        notes: ret.notes || "",
-        items: ret.items,
         recvDelta: -amount,
         payDelta: 0,
       });
@@ -787,12 +776,9 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(receipt.created_at).getTime(),
         date: new Date(receipt.created_at).toLocaleDateString("ru-RU"),
-        side: "Мы должны ему",
         type: "Приняли товар",
         qty: totalQty ? `${totalQty} шт.` : "",
         amount,
-        notes: receipt.notes || "",
-        items: receipt.items,
         recvDelta: 0,
         payDelta: amount,
       });
@@ -802,11 +788,9 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(payout.created_at).getTime(),
         date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
-        side: "Мы должны ему",
         type: "Наша оплата",
         qty: "",
         amount: -amount,
-        notes: payout.notes || "",
         recvDelta: 0,
         payDelta: -amount,
       });
@@ -817,12 +801,9 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(ret.created_at).getTime(),
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
-        side: "Мы должны ему",
         type: "Вернули партнёру",
         qty: totalQty ? `${totalQty} шт.` : "",
         amount: -amount,
-        notes: ret.notes || "",
-        items: ret.items,
         recvDelta: 0,
         payDelta: -amount,
       });
@@ -840,90 +821,36 @@ export default function SuppliersPage() {
     }
 
     const ops = allOps.filter((op) => inSelectedPeriod(op.ts));
-    const recvTurnover = ops.reduce((acc, op) => acc + op.recvDelta, 0);
-    const payTurnover = ops.reduce((acc, op) => acc + op.payDelta, 0);
-    const recvClose = period.mode === "all" ? Number(detail.receivable_debt || 0) : recvOpen + recvTurnover;
-    const payClose = period.mode === "all" ? Number(detail.payable_debt || 0) : payOpen + payTurnover;
-    const netClose = recvClose - payClose;
+    const recvClose =
+      period.mode === "all"
+        ? Number(detail.receivable_debt || 0)
+        : recvOpen + ops.reduce((acc, op) => acc + op.recvDelta, 0);
+    const payClose =
+      period.mode === "all"
+        ? Number(detail.payable_debt || 0)
+        : payOpen + ops.reduce((acc, op) => acc + op.payDelta, 0);
 
-    const sumByType = (type: string) =>
-      ops.filter((op) => op.type === type || (type === "Оплата от партнёра" && op.type === "Закрытие долга"))
-        .reduce((acc, op) => acc + Math.abs(op.amount), 0);
+    const fmtAmount = (n: number) => `${n > 0 ? "+" : n < 0 ? "-" : ""}${Math.abs(n)}`;
 
-    const summaryRows: (string | number)[][] = [
-      ["Взаиморасчёты с партнёром"],
+    const rows: (string | number)[][] = [
       ["Партнёр", detail.name],
-      ["Контакт", detail.contact_info || "—"],
-      ["Адрес", detail.address || "—"],
       ["Период", periodLabel],
-      ["Дата выгрузки", `${dateStr} ${exportedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`],
+      ["Дата выгрузки", dateStr],
       [],
-      ["Баланс на конец периода"],
       ["Он должен нам (TJS)", recvClose],
       ["Мы должны ему (TJS)", payClose],
-      ["Итог: кто кому должен", netClose > 0 ? `Партнёр должен нам ${netClose} TJS` : netClose < 0 ? `Мы должны партнёру ${Math.abs(netClose)} TJS` : "Взаимный долг закрыт"],
-      ["Чистый баланс (TJS)", netClose],
-    ];
-
-    if (period.mode === "month") {
-      summaryRows.push(
-        [],
-        ["На начало месяца"],
-        ["Он должен нам (TJS)", recvOpen],
-        ["Мы должны ему (TJS)", payOpen],
-      );
-    }
-
-    summaryRows.push(
       [],
-      ["Обороты за период"],
-      ["Отдали товар", sumByType("Отдали товар")],
-      ["Оплаты от партнёра", sumByType("Оплата от партнёра")],
-      ["Возвраты нам", sumByType("Возврат нам")],
-      ["Приняли товар", sumByType("Приняли товар")],
-      ["Наши оплаты", sumByType("Наша оплата")],
-      ["Вернули партнёру", sumByType("Вернули партнёру")],
-    );
-
-    const opsRows: (string | number)[][] = [
-      ["Дата", "Сторона", "Операция", "Кол-во", "Сумма (TJS)", "Примечание"],
+      ["История"],
+      ["Дата", "Операция", "Кол-во", "Сумма (TJS)"],
       ...(ops.length
-        ? ops.map((op) => [op.date, op.side, op.type, op.qty, op.amount, op.notes])
-        : [["—", "—", "Нет операций за выбранный период", "—", "—", "—"]]),
+        ? ops.map((op) => [op.date, op.type, op.qty || "—", fmtAmount(op.amount)])
+        : [["—", "Нет операций за выбранный период", "—", "—"]]),
     ];
-
-    const goodsRows: (string | number)[][] = [
-      ["Дата", "Сторона", "Операция", "SKU", "Кол-во", "Цена", "Сумма строки (TJS)"],
-    ];
-    for (const op of ops) {
-      if (!op.items?.length) continue;
-      for (const item of op.items) {
-        goodsRows.push([
-          op.date,
-          op.side,
-          op.type,
-          item.sku,
-          item.quantity,
-          Number(item.price_per_unit),
-          Number(item.line_total),
-        ]);
-      }
-    }
-    if (goodsRows.length === 1) {
-      goodsRows.push(["—", "—", "Нет товарных позиций", "—", "—", "—", "—"]);
-    }
 
     const wb = XLSX.utils.book_new();
-    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-    wsSummary["!cols"] = [{ wch: 28 }, { wch: 48 }];
-    const wsOps = XLSX.utils.aoa_to_sheet(opsRows);
-    wsOps["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 22 }, { wch: 10 }, { wch: 14 }, { wch: 28 }];
-    const wsGoods = XLSX.utils.aoa_to_sheet(goodsRows);
-    wsGoods["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
-
-    XLSX.utils.book_append_sheet(wb, wsSummary, "Сводка");
-    XLSX.utils.book_append_sheet(wb, wsOps, "Операции");
-    XLSX.utils.book_append_sheet(wb, wsGoods, "Товары");
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Взаиморасчёты");
 
     const safeName = detail.name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "partner";
     const periodFile =
