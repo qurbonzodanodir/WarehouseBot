@@ -204,3 +204,37 @@ class SupplierDetailOut(BaseModel):
     outgoing_returns: list[SupplierOutgoingReturnOut]
 
     model_config = {"from_attributes": True}
+
+
+# ── Update schemas for PATCH endpoints ─────────────────────────────────────
+
+class SupplierInvoiceUpdate(BaseModel):
+    notes: str | None = None
+    operation_date: date | None = None
+
+
+class SupplierPaymentUpdate(BaseModel):
+    amount: Decimal | None = Field(None, gt=0)
+    notes: str | None = None
+    operation_date: date | None = None
+
+
+class SupplierReturnUpdate(BaseModel):
+    notes: str | None = None
+    operation_date: date | None = None
+
+
+class SupplierReceiptUpdate(BaseModel):
+    notes: str | None = None
+    operation_date: date | None = None
+
+
+class SupplierPayoutUpdate(BaseModel):
+    amount: Decimal | None = Field(None, gt=0)
+    notes: str | None = None
+    operation_date: date | None = None
+
+
+class SupplierOutgoingReturnUpdate(BaseModel):
+    notes: str | None = None
+    operation_date: date | None = None

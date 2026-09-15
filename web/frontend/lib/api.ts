@@ -362,6 +362,34 @@ export const api = {
     request<SupplierPayoutItem>(`/suppliers/${id}/payouts`, { method: "POST", body: JSON.stringify(data) }),
   addSupplierOutgoingReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null; operation_date?: string | null }) =>
     request<SupplierOutgoingReturnItem>(`/suppliers/${id}/outgoing-returns`, { method: "POST", body: JSON.stringify(data) }),
+
+  // Delete operations
+  deleteSupplierInvoice: (supplierId: number, id: number) =>
+    request<void>(`/suppliers/${supplierId}/invoices/${id}`, { method: "DELETE" }),
+  deleteSupplierPayment: (supplierId: number, id: number) =>
+    request<void>(`/suppliers/${supplierId}/payments/${id}`, { method: "DELETE" }),
+  deleteSupplierReturn: (supplierId: number, id: number) =>
+    request<void>(`/suppliers/${supplierId}/returns/${id}`, { method: "DELETE" }),
+  deleteSupplierReceipt: (supplierId: number, id: number) =>
+    request<void>(`/suppliers/${supplierId}/receipts/${id}`, { method: "DELETE" }),
+  deleteSupplierPayout: (supplierId: number, id: number) =>
+    request<void>(`/suppliers/${supplierId}/payouts/${id}`, { method: "DELETE" }),
+  deleteSupplierOutgoingReturn: (supplierId: number, id: number) =>
+    request<void>(`/suppliers/${supplierId}/outgoing-returns/${id}`, { method: "DELETE" }),
+
+  // Patch operations (update date / notes / amount)
+  patchSupplierInvoice: (supplierId: number, id: number, data: { notes?: string | null; operation_date?: string | null }) =>
+    request<SupplierInvoiceItem>(`/suppliers/${supplierId}/invoices/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  patchSupplierPayment: (supplierId: number, id: number, data: { amount?: number; notes?: string | null; operation_date?: string | null }) =>
+    request<SupplierPaymentItem>(`/suppliers/${supplierId}/payments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  patchSupplierReturn: (supplierId: number, id: number, data: { notes?: string | null; operation_date?: string | null }) =>
+    request<SupplierReturnItem>(`/suppliers/${supplierId}/returns/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  patchSupplierReceipt: (supplierId: number, id: number, data: { notes?: string | null; operation_date?: string | null }) =>
+    request<SupplierReceiptItem>(`/suppliers/${supplierId}/receipts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  patchSupplierPayout: (supplierId: number, id: number, data: { amount?: number; notes?: string | null; operation_date?: string | null }) =>
+    request<SupplierPayoutItem>(`/suppliers/${supplierId}/payouts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  patchSupplierOutgoingReturn: (supplierId: number, id: number, data: { notes?: string | null; operation_date?: string | null }) =>
+    request<SupplierOutgoingReturnItem>(`/suppliers/${supplierId}/outgoing-returns/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 };
 
 export interface PaginatedResponse<T> {

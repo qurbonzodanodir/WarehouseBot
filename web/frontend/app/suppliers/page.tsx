@@ -11,7 +11,7 @@ import * as XLSX from "xlsx";
 import {
   Truck, Plus, AlertCircle, ChevronRight, ChevronDown,
   Receipt, Wallet, X, History, ArrowDownCircle, ArrowUpCircle,
-  Search, Trash2, ShoppingCart, FileSpreadsheet, Calendar
+  Search, Trash2, ShoppingCart, FileSpreadsheet, Calendar, Pencil
 } from "lucide-react";
 
 function fmt(n: number) {
@@ -88,6 +88,23 @@ export default function SuppliersPage() {
   const [exportMonth, setExportMonth] = useState(() => new Date().getMonth());
   const [exportYear, setExportYear] = useState(() => new Date().getFullYear());
   const [operationDate, setOperationDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // Edit history entry modal
+  type EditableOp = {
+    key: string;
+    id: number;
+    opType: "invoice" | "payment" | "return" | "receipt" | "payout" | "outgoing-return";
+    supplierId: number;
+    label: string;
+    notes: string;
+    date: string;
+    amount?: number;
+  };
+  const [editHistoryModal, setEditHistoryModal] = useState<EditableOp | null>(null);
+  const [editHistoryNotes, setEditHistoryNotes] = useState("");
+  const [editHistoryDate, setEditHistoryDate] = useState("");
+  const [editHistoryAmount, setEditHistoryAmount] = useState("");
+  const [savingEditHistory, setSavingEditHistory] = useState(false);
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -544,6 +561,71 @@ export default function SuppliersPage() {
     }
   };
 
+  const refreshCurrentSupplierDetail = async (supplierId: number) => {
+    setDetailCache(prev => { const n = { ...prev }; delete n[supplierId]; return n; });
+    try {
+      const fresh = await api.getSupplierDetail(supplierId);
+      setDetailCache(prev => ({ ...prev, [supplierId]: fresh }));
+    } catch {
+      // ignore
+    }
+    await fetchSuppliers();
+  };
+
+  const handleDeleteHistory = async (row: TimelineRow) => {
+    if (!expandedId) return;
+    if (!window.confirm(`Вы уверены, что хотите удалить запись «${row.badge}» (${row.date})?`)) return;
+    try {
+      if (row.opType === "invoice") await api.deleteSupplierInvoice(expandedId, row.id);
+      else if (row.opType === "payment") await api.deleteSupplierPayment(expandedId, row.id);
+      else if (row.opType === "return") await api.deleteSupplierReturn(expandedId, row.id);
+      else if (row.opType === "receipt") await api.deleteSupplierReceipt(expandedId, row.id);
+      else if (row.opType === "payout") await api.deleteSupplierPayout(expandedId, row.id);
+      else if (row.opType === "outgoing-return") await api.deleteSupplierOutgoingReturn(expandedId, row.id);
+
+      await refreshCurrentSupplierDetail(expandedId);
+      showToast("Запись успешно удалена", "success");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    }
+  };
+
+  const handleSaveEditHistory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editHistoryModal) return;
+    setSavingEditHistory(true);
+    try {
+      const sid = editHistoryModal.supplierId;
+      const id = editHistoryModal.id;
+      const opDate = editHistoryDate || null;
+      const notes = editHistoryNotes || null;
+
+      if (editHistoryModal.opType === "invoice") {
+        await api.patchSupplierInvoice(sid, id, { notes, operation_date: opDate });
+      } else if (editHistoryModal.opType === "payment") {
+        const amt = editHistoryAmount ? Number(editHistoryAmount) : undefined;
+        await api.patchSupplierPayment(sid, id, { amount: amt, notes, operation_date: opDate });
+      } else if (editHistoryModal.opType === "return") {
+        await api.patchSupplierReturn(sid, id, { notes, operation_date: opDate });
+      } else if (editHistoryModal.opType === "receipt") {
+        await api.patchSupplierReceipt(sid, id, { notes, operation_date: opDate });
+      } else if (editHistoryModal.opType === "payout") {
+        const amt = editHistoryAmount ? Number(editHistoryAmount) : undefined;
+        await api.patchSupplierPayout(sid, id, { amount: amt, notes, operation_date: opDate });
+      } else if (editHistoryModal.opType === "outgoing-return") {
+        await api.patchSupplierOutgoingReturn(sid, id, { notes, operation_date: opDate });
+      }
+
+      setEditHistoryModal(null);
+      await refreshCurrentSupplierDetail(sid);
+      showToast("Запись обновлена", "success");
+    } catch (error) {
+      showToast(getErrorMessage(error, t("common.error")), "error");
+    } finally {
+      setSavingEditHistory(false);
+    }
+  };
+
   const totalDebt = suppliers.reduce((acc, s) => acc + Number(s.current_debt), 0);
   const totalPayable = suppliers.reduce((acc, s) => acc + Number(s.payable_debt || 0), 0);
   const netBalance = suppliers.reduce((acc, s) => acc + Number(s.net_balance || 0), 0);
@@ -574,11 +656,16 @@ export default function SuppliersPage() {
 
   type TimelineRow = {
     key: string;
+    id: number;
+    opType: "invoice" | "payment" | "return" | "receipt" | "payout" | "outgoing-return";
     date: string;
+    rawDate: string; // ISO date string YYYY-MM-DD for edit modal
     label: string;
     badge: string;
     qty?: string;
     amount: number;
+    rawAmount?: number; // original positive amount for editable fields
+    notes: string | null;
     tone: "give" | "take";
     items?: { sku: string; quantity: number; price_per_unit: number; line_total: number }[];
   };
@@ -589,10 +676,15 @@ export default function SuppliersPage() {
       const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       rows.push({
         key: `invoice-${inv.id}`,
+        id: inv.id,
+        opType: "invoice",
         date: new Date(inv.created_at).toLocaleDateString("ru-RU"),
+        rawDate: new Date(inv.created_at).toISOString().slice(0, 10),
         label: t("suppliers.invoices_title"),
         qty: `${totalQty} шт.`,
         amount: Number(inv.total_amount),
+        rawAmount: Number(inv.total_amount),
+        notes: inv.notes || null,
         badge: "Отдали товар",
         tone: "give",
         items: inv.items,
@@ -604,9 +696,14 @@ export default function SuppliersPage() {
       const badge = note.includes("закрыт") ? "Закрытие долга" : "Оплата от партнёра";
       rows.push({
         key: `payment-${pay.id}`,
+        id: pay.id,
+        opType: "payment",
         date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
+        rawDate: new Date(pay.created_at).toISOString().slice(0, 10),
         label: t("suppliers.payments_title"),
         amount: -Number(pay.amount),
+        rawAmount: Number(pay.amount),
+        notes: pay.notes || null,
         badge,
         tone: "take",
         ts: new Date(pay.created_at).getTime(),
@@ -616,10 +713,15 @@ export default function SuppliersPage() {
       const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       rows.push({
         key: `return-${ret.id}`,
+        id: ret.id,
+        opType: "return",
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
+        rawDate: new Date(ret.created_at).toISOString().slice(0, 10),
         label: t("suppliers.returns_title"),
         qty: `${totalQty} шт.`,
         amount: -Number(ret.total_amount),
+        rawAmount: Number(ret.total_amount),
+        notes: ret.notes || null,
         badge: "Возврат нам",
         tone: "take",
         items: ret.items,
@@ -635,10 +737,15 @@ export default function SuppliersPage() {
       const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       rows.push({
         key: `receipt-${receipt.id}`,
+        id: receipt.id,
+        opType: "receipt",
         date: new Date(receipt.created_at).toLocaleDateString("ru-RU"),
+        rawDate: new Date(receipt.created_at).toISOString().slice(0, 10),
         label: t("suppliers.receipts_title"),
         qty: `${totalQty} шт.`,
         amount: Number(receipt.total_amount),
+        rawAmount: Number(receipt.total_amount),
+        notes: receipt.notes || null,
         badge: "Приняли товар",
         tone: "take",
         items: receipt.items,
@@ -648,9 +755,14 @@ export default function SuppliersPage() {
     for (const payout of detail.payouts || []) {
       rows.push({
         key: `payout-${payout.id}`,
+        id: payout.id,
+        opType: "payout",
         date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
+        rawDate: new Date(payout.created_at).toISOString().slice(0, 10),
         label: t("suppliers.payouts_title"),
         amount: -Number(payout.amount),
+        rawAmount: Number(payout.amount),
+        notes: payout.notes || null,
         badge: "Наша оплата",
         tone: "give",
         ts: new Date(payout.created_at).getTime(),
@@ -660,10 +772,15 @@ export default function SuppliersPage() {
       const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       rows.push({
         key: `outgoing-return-${ret.id}`,
+        id: ret.id,
+        opType: "outgoing-return",
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
+        rawDate: new Date(ret.created_at).toISOString().slice(0, 10),
         label: t("suppliers.outgoing_returns_title"),
         qty: `${totalQty} шт.`,
         amount: -Number(ret.total_amount),
+        rawAmount: Number(ret.total_amount),
+        notes: ret.notes || null,
         badge: "Вернули партнёру",
         tone: "give",
         items: ret.items,
@@ -683,20 +800,81 @@ export default function SuppliersPage() {
           const open = !!expandedHistory[row.key];
           return (
             <div key={row.key} className="partner-tl-item">
-              <button
-                type="button"
-                className={`partner-tl-main${row.items ? "" : " is-static"}`}
-                onClick={() => row.items && toggleHistory(row.key)}
-              >
-                <span className="partner-tl-date">{row.date}</span>
-                <div className="partner-tl-mid">
-                  <div className="partner-tl-title">{row.badge}</div>
-                  {row.qty ? <div className="partner-tl-sub">{row.qty}</div> : null}
+              <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                <button
+                  type="button"
+                  className={`partner-tl-main${row.items ? "" : " is-static"}`}
+                  onClick={() => row.items && toggleHistory(row.key)}
+                  style={{ flex: 1 }}
+                >
+                  <span className="partner-tl-date">{row.date}</span>
+                  <div className="partner-tl-mid">
+                    <div className="partner-tl-title">{row.badge}</div>
+                    {row.qty ? <div className="partner-tl-sub">{row.qty}</div> : null}
+                    {row.notes ? <div className="partner-tl-sub" style={{ fontStyle: "italic", color: "var(--text-muted)" }}>{row.notes}</div> : null}
+                  </div>
+                  <div className={`partner-tl-amount ${row.tone}`}>
+                    {row.amount > 0 ? "+" : "−"}{fmt(Math.abs(row.amount))} TJS
+                  </div>
+                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 8px" }}>
+                  <button
+                    type="button"
+                    title="Редактировать"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!expandedId) return;
+                      setEditHistoryModal({
+                        key: row.key,
+                        id: row.id,
+                        opType: row.opType,
+                        supplierId: expandedId,
+                        label: row.badge,
+                        notes: row.notes || "",
+                        date: row.rawDate,
+                        amount: row.rawAmount,
+                      });
+                      setEditHistoryDate(row.rawDate);
+                      setEditHistoryNotes(row.notes || "");
+                      setEditHistoryAmount(row.rawAmount != null ? String(row.rawAmount) : "");
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      padding: 6,
+                      borderRadius: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Удалить"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDeleteHistory(row);
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#ef4444",
+                      cursor: "pointer",
+                      padding: 6,
+                      borderRadius: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
-                <div className={`partner-tl-amount ${row.tone}`}>
-                  {row.amount > 0 ? "+" : "−"}{fmt(Math.abs(row.amount))} TJS
-                </div>
-              </button>
+              </div>
               {open && renderLineItems(row.items)}
             </div>
           );
@@ -1844,6 +2022,88 @@ export default function SuppliersPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {mounted && editHistoryModal && createPortal(
+        <div className="modal-overlay" onClick={() => setEditHistoryModal(null)}>
+          <div className="modal-card" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Редактировать: {editHistoryModal.label}</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setEditHistoryModal(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditHistory} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 13, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>
+                  Дата операции
+                </label>
+                <input
+                  type="date"
+                  className="input"
+                  style={{ width: "100%" }}
+                  value={editHistoryDate}
+                  onChange={(e) => setEditHistoryDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              {(editHistoryModal.opType === "payment" || editHistoryModal.opType === "payout") && (
+                <div>
+                  <label style={{ fontSize: 13, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>
+                    Сумма (TJS)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    className="input"
+                    style={{ width: "100%" }}
+                    value={editHistoryAmount}
+                    onChange={(e) => setEditHistoryAmount(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={{ fontSize: 13, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>
+                  Заметка / комментарий
+                </label>
+                <textarea
+                  className="input"
+                  style={{ width: "100%", height: 70, resize: "none" }}
+                  placeholder="Заметка..."
+                  value={editHistoryNotes}
+                  onChange={(e) => setEditHistoryNotes(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditHistoryModal(null)}
+                  disabled={savingEditHistory}
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingEditHistory}
+                >
+                  {savingEditHistory ? "..." : t("common.save")}
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body
