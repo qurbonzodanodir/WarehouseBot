@@ -935,7 +935,7 @@ async def patch_invoice(supplier_id: int, invoice_id: int, body: SupplierInvoice
     record = await session.get(SupplierInvoice, invoice_id, options=[selectinload(SupplierInvoice.user), selectinload(SupplierInvoice.items)])
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    if body.notes is not None:
+    if "notes" in body.model_fields_set:
         record.notes = body.notes
     if body.operation_date is not None:
         await _apply_date(session, "supplier_invoices", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
@@ -961,7 +961,7 @@ async def patch_payment(supplier_id: int, payment_id: int, body: SupplierPayment
         raise HTTPException(status_code=404, detail="Payment not found")
     if body.amount is not None:
         record.amount = body.amount
-    if body.notes is not None:
+    if "notes" in body.model_fields_set:
         record.notes = body.notes
     if body.operation_date is not None:
         await _apply_date(session, "supplier_payments", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
@@ -981,7 +981,7 @@ async def patch_return(supplier_id: int, return_id: int, body: SupplierReturnUpd
     record = await session.get(SupplierReturn, return_id, options=[selectinload(SupplierReturn.user), selectinload(SupplierReturn.items)])
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Return not found")
-    if body.notes is not None:
+    if "notes" in body.model_fields_set:
         record.notes = body.notes
     if body.operation_date is not None:
         await _apply_date(session, "supplier_returns", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
@@ -1005,7 +1005,7 @@ async def patch_receipt(supplier_id: int, receipt_id: int, body: SupplierReceipt
     record = await session.get(SupplierReceipt, receipt_id, options=[selectinload(SupplierReceipt.user), selectinload(SupplierReceipt.items)])
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Receipt not found")
-    if body.notes is not None:
+    if "notes" in body.model_fields_set:
         record.notes = body.notes
     if body.operation_date is not None:
         await _apply_date(session, "supplier_receipts", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
@@ -1031,7 +1031,7 @@ async def patch_payout(supplier_id: int, payout_id: int, body: SupplierPayoutUpd
         raise HTTPException(status_code=404, detail="Payout not found")
     if body.amount is not None:
         record.amount = body.amount
-    if body.notes is not None:
+    if "notes" in body.model_fields_set:
         record.notes = body.notes
     if body.operation_date is not None:
         await _apply_date(session, "supplier_payouts", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
@@ -1051,7 +1051,7 @@ async def patch_outgoing_return(supplier_id: int, return_id: int, body: Supplier
     record = await session.get(SupplierOutgoingReturn, return_id, options=[selectinload(SupplierOutgoingReturn.user), selectinload(SupplierOutgoingReturn.items)])
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Outgoing return not found")
-    if body.notes is not None:
+    if "notes" in body.model_fields_set:
         record.notes = body.notes
     if body.operation_date is not None:
         await _apply_date(session, "supplier_outgoing_returns", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
