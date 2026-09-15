@@ -915,25 +915,26 @@ export default function SuppliersPage() {
       ts: number;
       date: string;
       type: string;
-      qty: string;
       amount: number;
       recvDelta: number;
       payDelta: number;
+      notes: string;
+      items: { sku: string; quantity: number; price_per_unit: number; line_total: number }[];
     };
 
     const allOps: ExportOp[] = [];
 
     for (const inv of detail.invoices || []) {
-      const totalQty = inv.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       const amount = Number(inv.total_amount);
       allOps.push({
         ts: new Date(inv.created_at).getTime(),
         date: new Date(inv.created_at).toLocaleDateString("ru-RU"),
         type: "Отдали товар",
-        qty: totalQty ? `${totalQty} шт.` : "",
         amount,
         recvDelta: amount,
         payDelta: 0,
+        notes: inv.notes || "",
+        items: inv.items || [],
       });
     }
     for (const pay of detail.payments || []) {
@@ -943,36 +944,37 @@ export default function SuppliersPage() {
         ts: new Date(pay.created_at).getTime(),
         date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
         type: note.includes("закрыт") ? "Закрытие долга" : "Оплата от партнёра",
-        qty: "",
         amount: -amount,
         recvDelta: -amount,
         payDelta: 0,
+        notes: pay.notes || "",
+        items: [],
       });
     }
     for (const ret of detail.returns || []) {
-      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       const amount = Number(ret.total_amount);
       allOps.push({
         ts: new Date(ret.created_at).getTime(),
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
         type: "Возврат нам",
-        qty: totalQty ? `${totalQty} шт.` : "",
         amount: -amount,
         recvDelta: -amount,
         payDelta: 0,
+        notes: ret.notes || "",
+        items: ret.items || [],
       });
     }
     for (const receipt of detail.receipts || []) {
-      const totalQty = receipt.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       const amount = Number(receipt.total_amount);
       allOps.push({
         ts: new Date(receipt.created_at).getTime(),
         date: new Date(receipt.created_at).toLocaleDateString("ru-RU"),
         type: "Приняли товар",
-        qty: totalQty ? `${totalQty} шт.` : "",
         amount,
         recvDelta: 0,
         payDelta: amount,
+        notes: receipt.notes || "",
+        items: receipt.items || [],
       });
     }
     for (const payout of detail.payouts || []) {
@@ -981,23 +983,24 @@ export default function SuppliersPage() {
         ts: new Date(payout.created_at).getTime(),
         date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
         type: "Наша оплата",
-        qty: "",
         amount: -amount,
         recvDelta: 0,
         payDelta: -amount,
+        notes: payout.notes || "",
+        items: [],
       });
     }
     for (const ret of detail.outgoing_returns || []) {
-      const totalQty = ret.items?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
       const amount = Number(ret.total_amount);
       allOps.push({
         ts: new Date(ret.created_at).getTime(),
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
         type: "Вернули партнёру",
-        qty: totalQty ? `${totalQty} шт.` : "",
         amount: -amount,
         recvDelta: 0,
         payDelta: -amount,
+        notes: ret.notes || "",
+        items: ret.items || [],
       });
     }
 
@@ -1065,6 +1068,31 @@ export default function SuppliersPage() {
       }
     };
 
+    const detailRows = ops.flatMap((op) => {
+      if (op.items.length > 0) {
+        return op.items.map((item) => [
+          op.date,
+          partnerLabel(op.type),
+          item.sku || "—",
+          item.sku || "—",
+          item.quantity,
+          Number(item.price_per_unit),
+          Number(item.line_total),
+          op.notes || "—",
+        ]);
+      }
+      return [[
+        op.date,
+        partnerLabel(op.type),
+        "—",
+        "—",
+        "—",
+        "—",
+        fmtSigned(op.amount),
+        op.notes || "—",
+      ]];
+    });
+
     const rows: (string | number)[][] = [
       ["Партнёр", detail.name],
       ["Период", periodLabel],
@@ -1076,10 +1104,10 @@ export default function SuppliersPage() {
       ["ИТОГ", debtResult],
       [],
       ["ИСТОРИЯ ОПЕРАЦИЙ"],
-      ["Дата", "Что произошло", "Кол-во", "Сумма (TJS)"],
-      ...(ops.length
-        ? ops.map((op) => [op.date, partnerLabel(op.type), op.qty || "—", fmtSigned(op.amount)])
-        : [["—", "Нет операций за выбранный период", "—", "—"]]),
+      ["Дата", "Операция", "Товар", "SKU", "Кол-во", "Цена за шт. (TJS)", "Сумма (TJS)", "Комментарий"],
+      ...(detailRows.length
+        ? detailRows
+        : [["—", "Нет операций за выбранный период", "—", "—", "—", "—", "—", "—"]]),
       [],
       ["ИТОГО ЗА ПЕРИОД", "", "", ""],
       ["Товар вам", "", "", fmtMoney(gaveGoods)],
@@ -1094,7 +1122,10 @@ export default function SuppliersPage() {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{ wch: 34 }, { wch: 42 }, { wch: 12 }, { wch: 16 }];
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 18 },
+      { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 32 },
+    ];
     XLSX.utils.book_append_sheet(wb, ws, "Взаиморасчёты");
 
     const safeName = detail.name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "partner";
