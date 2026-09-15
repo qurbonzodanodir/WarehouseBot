@@ -22,6 +22,10 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function getProductPrice(p: ProductPicker): number {
+  return p.store_price != null && Number(p.store_price) > 0 ? Number(p.store_price) : Number(p.price);
+}
+
 interface CartItem {
   product: ProductPicker;
   quantity: number;
@@ -226,7 +230,7 @@ export default function SuppliersPage() {
     }
   };
 
-  const cartTotal = cart.reduce((acc, c) => acc + Number(c.product.price) * c.quantity, 0);
+  const cartTotal = cart.reduce((acc, c) => acc + getProductPrice(c.product) * c.quantity, 0);
 
   const handleAddInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1380,7 +1384,7 @@ export default function SuppliersPage() {
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</div>
                           <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{p.brand || "—"}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{fmt(Number(p.price))} TJS / шт.</div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{fmt(getProductPrice(p))} TJS / шт.</div>
                         </div>
                         {inCart ? (
                           <span style={{ fontSize: 11, background: "var(--accent)", color: "#fff", borderRadius: 20, padding: "2px 8px" }}>{inCart.quantity} шт.</span>
@@ -1407,7 +1411,7 @@ export default function SuppliersPage() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(Number(c.product.price))} × {c.quantity} = <strong>{fmt(Number(c.product.price) * c.quantity)}</strong> TJS</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(getProductPrice(c.product))} × {c.quantity} = <strong>{fmt(getProductPrice(c.product) * c.quantity)}</strong> TJS</div>
                       </div>
                       <input
                         type="number" min="1"
@@ -1495,7 +1499,7 @@ export default function SuppliersPage() {
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{p.sku}</div>
                           <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{p.brand || "—"}</div>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{fmt(Number(p.price))} TJS / шт.</div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{fmt(getProductPrice(p))} TJS / шт.</div>
                         </div>
                         {inCart ? <span style={{ fontSize: 11, background: "#3b82f6", color: "#fff", borderRadius: 20, padding: "2px 8px" }}>{inCart.quantity} шт.</span> : <Plus size={16} color="var(--text-muted)" />}
                       </div>
@@ -1517,7 +1521,7 @@ export default function SuppliersPage() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(Number(c.product.price))} × {c.quantity} = <strong>{fmt(Number(c.product.price) * c.quantity)}</strong> TJS</div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{fmt(getProductPrice(c.product))} × {c.quantity} = <strong>{fmt(getProductPrice(c.product) * c.quantity)}</strong> TJS</div>
                       </div>
                       <input type="number" min="1" style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-input)", color: "var(--text-primary)", fontSize: 13, textAlign: "center" }} value={c.quantity} onChange={e => updateCartQty(c.product.id, parseInt(e.target.value) || 0)} />
                       <button onClick={() => updateCartQty(c.product.id, 0)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef4444" }}><Trash2 size={15} /></button>
@@ -1694,7 +1698,7 @@ export default function SuppliersPage() {
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
                             <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
-                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(c.product.price)} TJS · макс. {max} шт.</div>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(getProductPrice(c.product))} TJS · макс. {max} шт.</div>
                           </div>
                           <input
                             type="number"
@@ -1815,7 +1819,7 @@ export default function SuppliersPage() {
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{c.product.sku}</div>
                           <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{c.product.brand || "—"}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(c.product.price)} TJS · макс. {max} шт.</div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(getProductPrice(c.product))} TJS · макс. {max} шт.</div>
                         </div>
                         <input type="number" className="input" min={1} max={max} style={{ width: 60, padding: "4px 8px", textAlign: "center" }} value={c.quantity} onChange={e => updateOutgoingReturnCartQty(c.product.id, parseInt(e.target.value) || 0)} />
                         <button onClick={() => updateOutgoingReturnCartQty(c.product.id, 0)} style={{ border: "none", background: "transparent", color: "var(--red)" }}><Trash2 size={16} /></button>
