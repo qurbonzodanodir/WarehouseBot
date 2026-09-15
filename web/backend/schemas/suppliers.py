@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,7 @@ class SupplierInvoiceLineItemOut(BaseModel):
 class SupplierInvoiceCreate(BaseModel):
     items: list[SupplierInvoiceLineItemIn] = Field(..., min_length=1)
     notes: str | None = None
+    operation_date: date | None = None
 
 
 class SupplierInvoiceOut(BaseModel):
@@ -61,6 +62,7 @@ class SupplierInvoiceOut(BaseModel):
 class SupplierPaymentCreate(BaseModel):
     amount: Decimal = Field(..., gt=0)
     notes: str | None = None
+    operation_date: date | None = None
 
 
 class SupplierPaymentOut(BaseModel):
@@ -87,6 +89,7 @@ class SupplierReturnLineItemOut(BaseModel):
 class SupplierReturnCreate(BaseModel):
     items: list[SupplierInvoiceLineItemIn] = Field(..., min_length=1)  # Reuse input item schema
     notes: str | None = None
+    operation_date: date | None = None
 
 
 class SupplierReturnOut(BaseModel):
@@ -114,6 +117,7 @@ class SupplierReceiptLineItemOut(BaseModel):
 class SupplierReceiptCreate(BaseModel):
     items: list[SupplierInvoiceLineItemIn] = Field(..., min_length=1)
     notes: str | None = None
+    operation_date: date | None = None
 
 
 class SupplierReceiptOut(BaseModel):
@@ -131,6 +135,7 @@ class SupplierReceiptOut(BaseModel):
 class SupplierPayoutCreate(BaseModel):
     amount: Decimal = Field(..., gt=0)
     notes: str | None = None
+    operation_date: date | None = None
 
 
 class SupplierPayoutOut(BaseModel):
@@ -157,6 +162,7 @@ class SupplierOutgoingReturnLineItemOut(BaseModel):
 class SupplierOutgoingReturnCreate(BaseModel):
     items: list[SupplierInvoiceLineItemIn] = Field(..., min_length=1)
     notes: str | None = None
+    operation_date: date | None = None
 
 
 class SupplierOutgoingReturnOut(BaseModel):

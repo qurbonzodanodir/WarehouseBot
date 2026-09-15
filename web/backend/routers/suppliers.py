@@ -1,7 +1,21 @@
+from datetime import datetime, timezone, date as date_type
 from decimal import Decimal
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+
+
+def _resolve_dt(operation_date: date_type | None) -> datetime | None:
+    """Convert an optional date to a timezone-aware datetime (midnight UTC).
+    Returns None if no date provided — callers fall back to DB default (now()).
+    """
+    if operation_date is None:
+        return None
+    return datetime(
+        operation_date.year, operation_date.month, operation_date.day,
+        tzinfo=timezone.utc,
+    )
+
 
 from app.models.supplier import Supplier
 from app.models.supplier_invoice import SupplierInvoice
@@ -444,6 +458,9 @@ async def add_invoice(supplier_id: int, body: SupplierInvoiceCreate, session: Se
             total_amount=Decimal(str(total_amount)),
             notes=body.notes,
         )
+        op_dt = _resolve_dt(body.operation_date)
+        if op_dt is not None:
+            invoice.created_at = op_dt
         session.add(invoice)
         await session.flush()  # Get invoice.id
 
@@ -514,6 +531,9 @@ async def add_payment(supplier_id: int, body: SupplierPaymentCreate, session: Se
         amount=body.amount,
         notes=body.notes,
     )
+    op_dt = _resolve_dt(body.operation_date)
+    if op_dt is not None:
+        payment.created_at = op_dt
     session.add(payment)
     await session.commit()
     await session.refresh(payment)
@@ -558,6 +578,9 @@ async def add_return(supplier_id: int, body: SupplierReturnCreate, session: Sess
             total_amount=Decimal(str(total_amount)),
             notes=body.notes,
         )
+        op_dt = _resolve_dt(body.operation_date)
+        if op_dt is not None:
+            ret.created_at = op_dt
         session.add(ret)
         await session.flush()
 
@@ -634,6 +657,9 @@ async def add_receipt(supplier_id: int, body: SupplierReceiptCreate, session: Se
             total_amount=Decimal(str(total_amount)),
             notes=body.notes,
         )
+        op_dt = _resolve_dt(body.operation_date)
+        if op_dt is not None:
+            receipt.created_at = op_dt
         session.add(receipt)
         await session.flush()
 
@@ -693,6 +719,9 @@ async def add_payout(supplier_id: int, body: SupplierPayoutCreate, session: Sess
         amount=body.amount,
         notes=body.notes,
     )
+    op_dt = _resolve_dt(body.operation_date)
+    if op_dt is not None:
+        payout.created_at = op_dt
     session.add(payout)
     await session.commit()
     await session.refresh(payout)
@@ -765,6 +794,9 @@ async def add_outgoing_return(supplier_id: int, body: SupplierOutgoingReturnCrea
             total_amount=Decimal(str(total_amount)),
             notes=body.notes,
         )
+        op_dt = _resolve_dt(body.operation_date)
+        if op_dt is not None:
+            outgoing_return.created_at = op_dt
         session.add(outgoing_return)
         await session.flush()
 

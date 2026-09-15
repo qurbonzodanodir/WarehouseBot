@@ -11,7 +11,7 @@ import * as XLSX from "xlsx";
 import {
   Truck, Plus, AlertCircle, ChevronRight, ChevronDown,
   Receipt, Wallet, X, History, ArrowDownCircle, ArrowUpCircle,
-  Search, Trash2, ShoppingCart, FileSpreadsheet
+  Search, Trash2, ShoppingCart, FileSpreadsheet, Calendar
 } from "lucide-react";
 
 function fmt(n: number) {
@@ -83,6 +83,7 @@ export default function SuppliersPage() {
   const [exportPeriodMode, setExportPeriodMode] = useState<"all" | "month">("month");
   const [exportMonth, setExportMonth] = useState(() => new Date().getMonth());
   const [exportYear, setExportYear] = useState(() => new Date().getFullYear());
+  const [operationDate, setOperationDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -235,6 +236,7 @@ export default function SuppliersPage() {
       await api.addSupplierInvoice(invoiceModal.id, {
         items: cart.map(c => ({ product_id: c.product.id, quantity: c.quantity })),
         notes: invoiceNotes || null,
+        operation_date: operationDate || null,
       });
       setInvoiceModal(null);
       setCart([]);
@@ -435,7 +437,7 @@ export default function SuppliersPage() {
     if (isNaN(amount) || amount <= 0) { showToast(t("finance.err_zero"), "error"); return; }
     setSavingPayment(true);
     try {
-      await api.addSupplierPayment(paymentModal.id, { amount, notes: paymentNotes || null });
+      await api.addSupplierPayment(paymentModal.id, { amount, notes: paymentNotes || null, operation_date: operationDate || null });
       setPaymentModal(null);
       setPaymentAmount(""); setPaymentNotes("");
       setDetailCache(prev => { const n = { ...prev }; delete n[paymentModal.id]; return n; });
@@ -456,6 +458,7 @@ export default function SuppliersPage() {
       await api.addSupplierReturn(returnModal.id, {
         items: cart.map(c => ({ product_id: c.product.id, quantity: c.quantity })),
         notes: returnNotes || null,
+        operation_date: operationDate || null,
       });
       setReturnModal(null);
       setCart([]);
@@ -478,6 +481,7 @@ export default function SuppliersPage() {
       await api.addSupplierReceipt(receiptModal.id, {
         items: cart.map(c => ({ product_id: c.product.id, quantity: c.quantity })),
         notes: receiptNotes || null,
+        operation_date: operationDate || null,
       });
       setReceiptModal(null);
       setCart([]);
@@ -499,7 +503,7 @@ export default function SuppliersPage() {
     if (isNaN(amount) || amount <= 0) { showToast(t("finance.err_zero"), "error"); return; }
     setSavingPayout(true);
     try {
-      await api.addSupplierPayout(payoutModal.id, { amount, notes: payoutNotes || null });
+      await api.addSupplierPayout(payoutModal.id, { amount, notes: payoutNotes || null, operation_date: operationDate || null });
       setPayoutModal(null);
       setPayoutAmount("");
       setPayoutNotes("");
@@ -521,6 +525,7 @@ export default function SuppliersPage() {
       await api.addSupplierOutgoingReturn(outgoingReturnModal.id, {
         items: cart.map(c => ({ product_id: c.product.id, quantity: c.quantity })),
         notes: outgoingReturnNotes || null,
+        operation_date: operationDate || null,
       });
       setOutgoingReturnModal(null);
       setCart([]);
@@ -1092,6 +1097,19 @@ export default function SuppliersPage() {
                       </div>
                     </div>
                     <div className="partner-detail-body">
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
+                          <Calendar size={14} style={{ color: "var(--accent)" }} />
+                          <span>Дата операции:</span>
+                        </label>
+                        <input
+                          type="date"
+                          className="input"
+                          style={{ padding: "4px 8px", height: 32, fontSize: 13, borderRadius: 8, width: 145 }}
+                          value={operationDate}
+                          onChange={(e) => setOperationDate(e.target.value)}
+                        />
+                      </div>
                       <div className="partner-actions">
                         <button className="partner-action-btn" onClick={() => openInvoiceModal(selectedSupplier)}>
                           <ArrowDownCircle size={14} /> {t("suppliers.btn_invoice")}
@@ -1133,6 +1151,19 @@ export default function SuppliersPage() {
                       </div>
                     </div>
                     <div className="partner-detail-body">
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
+                          <Calendar size={14} style={{ color: "var(--accent)" }} />
+                          <span>Дата операции:</span>
+                        </label>
+                        <input
+                          type="date"
+                          className="input"
+                          style={{ padding: "4px 8px", height: 32, fontSize: 13, borderRadius: 8, width: 145 }}
+                          value={operationDate}
+                          onChange={(e) => setOperationDate(e.target.value)}
+                        />
+                      </div>
                       <div className="partner-actions">
                         <button className="partner-action-btn" onClick={() => openReceiptModal(selectedSupplier)}>
                           <ArrowUpCircle size={14} /> {t("suppliers.btn_receipt")}
@@ -1399,10 +1430,21 @@ export default function SuppliersPage() {
             </div>
 
             {/* Footer */}
-            <form onSubmit={handleAddInvoice} style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center" }}>
+            <form onSubmit={handleAddInvoice} style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Calendar size={15} style={{ color: "var(--text-muted)" }} />
+                <input
+                  type="date"
+                  className="input"
+                  style={{ height: 38, fontSize: 13, width: 145 }}
+                  value={operationDate}
+                  onChange={e => setOperationDate(e.target.value)}
+                  title="Дата операции"
+                />
+              </div>
               <input
                 className="input"
-                style={{ flex: 1 }}
+                style={{ flex: 1, minWidth: 150 }}
                 placeholder={t("suppliers.notes_ph")}
                 value={invoiceNotes}
                 onChange={e => setInvoiceNotes(e.target.value)}
@@ -1489,8 +1531,19 @@ export default function SuppliersPage() {
               </div>
             </div>
 
-            <form onSubmit={handleAddReceipt} style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center" }}>
-              <input className="input" style={{ flex: 1 }} placeholder={t("suppliers.notes_ph")} value={receiptNotes} onChange={e => setReceiptNotes(e.target.value)} />
+            <form onSubmit={handleAddReceipt} style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Calendar size={15} style={{ color: "var(--text-muted)" }} />
+                <input
+                  type="date"
+                  className="input"
+                  style={{ height: 38, fontSize: 13, width: 145 }}
+                  value={operationDate}
+                  onChange={e => setOperationDate(e.target.value)}
+                  title="Дата операции"
+                />
+              </div>
+              <input className="input" style={{ flex: 1, minWidth: 150 }} placeholder={t("suppliers.notes_ph")} value={receiptNotes} onChange={e => setReceiptNotes(e.target.value)} />
               <button type="button" className="btn btn-ghost" onClick={() => setReceiptModal(null)}>{t("common.cancel")}</button>
               <button type="submit" className="btn btn-primary" disabled={savingReceipt || cart.length === 0}>{savingReceipt ? "..." : `${t("suppliers.btn_receipt")} — ${fmt(cartTotal)} TJS`}</button>
             </form>
@@ -1511,6 +1564,10 @@ export default function SuppliersPage() {
               {t("suppliers.current_debt")}: <strong>{fmt(Number(paymentModal.current_debt))} TJS</strong>
             </p>
             <form onSubmit={handleAddPayment} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 5 }}>Дата операции</label>
+                <input type="date" className="input" style={{ width: "100%" }} value={operationDate} onChange={e => setOperationDate(e.target.value)} />
+              </div>
               <div>
                 <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 5 }}>{t("finance.amount")} (TJS) *</label>
                 <input type="number" min="0" step="0.01" max={Number(paymentModal.current_debt)} className="input" style={{ width: "100%" }} value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} autoFocus required />
@@ -1540,6 +1597,10 @@ export default function SuppliersPage() {
               {t("suppliers.current_payable")}: <strong>{fmt(Number(payoutModal.payable_debt || 0))} TJS</strong>
             </p>
             <form onSubmit={handleAddPayout} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 5 }}>Дата операции</label>
+                <input type="date" className="input" style={{ width: "100%" }} value={operationDate} onChange={e => setOperationDate(e.target.value)} />
+              </div>
               <div>
                 <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 5 }}>{t("finance.amount")} (TJS) *</label>
                 <input type="number" min="0" step="0.01" max={Number(payoutModal.payable_debt || 0)} className="input" style={{ width: "100%" }} value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)} autoFocus required />
@@ -1653,6 +1714,10 @@ export default function SuppliersPage() {
                   )}
                 </div>
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Дата операции</label>
+                    <input type="date" className="input" style={{ width: "100%" }} value={operationDate} onChange={e => setOperationDate(e.target.value)} />
+                  </div>
                   <textarea
                     className="input"
                     style={{ width: "100%", height: 60, marginBottom: 12, resize: "none" }}
@@ -1759,6 +1824,10 @@ export default function SuppliersPage() {
                   })}
                 </div>
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Дата операции</label>
+                    <input type="date" className="input" style={{ width: "100%" }} value={operationDate} onChange={e => setOperationDate(e.target.value)} />
+                  </div>
                   <textarea className="input" style={{ width: "100%", height: 60, marginBottom: 12, resize: "none" }} placeholder={t("suppliers.notes_ph")} value={outgoingReturnNotes} onChange={e => setOutgoingReturnNotes(e.target.value)} />
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>{t("common.total")}:</span>

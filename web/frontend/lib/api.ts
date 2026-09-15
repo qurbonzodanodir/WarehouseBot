@@ -350,17 +350,17 @@ export const api = {
   createSupplier: (data: { name: string; contact_info?: string; address?: string; notes?: string }) =>
     request<Supplier>("/suppliers", { method: "POST", body: JSON.stringify(data) }),
   getSupplierDetail: (id: number) => request<SupplierDetail>(`/suppliers/${id}`),
-  addSupplierInvoice: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+  addSupplierInvoice: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null; operation_date?: string | null }) =>
     request<SupplierInvoiceItem>(`/suppliers/${id}/invoices`, { method: "POST", body: JSON.stringify(data) }),
-  addSupplierPayment: (id: number, data: { amount: number; notes?: string | null }) =>
+  addSupplierPayment: (id: number, data: { amount: number; notes?: string | null; operation_date?: string | null }) =>
     request<SupplierPaymentItem>(`/suppliers/${id}/payments`, { method: "POST", body: JSON.stringify(data) }),
-  addSupplierReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+  addSupplierReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null; operation_date?: string | null }) =>
     request<SupplierReturnItem>(`/suppliers/${id}/returns`, { method: "POST", body: JSON.stringify(data) }),
-  addSupplierReceipt: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+  addSupplierReceipt: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null; operation_date?: string | null }) =>
     request<SupplierReceiptItem>(`/suppliers/${id}/receipts`, { method: "POST", body: JSON.stringify(data) }),
-  addSupplierPayout: (id: number, data: { amount: number; notes?: string | null }) =>
+  addSupplierPayout: (id: number, data: { amount: number; notes?: string | null; operation_date?: string | null }) =>
     request<SupplierPayoutItem>(`/suppliers/${id}/payouts`, { method: "POST", body: JSON.stringify(data) }),
-  addSupplierOutgoingReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null }) =>
+  addSupplierOutgoingReturn: (id: number, data: { items: { product_id: number; quantity: number }[]; notes?: string | null; operation_date?: string | null }) =>
     request<SupplierOutgoingReturnItem>(`/suppliers/${id}/outgoing-returns`, { method: "POST", body: JSON.stringify(data) }),
 };
 
