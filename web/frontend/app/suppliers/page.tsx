@@ -1068,9 +1068,12 @@ export default function SuppliersPage() {
       }
     };
 
-    const detailRows = ops.flatMap((op) => {
+    const detailRows: (string | number)[][] = [];
+    const detailRowDates: string[] = [];
+    for (const op of ops) {
       if (op.items.length > 0) {
-        return op.items.map((item) => [
+        for (const item of op.items) {
+          detailRows.push([
           op.date,
           partnerLabel(op.type),
           item.sku || "—",
@@ -1079,19 +1082,23 @@ export default function SuppliersPage() {
           Number(item.price_per_unit),
           Number(item.line_total),
           op.notes || "—",
+          ]);
+          detailRowDates.push(op.date);
+        }
+      } else {
+        detailRows.push([
+          op.date,
+          partnerLabel(op.type),
+          "—",
+          "—",
+          "—",
+          "—",
+          fmtSigned(op.amount),
+          op.notes || "—",
         ]);
+        detailRowDates.push(op.date);
       }
-      return [[
-        op.date,
-        partnerLabel(op.type),
-        "—",
-        "—",
-        "—",
-        "—",
-        fmtSigned(op.amount),
-        op.notes || "—",
-      ]];
-    });
+    }
 
     const rows: (string | number)[][] = [
       ["Партнёр", detail.name],
@@ -1122,6 +1129,26 @@ export default function SuppliersPage() {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
+    const detailHeaderRow = 10;
+    const detailFirstRow = detailHeaderRow + 1;
+    ws["!merges"] = [];
+    let groupStart = 0;
+    while (groupStart < detailRowDates.length) {
+      let groupEnd = groupStart;
+      while (
+        groupEnd + 1 < detailRowDates.length &&
+        detailRowDates[groupEnd + 1] === detailRowDates[groupStart]
+      ) {
+        groupEnd += 1;
+      }
+      if (groupEnd > groupStart) {
+        ws["!merges"].push({
+          s: { r: detailFirstRow + groupStart, c: 0 },
+          e: { r: detailFirstRow + groupEnd, c: 0 },
+        });
+      }
+      groupStart = groupEnd + 1;
+    }
     ws["!cols"] = [
       { wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 18 },
       { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 32 },
