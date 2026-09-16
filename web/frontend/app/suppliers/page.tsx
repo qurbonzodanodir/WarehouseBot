@@ -970,7 +970,7 @@ export default function SuppliersPage() {
         ts: new Date(receipt.created_at).getTime(),
         date: new Date(receipt.created_at).toLocaleDateString("ru-RU"),
         type: "Приняли товар",
-        amount,
+        amount: -amount,
         recvDelta: 0,
         payDelta: amount,
         notes: receipt.notes || "",
@@ -983,7 +983,7 @@ export default function SuppliersPage() {
         ts: new Date(payout.created_at).getTime(),
         date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
         type: "Наша оплата",
-        amount: -amount,
+        amount,
         recvDelta: 0,
         payDelta: -amount,
         notes: payout.notes || "",
@@ -996,7 +996,7 @@ export default function SuppliersPage() {
         ts: new Date(ret.created_at).getTime(),
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
         type: "Вернули партнёру",
-        amount: -amount,
+        amount,
         recvDelta: 0,
         payDelta: -amount,
         notes: ret.notes || "",
@@ -1024,19 +1024,18 @@ export default function SuppliersPage() {
       period.mode === "all"
         ? Number(detail.payable_debt || 0)
         : payOpen + ops.reduce((acc, op) => acc + op.payDelta, 0);
+    const netClose = recvClose - payClose;
 
     const fmtMoney = (n: number) => `${Math.round(Math.abs(n)).toLocaleString("ru-RU")} TJS`;
     const fmtSigned = (n: number) =>
       `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.round(Math.abs(n)).toLocaleString("ru-RU")}`;
 
     const debtResult =
-      recvClose > 0 && payClose === 0
-        ? `Вы должны нам: ${fmtMoney(recvClose)}`
-        : payClose > 0 && recvClose === 0
-          ? `Мы должны вам: ${fmtMoney(payClose)}`
-          : recvClose > 0 && payClose > 0
-            ? `Вы должны нам ${fmtMoney(recvClose)}; мы должны вам ${fmtMoney(payClose)}`
-            : "Долгов нет — всё закрыто";
+      netClose > 0
+        ? `Итог: вы должны нам ${fmtMoney(netClose)}`
+        : netClose < 0
+          ? `Итог: мы должны вам ${fmtMoney(netClose)}`
+          : "Итог: долгов нет — всё закрыто";
 
     const gaveGoods = ops.filter((o) => o.type === "Отдали товар").reduce((a, o) => a + Math.abs(o.amount), 0);
     const partnerPaid = ops
@@ -1111,11 +1110,20 @@ export default function SuppliersPage() {
       }
 
       detailDateRanges.push({ start: dateStartRow, end: detailRows.length - 1 });
-      detailRows.push(["", `ИТОГ ЗА ${date}`, "", "", "", "", fmtSigned(dateOps.reduce((sum, op) => sum + op.amount, 0)), ""]);
+      detailRows.push([
+        "",
+        `ИТОГ ЗА ${date}`,
+        "",
+        "",
+        "",
+        "",
+        fmtSigned(dateOps.reduce((sum, op) => sum + op.recvDelta - op.payDelta, 0)),
+        "",
+      ]);
       detailSubtotalRows.push(detailRows.length - 1);
     }
 
-    const periodTotal = ops.reduce((sum, op) => sum + op.amount, 0);
+    const periodTotal = ops.reduce((sum, op) => sum + op.recvDelta - op.payDelta, 0);
 
     const rows: (string | number)[][] = [
       ["Партнёр", detail.name],
