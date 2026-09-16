@@ -1110,6 +1110,7 @@ export default function SuppliersPage() {
       }
 
       detailDateRanges.push({ start: dateStartRow, end: detailRows.length - 1 });
+      detailRows.push(["", "", "", "", "", "", "", ""]);
       detailRows.push([
         "",
         `ИТОГ ЗА ${date}`,
@@ -1140,6 +1141,8 @@ export default function SuppliersPage() {
       ...(detailRows.length
         ? detailRows
         : [["—", "Нет операций за выбранный период", "—", "—", "—", "—", "—", "—"]]),
+      [],
+      [],
       ["", "ИТОГ ЗА ВЫБРАННЫЙ ПЕРИОД", "", "", "", "", fmtSigned(periodTotal), ""],
       [],
       ["ИТОГО ЗА ПЕРИОД", "", "", ""],
