@@ -1069,36 +1069,53 @@ export default function SuppliersPage() {
     };
 
     const detailRows: (string | number)[][] = [];
-    const detailRowDates: string[] = [];
-    for (const op of ops) {
-      if (op.items.length > 0) {
-        for (const item of op.items) {
-          detailRows.push([
-          op.date,
-          partnerLabel(op.type),
-          item.sku || "—",
-          item.sku || "—",
-          item.quantity,
-          Number(item.price_per_unit),
-          Number(item.line_total),
-          op.notes || "—",
-          ]);
-          detailRowDates.push(op.date);
-        }
-      } else {
-        detailRows.push([
-          op.date,
-          partnerLabel(op.type),
-          "—",
-          "—",
-          "—",
-          "—",
-          fmtSigned(op.amount),
-          op.notes || "—",
-        ]);
-        detailRowDates.push(op.date);
+    const detailSubtotalRows: number[] = [];
+    const detailDateRanges: { start: number; end: number }[] = [];
+    let operationIndex = 0;
+
+    while (operationIndex < ops.length) {
+      const date = ops[operationIndex].date;
+      const dateOps: ExportOp[] = [];
+      const dateStartRow = detailRows.length;
+      while (operationIndex < ops.length && ops[operationIndex].date === date) {
+        dateOps.push(ops[operationIndex]);
+        operationIndex += 1;
       }
+
+      for (const op of dateOps) {
+        if (op.items.length > 0) {
+          for (const item of op.items) {
+            detailRows.push([
+              op.date,
+              partnerLabel(op.type),
+              item.sku || "—",
+              item.sku || "—",
+              item.quantity,
+              Number(item.price_per_unit),
+              Number(item.line_total),
+              op.notes || "—",
+            ]);
+          }
+        } else {
+          detailRows.push([
+            op.date,
+            partnerLabel(op.type),
+            "—",
+            "—",
+            "—",
+            "—",
+            fmtSigned(op.amount),
+            op.notes || "—",
+          ]);
+        }
+      }
+
+      detailDateRanges.push({ start: dateStartRow, end: detailRows.length - 1 });
+      detailRows.push(["", `ИТОГ ЗА ${date}`, "", "", "", "", fmtSigned(dateOps.reduce((sum, op) => sum + op.amount, 0)), ""]);
+      detailSubtotalRows.push(detailRows.length - 1);
     }
+
+    const periodTotal = ops.reduce((sum, op) => sum + op.amount, 0);
 
     const rows: (string | number)[][] = [
       ["Партнёр", detail.name],
@@ -1115,6 +1132,7 @@ export default function SuppliersPage() {
       ...(detailRows.length
         ? detailRows
         : [["—", "Нет операций за выбранный период", "—", "—", "—", "—", "—", "—"]]),
+      ["", "ИТОГ ЗА ВЫБРАННЫЙ ПЕРИОД", "", "", "", "", fmtSigned(periodTotal), ""],
       [],
       ["ИТОГО ЗА ПЕРИОД", "", "", ""],
       ["Товар вам", "", "", fmtMoney(gaveGoods)],
@@ -1132,22 +1150,20 @@ export default function SuppliersPage() {
     const detailHeaderRow = 10;
     const detailFirstRow = detailHeaderRow + 1;
     ws["!merges"] = [];
-    let groupStart = 0;
-    while (groupStart < detailRowDates.length) {
-      let groupEnd = groupStart;
-      while (
-        groupEnd + 1 < detailRowDates.length &&
-        detailRowDates[groupEnd + 1] === detailRowDates[groupStart]
-      ) {
-        groupEnd += 1;
-      }
-      if (groupEnd > groupStart) {
+    for (const { start, end } of detailDateRanges) {
+      if (end > start) {
         ws["!merges"].push({
-          s: { r: detailFirstRow + groupStart, c: 0 },
-          e: { r: detailFirstRow + groupEnd, c: 0 },
+          s: { r: detailFirstRow + start, c: 0 },
+          e: { r: detailFirstRow + end, c: 0 },
         });
       }
-      groupStart = groupEnd + 1;
+    }
+    for (const subtotalRow of detailSubtotalRows) {
+      const rowNumber = detailFirstRow + subtotalRow;
+      ws["!merges"].push({
+        s: { r: rowNumber, c: 1 },
+        e: { r: rowNumber, c: 5 },
+      });
     }
     ws["!cols"] = [
       { wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 18 },
