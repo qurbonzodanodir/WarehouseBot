@@ -332,6 +332,17 @@ export const ru = {
   },
 
   suppliers: {
+    goods_given: "Отдали партнёру",
+    goods_received: "Получили от партнёра",
+    operation_history: "История операций",
+    operation_items: "Состав операции",
+    product_sku: "Товар / артикул",
+    show_items: "Показать товары",
+    hide_items: "Скрыть товары",
+    edit_operation: "Редактировать операцию",
+    delete_operation: "Удалить операцию",
+    debt_settled: "Закрытие долга",
+
     title: "Партнёры",
     subtitle: "Контрагенты, которым мы отдаём товар и у которых можем принимать товар.",
     add_btn: "Добавить партнёра",

@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import styles from "./suppliers.module.css";
 import { isAuthenticated } from "@/lib/auth";
 import { api, ProductPicker, Supplier, SupplierDetail } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -10,7 +11,7 @@ import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import {
   Truck, Plus, AlertCircle, ChevronRight, ChevronDown,
-  Receipt, Wallet, X, History, ArrowDownCircle, ArrowUpCircle,
+  Wallet, X, History, ArrowDownCircle, ArrowUpCircle,
   Search, Trash2, ShoppingCart, FileSpreadsheet, Calendar, Pencil
 } from "lucide-react";
 
@@ -127,6 +128,7 @@ export default function SuppliersPage() {
   useEffect(() => {
     setOpenRecvHistory(false);
     setOpenPayHistory(false);
+    setExpandedHistory({});
   }, [expandedId]);
 
   const handleExpand = async (id: number) => {
@@ -638,18 +640,30 @@ export default function SuppliersPage() {
   const renderLineItems = (items?: { sku: string; quantity: number; price_per_unit: number; line_total: number }[]) => {
     if (!items || items.length === 0) return null;
     return (
-      <div className="partner-history-items">
-        {items.map((item, index) => (
-          <div key={`${item.sku}-${index}`} className="partner-history-item">
-            <div>
-              <div style={{ fontWeight: 650 }}>{item.sku}</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>
-                {item.quantity} шт. × {fmt(Number(item.price_per_unit))} TJS
-              </div>
-            </div>
-            <strong>{fmt(Number(item.line_total))} TJS</strong>
-          </div>
-        ))}
+      <div className={styles.lineItems}>
+        <table className={styles.itemsTable}>
+          <caption>{t("suppliers.operation_items")}</caption>
+          <thead><tr>
+            <th scope="col">{t("suppliers.product_sku")}</th>
+            <th scope="col">{t("common.qty")}</th>
+            <th scope="col">{t("common.price")}, TJS</th>
+            <th scope="col">{t("common.amount")}, TJS</th>
+          </tr></thead>
+          <tbody>{items.map((item, index) => (
+            <tr key={`${item.sku}-${index}`}>
+              <th scope="row">{item.sku}</th>
+              <td>{item.quantity}</td>
+              <td>{Number(item.price_per_unit).toLocaleString("ru-RU", { maximumFractionDigits: 2 })}</td>
+              <td>{Number(item.line_total).toLocaleString("ru-RU", { maximumFractionDigits: 2 })}</td>
+            </tr>
+          ))}</tbody>
+          <tfoot><tr>
+            <th scope="row">{t("common.total")}</th>
+            <td>{items.reduce((total, item) => total + item.quantity, 0)}</td>
+            <td />
+            <td>{items.reduce((total, item) => total + Number(item.line_total), 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 })}</td>
+          </tr></tfoot>
+        </table>
       </div>
     );
   };
@@ -685,7 +699,7 @@ export default function SuppliersPage() {
         amount: Number(inv.total_amount),
         rawAmount: Number(inv.total_amount),
         notes: inv.notes || null,
-        badge: "Отдали товар",
+        badge: t("suppliers.goods_given"),
         tone: "give",
         items: inv.items,
         ts: new Date(inv.created_at).getTime(),
@@ -693,7 +707,7 @@ export default function SuppliersPage() {
     }
     for (const pay of detail.payments || []) {
       const note = (pay.notes || "").toLowerCase();
-      const badge = note.includes("закрыт") ? "Закрытие долга" : "Оплата от партнёра";
+      const badge = note.includes("закрыт") ? t("suppliers.debt_settled") : t("suppliers.payments_title");
       rows.push({
         key: `payment-${pay.id}`,
         id: pay.id,
@@ -722,7 +736,7 @@ export default function SuppliersPage() {
         amount: -Number(ret.total_amount),
         rawAmount: Number(ret.total_amount),
         notes: ret.notes || null,
-        badge: "Возврат нам",
+        badge: t("suppliers.returns_title"),
         tone: "take",
         items: ret.items,
         ts: new Date(ret.created_at).getTime(),
@@ -746,7 +760,7 @@ export default function SuppliersPage() {
         amount: Number(receipt.total_amount),
         rawAmount: Number(receipt.total_amount),
         notes: receipt.notes || null,
-        badge: "Приняли товар",
+        badge: t("suppliers.goods_received"),
         tone: "take",
         items: receipt.items,
         ts: new Date(receipt.created_at).getTime(),
@@ -763,7 +777,7 @@ export default function SuppliersPage() {
         amount: -Number(payout.amount),
         rawAmount: Number(payout.amount),
         notes: payout.notes || null,
-        badge: "Наша оплата",
+        badge: t("suppliers.payouts_title"),
         tone: "give",
         ts: new Date(payout.created_at).getTime(),
       });
@@ -781,7 +795,7 @@ export default function SuppliersPage() {
         amount: -Number(ret.total_amount),
         rawAmount: Number(ret.total_amount),
         notes: ret.notes || null,
-        badge: "Вернули партнёру",
+        badge: t("suppliers.outgoing_returns_title"),
         tone: "give",
         items: ret.items,
         ts: new Date(ret.created_at).getTime(),
@@ -798,29 +812,37 @@ export default function SuppliersPage() {
       <div className="partner-timeline">
         {rows.map((row) => {
           const open = !!expandedHistory[row.key];
+          const hasItems = !!row.items?.length;
           return (
             <div key={row.key} className="partner-tl-item">
-              <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <div className={styles.timelineRow}>
                 <button
                   type="button"
-                  className={`partner-tl-main${row.items ? "" : " is-static"}`}
-                  onClick={() => row.items && toggleHistory(row.key)}
-                  style={{ flex: 1 }}
+                  className={`${styles.timelineMain}${hasItems ? "" : ` ${styles.staticRow}`}`}
+                  onClick={() => hasItems && toggleHistory(row.key)}
+                  disabled={!hasItems}
+                  aria-expanded={hasItems ? open : undefined}
+                  aria-controls={hasItems ? `partner-items-${row.key}` : undefined}
                 >
-                  <span className="partner-tl-date">{row.date}</span>
+                  <span className={styles.operationDate}>{row.date} · #{row.id}</span>
                   <div className="partner-tl-mid">
                     <div className="partner-tl-title">{row.badge}</div>
                     {row.qty ? <div className="partner-tl-sub">{row.qty}</div> : null}
                     {row.notes ? <div className="partner-tl-sub" style={{ fontStyle: "italic", color: "var(--text-muted)" }}>{row.notes}</div> : null}
                   </div>
-                  <div className={`partner-tl-amount ${row.tone}`}>
+                  <div className={styles.operationAmount}>
                     {row.amount > 0 ? "+" : "−"}{fmt(Math.abs(row.amount))} TJS
                   </div>
+                  {hasItems && <span className={styles.itemsToggle}>
+                    {open ? t("suppliers.hide_items") : t("suppliers.show_items")}
+                    <ChevronDown size={14} className={open ? styles.chevronOpen : undefined} />
+                  </span>}
                 </button>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 8px" }}>
+                <div className={styles.rowActions}>
                   <button
                     type="button"
-                    title="Редактировать"
+                    title={t("suppliers.edit_operation")}
+                    aria-label={t("suppliers.edit_operation")}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!expandedId) return;
@@ -854,7 +876,8 @@ export default function SuppliersPage() {
                   </button>
                   <button
                     type="button"
-                    title="Удалить"
+                    title={t("suppliers.delete_operation")}
+                    aria-label={t("suppliers.delete_operation")}
                     onClick={(e) => {
                       e.stopPropagation();
                       void handleDeleteHistory(row);
@@ -875,7 +898,7 @@ export default function SuppliersPage() {
                   </button>
                 </div>
               </div>
-              {open && renderLineItems(row.items)}
+              {hasItems && <div id={`partner-items-${row.key}`} hidden={!open}>{open && renderLineItems(row.items)}</div>}
             </div>
           );
         })}
@@ -943,7 +966,7 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(pay.created_at).getTime(),
         date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
-        type: note.includes("закрыт") ? "Закрытие долга" : "Оплата от партнёра",
+        type: note.includes("закрыт") ? t("suppliers.debt_settled") : t("suppliers.payments_title"),
         amount: -amount,
         recvDelta: -amount,
         payDelta: 0,
@@ -1213,7 +1236,7 @@ export default function SuppliersPage() {
   return (
     <div style={{ display: "flex" }}>
       <Sidebar />
-      <main className="main-layout">
+      <main className={`main-layout ${styles.page}`}>
         {/* Header */}
         <div className="page-header" style={{ marginBottom: 32 }}>
           <div>
@@ -1271,7 +1294,7 @@ export default function SuppliersPage() {
             <p style={{ color: "var(--text-secondary)", fontSize: 16 }}>{t("suppliers.empty")}</p>
           </div>
         ) : (
-          <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "minmax(240px, 300px) 1fr", gap: 14, alignItems: "start" }}>
+          <div className={styles.workspace}>
             <section className="card" style={{ padding: 0, overflow: "hidden" }}>
               <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", fontSize: 13, fontWeight: 700 }}>
                 {t("suppliers.col_name")}
@@ -1284,6 +1307,7 @@ export default function SuppliersPage() {
                     key={s.id}
                     type="button"
                     onClick={() => void handleExpand(s.id)}
+                    aria-pressed={active}
                     style={{
                       width: "100%",
                       textAlign: "left",
@@ -1317,7 +1341,7 @@ export default function SuppliersPage() {
               })}
             </section>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className={styles.detail}>
               {selectedSupplier && (
                 <div className="card" style={{ padding: "16px 18px", display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                   <div>
@@ -1352,33 +1376,20 @@ export default function SuppliersPage() {
               {expandedId != null && detailLoading[expandedId] ? (
                 <div className="card" style={{ padding: 40, display: "flex", justifyContent: "center" }}><div className="spinner" /></div>
               ) : selectedSupplier && selectedDetail ? (
-                <>
-                  <section className="partner-detail-panel">
-                    <div className="partner-detail-header">
+                <div className={styles.columns}>
+                  <section className={`partner-detail-panel ${styles.directionPanel}`}>
+                    <div className={`partner-detail-header ${styles.directionHeader}`}>
                       <div>
-                        <h3 className="partner-detail-title">{t("suppliers.current_debt")}</h3>
-                        <div className="partner-detail-subtitle">{t("suppliers.btn_invoice")} · {t("suppliers.btn_pay")} · {t("suppliers.btn_return")}</div>
+                        <h3 className="partner-detail-title">{t("suppliers.goods_given")}</h3>
+                        <div className="partner-detail-subtitle">{t("suppliers.current_debt")}</div>
                       </div>
                       <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
                         {fmt(Number(selectedDetail.receivable_debt || 0))} TJS
                       </div>
                     </div>
                     <div className="partner-detail-body">
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
-                          <Calendar size={14} style={{ color: "var(--accent)" }} />
-                          <span>Дата операции:</span>
-                        </label>
-                        <input
-                          type="date"
-                          className="input"
-                          style={{ padding: "4px 8px", height: 32, fontSize: 13, borderRadius: 8, width: 145 }}
-                          value={operationDate}
-                          onChange={(e) => setOperationDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="partner-actions">
-                        <button className="partner-action-btn" onClick={() => openInvoiceModal(selectedSupplier)}>
+                      <div className={styles.actions}>
+                        <button className={`partner-action-btn ${styles.primaryAction}`} onClick={() => openInvoiceModal(selectedSupplier)}>
                           <ArrowDownCircle size={14} /> {t("suppliers.btn_invoice")}
                         </button>
                         <button className="partner-action-btn" disabled={Number(selectedSupplier.current_debt) <= 0} onClick={() => { setPaymentModal(selectedSupplier); setPaymentAmount(""); setPaymentNotes(""); }}>
@@ -1390,49 +1401,38 @@ export default function SuppliersPage() {
                       </div>
                       <button
                         type="button"
-                        className="partner-action-btn"
-                        style={{ width: "100%", justifyContent: "space-between", marginTop: 4 }}
+                        className={styles.historyToggle}
                         onClick={() => setOpenRecvHistory((v) => !v)}
+                        aria-expanded={openRecvHistory}
+                        aria-controls="partner-outgoing-history"
                       >
-                        <span>История</span>
-                        <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
-                          {buildReceivableTimeline(selectedDetail).length} записей · {openRecvHistory ? "скрыть ▴" : "показать ▾"}
+                        <span><History size={15} /> {t("suppliers.operation_history")}</span>
+                        <span className={styles.historyCount}>
+                          {buildReceivableTimeline(selectedDetail).length}
+                          <ChevronDown size={16} className={openRecvHistory ? styles.chevronOpen : undefined} />
                         </span>
                       </button>
-                      {openRecvHistory && (
-                        <div className="partner-history-box" style={{ marginTop: 10 }}>
+                      <div id="partner-outgoing-history" hidden={!openRecvHistory}>
+                        {openRecvHistory && <div className="partner-history-box" style={{ marginTop: 10 }}>
                           {renderTimeline(buildReceivableTimeline(selectedDetail))}
-                        </div>
-                      )}
+                        </div>}
+                      </div>
                     </div>
                   </section>
 
-                  <section className="partner-detail-panel">
-                    <div className="partner-detail-header">
+                  <section className={`partner-detail-panel ${styles.directionPanel}`}>
+                    <div className={`partner-detail-header ${styles.directionHeader}`}>
                       <div>
-                        <h3 className="partner-detail-title">{t("suppliers.current_payable")}</h3>
-                        <div className="partner-detail-subtitle">{t("suppliers.btn_receipt")} · {t("suppliers.btn_payout")} · {t("suppliers.btn_return_to_partner")}</div>
+                        <h3 className="partner-detail-title">{t("suppliers.goods_received")}</h3>
+                        <div className="partner-detail-subtitle">{t("suppliers.current_payable")}</div>
                       </div>
                       <div className="partner-detail-amount" style={{ color: "var(--red)" }}>
                         {fmt(Number(selectedDetail.payable_debt || 0))} TJS
                       </div>
                     </div>
                     <div className="partner-detail-body">
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
-                          <Calendar size={14} style={{ color: "var(--accent)" }} />
-                          <span>Дата операции:</span>
-                        </label>
-                        <input
-                          type="date"
-                          className="input"
-                          style={{ padding: "4px 8px", height: 32, fontSize: 13, borderRadius: 8, width: 145 }}
-                          value={operationDate}
-                          onChange={(e) => setOperationDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="partner-actions">
-                        <button className="partner-action-btn" onClick={() => openReceiptModal(selectedSupplier)}>
+                      <div className={styles.actions}>
+                        <button className={`partner-action-btn ${styles.primaryAction}`} onClick={() => openReceiptModal(selectedSupplier)}>
                           <ArrowUpCircle size={14} /> {t("suppliers.btn_receipt")}
                         </button>
                         <button className="partner-action-btn" disabled={Number(selectedSupplier.payable_debt || 0) <= 0} onClick={() => { setPayoutModal(selectedSupplier); setPayoutAmount(""); setPayoutNotes(""); }}>
@@ -1444,23 +1444,25 @@ export default function SuppliersPage() {
                       </div>
                       <button
                         type="button"
-                        className="partner-action-btn"
-                        style={{ width: "100%", justifyContent: "space-between", marginTop: 4 }}
+                        className={styles.historyToggle}
                         onClick={() => setOpenPayHistory((v) => !v)}
+                        aria-expanded={openPayHistory}
+                        aria-controls="partner-incoming-history"
                       >
-                        <span>История</span>
-                        <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>
-                          {buildPayableTimeline(selectedDetail).length} записей · {openPayHistory ? "скрыть ▴" : "показать ▾"}
+                        <span><History size={15} /> {t("suppliers.operation_history")}</span>
+                        <span className={styles.historyCount}>
+                          {buildPayableTimeline(selectedDetail).length}
+                          <ChevronDown size={16} className={openPayHistory ? styles.chevronOpen : undefined} />
                         </span>
                       </button>
-                      {openPayHistory && (
-                        <div className="partner-history-box" style={{ marginTop: 10 }}>
+                      <div id="partner-incoming-history" hidden={!openPayHistory}>
+                        {openPayHistory && <div className="partner-history-box" style={{ marginTop: 10 }}>
                           {renderTimeline(buildPayableTimeline(selectedDetail))}
-                        </div>
-                      )}
+                        </div>}
+                      </div>
                     </div>
                   </section>
-                </>
+                </div>
               ) : null}
             </div>
           </div>

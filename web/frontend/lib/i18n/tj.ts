@@ -329,6 +329,17 @@ export const tj = {
   },
 
   suppliers: {
+    goods_given: "Ба шарик додем",
+    goods_received: "Аз шарик гирифтем",
+    operation_history: "Таърихи амалиёт",
+    operation_items: "Молҳои амалиёт",
+    product_sku: "Мол / артикул",
+    show_items: "Нишон додани молҳо",
+    hide_items: "Пинҳон кардани молҳо",
+    edit_operation: "Таҳрири амалиёт",
+    delete_operation: "Нест кардани амалиёт",
+    debt_settled: "Пӯшидани қарз",
+
     title: "Шарикон",
     subtitle: "Контрагентҳое, ки мо ба онҳо мол медиҳем ва аз онҳо мол мегирем.",
     add_btn: "Илова кардани шарик",
