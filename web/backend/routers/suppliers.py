@@ -29,6 +29,62 @@ async def _apply_date(session, table: str, record_id: int, op_dt: datetime) -> N
     )
 
 
+async def _delete_goods_operation(
+    *,
+    session,
+    supplier_id: int,
+    record_id: int,
+    model,
+    items_relation,
+    not_found_detail: str,
+    inventory_delta: int,
+) -> None:
+    """Delete a goods operation and reverse its warehouse stock effect."""
+    from app.services.store_service import StoreService
+    from app.services.transaction_service import TransactionService
+
+    result = await session.execute(
+        select(model)
+        .options(selectinload(items_relation))
+        .where(model.id == record_id)
+    )
+    record = result.scalar_one_or_none()
+    if not record or record.supplier_id != supplier_id:
+        raise HTTPException(status_code=404, detail=not_found_detail)
+
+    warehouse_id = await StoreService(session).get_main_warehouse_id()
+    if not warehouse_id:
+        raise HTTPException(status_code=404, detail="Главный склад не найден")
+
+    txn_svc = TransactionService(session)
+    try:
+        for item in record.items:
+            inventory = await txn_svc._get_or_create_inventory(
+                warehouse_id, item.product_id, lock=True
+            )
+            change = inventory_delta * item.quantity
+            if inventory.quantity + change < 0:
+                product = await session.get(Product, item.product_id)
+                sku = product.sku if product else f"id={item.product_id}"
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Нельзя удалить операцию: на складе недостаточно товара "
+                        f"{sku}. В наличии {inventory.quantity} шт., нужно {item.quantity} шт."
+                    ),
+                )
+            inventory.quantity += change
+
+        await session.delete(record)
+        await session.commit()
+    except HTTPException:
+        await session.rollback()
+        raise
+    except Exception:
+        await session.rollback()
+        raise
+
+
 from app.models.supplier import Supplier
 from app.models.supplier_invoice import SupplierInvoice
 from app.models.supplier_invoice_item import SupplierInvoiceLineItem
@@ -864,11 +920,15 @@ async def add_outgoing_return(supplier_id: int, body: SupplierOutgoingReturnCrea
 async def delete_invoice(supplier_id: int, invoice_id: int, session: SessionDep, current_user: CurrentUser) -> None:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierInvoice, invoice_id)
-    if not record or record.supplier_id != supplier_id:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    await session.delete(record)
-    await session.commit()
+    await _delete_goods_operation(
+        session=session,
+        supplier_id=supplier_id,
+        record_id=invoice_id,
+        model=SupplierInvoice,
+        items_relation=SupplierInvoice.items,
+        not_found_detail="Invoice not found",
+        inventory_delta=1,
+    )
 
 
 @router.delete("/{supplier_id}/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить оплату (payment)")
@@ -886,22 +946,30 @@ async def delete_payment(supplier_id: int, payment_id: int, session: SessionDep,
 async def delete_return(supplier_id: int, return_id: int, session: SessionDep, current_user: CurrentUser) -> None:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierReturn, return_id)
-    if not record or record.supplier_id != supplier_id:
-        raise HTTPException(status_code=404, detail="Return not found")
-    await session.delete(record)
-    await session.commit()
+    await _delete_goods_operation(
+        session=session,
+        supplier_id=supplier_id,
+        record_id=return_id,
+        model=SupplierReturn,
+        items_relation=SupplierReturn.items,
+        not_found_detail="Return not found",
+        inventory_delta=-1,
+    )
 
 
 @router.delete("/{supplier_id}/receipts/{receipt_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить приёмку (receipt)")
 async def delete_receipt(supplier_id: int, receipt_id: int, session: SessionDep, current_user: CurrentUser) -> None:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierReceipt, receipt_id)
-    if not record or record.supplier_id != supplier_id:
-        raise HTTPException(status_code=404, detail="Receipt not found")
-    await session.delete(record)
-    await session.commit()
+    await _delete_goods_operation(
+        session=session,
+        supplier_id=supplier_id,
+        record_id=receipt_id,
+        model=SupplierReceipt,
+        items_relation=SupplierReceipt.items,
+        not_found_detail="Receipt not found",
+        inventory_delta=-1,
+    )
 
 
 @router.delete("/{supplier_id}/payouts/{payout_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить выплату партнёру (payout)")
@@ -919,11 +987,15 @@ async def delete_payout(supplier_id: int, payout_id: int, session: SessionDep, c
 async def delete_outgoing_return(supplier_id: int, return_id: int, session: SessionDep, current_user: CurrentUser) -> None:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierOutgoingReturn, return_id)
-    if not record or record.supplier_id != supplier_id:
-        raise HTTPException(status_code=404, detail="Outgoing return not found")
-    await session.delete(record)
-    await session.commit()
+    await _delete_goods_operation(
+        session=session,
+        supplier_id=supplier_id,
+        record_id=return_id,
+        model=SupplierOutgoingReturn,
+        items_relation=SupplierOutgoingReturn.items,
+        not_found_detail="Outgoing return not found",
+        inventory_delta=1,
+    )
 
 
 # ── PATCH endpoints ──────────────────────────────────────────────────────────
@@ -932,7 +1004,13 @@ async def delete_outgoing_return(supplier_id: int, return_id: int, session: Sess
 async def patch_invoice(supplier_id: int, invoice_id: int, body: SupplierInvoiceUpdate, session: SessionDep, current_user: CurrentUser) -> SupplierInvoiceOut:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierInvoice, invoice_id, options=[selectinload(SupplierInvoice.user), selectinload(SupplierInvoice.items)])
+    result = await session.execute(
+        select(SupplierInvoice)
+        .options(selectinload(SupplierInvoice.user), selectinload(SupplierInvoice.items))
+        .where(SupplierInvoice.id == invoice_id)
+        .execution_options(populate_existing=True)
+    )
+    record = result.scalar_one_or_none()
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Invoice not found")
     if "notes" in body.model_fields_set:
@@ -940,7 +1018,9 @@ async def patch_invoice(supplier_id: int, invoice_id: int, body: SupplierInvoice
     if body.operation_date is not None:
         await _apply_date(session, "supplier_invoices", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
     await session.commit()
-    await session.refresh(record)
+    await session.refresh(
+        record, attribute_names=["created_at", "notes", "total_amount"]
+    )
     return SupplierInvoiceOut(
         id=record.id, supplier_id=record.supplier_id, total_amount=record.total_amount,
         notes=record.notes, created_at=record.created_at,
@@ -966,7 +1046,9 @@ async def patch_payment(supplier_id: int, payment_id: int, body: SupplierPayment
     if body.operation_date is not None:
         await _apply_date(session, "supplier_payments", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
     await session.commit()
-    await session.refresh(record)
+    await session.refresh(
+        record, attribute_names=["created_at", "notes", "amount"]
+    )
     return SupplierPaymentOut(
         id=record.id, supplier_id=record.supplier_id, amount=record.amount,
         notes=record.notes, created_at=record.created_at,
@@ -978,7 +1060,13 @@ async def patch_payment(supplier_id: int, payment_id: int, body: SupplierPayment
 async def patch_return(supplier_id: int, return_id: int, body: SupplierReturnUpdate, session: SessionDep, current_user: CurrentUser) -> SupplierReturnOut:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierReturn, return_id, options=[selectinload(SupplierReturn.user), selectinload(SupplierReturn.items)])
+    result = await session.execute(
+        select(SupplierReturn)
+        .options(selectinload(SupplierReturn.user), selectinload(SupplierReturn.items))
+        .where(SupplierReturn.id == return_id)
+        .execution_options(populate_existing=True)
+    )
+    record = result.scalar_one_or_none()
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Return not found")
     if "notes" in body.model_fields_set:
@@ -986,7 +1074,9 @@ async def patch_return(supplier_id: int, return_id: int, body: SupplierReturnUpd
     if body.operation_date is not None:
         await _apply_date(session, "supplier_returns", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
     await session.commit()
-    await session.refresh(record)
+    await session.refresh(
+        record, attribute_names=["created_at", "notes", "total_amount"]
+    )
     return SupplierReturnOut(
         id=record.id, supplier_id=record.supplier_id, total_amount=record.total_amount,
         notes=record.notes, created_at=record.created_at,
@@ -1002,7 +1092,13 @@ async def patch_return(supplier_id: int, return_id: int, body: SupplierReturnUpd
 async def patch_receipt(supplier_id: int, receipt_id: int, body: SupplierReceiptUpdate, session: SessionDep, current_user: CurrentUser) -> SupplierReceiptOut:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierReceipt, receipt_id, options=[selectinload(SupplierReceipt.user), selectinload(SupplierReceipt.items)])
+    result = await session.execute(
+        select(SupplierReceipt)
+        .options(selectinload(SupplierReceipt.user), selectinload(SupplierReceipt.items))
+        .where(SupplierReceipt.id == receipt_id)
+        .execution_options(populate_existing=True)
+    )
+    record = result.scalar_one_or_none()
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Receipt not found")
     if "notes" in body.model_fields_set:
@@ -1010,7 +1106,9 @@ async def patch_receipt(supplier_id: int, receipt_id: int, body: SupplierReceipt
     if body.operation_date is not None:
         await _apply_date(session, "supplier_receipts", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
     await session.commit()
-    await session.refresh(record)
+    await session.refresh(
+        record, attribute_names=["created_at", "notes", "total_amount"]
+    )
     return SupplierReceiptOut(
         id=record.id, supplier_id=record.supplier_id, total_amount=record.total_amount,
         notes=record.notes, created_at=record.created_at,
@@ -1036,7 +1134,9 @@ async def patch_payout(supplier_id: int, payout_id: int, body: SupplierPayoutUpd
     if body.operation_date is not None:
         await _apply_date(session, "supplier_payouts", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
     await session.commit()
-    await session.refresh(record)
+    await session.refresh(
+        record, attribute_names=["created_at", "notes", "amount"]
+    )
     return SupplierPayoutOut(
         id=record.id, supplier_id=record.supplier_id, amount=record.amount,
         notes=record.notes, created_at=record.created_at,
@@ -1048,7 +1148,16 @@ async def patch_payout(supplier_id: int, payout_id: int, body: SupplierPayoutUpd
 async def patch_outgoing_return(supplier_id: int, return_id: int, body: SupplierOutgoingReturnUpdate, session: SessionDep, current_user: CurrentUser) -> SupplierOutgoingReturnOut:
     if current_user.role not in _ALLOWED_ROLES:
         raise HTTPException(status_code=403, detail="Access denied")
-    record = await session.get(SupplierOutgoingReturn, return_id, options=[selectinload(SupplierOutgoingReturn.user), selectinload(SupplierOutgoingReturn.items)])
+    result = await session.execute(
+        select(SupplierOutgoingReturn)
+        .options(
+            selectinload(SupplierOutgoingReturn.user),
+            selectinload(SupplierOutgoingReturn.items),
+        )
+        .where(SupplierOutgoingReturn.id == return_id)
+        .execution_options(populate_existing=True)
+    )
+    record = result.scalar_one_or_none()
     if not record or record.supplier_id != supplier_id:
         raise HTTPException(status_code=404, detail="Outgoing return not found")
     if "notes" in body.model_fields_set:
@@ -1056,7 +1165,9 @@ async def patch_outgoing_return(supplier_id: int, return_id: int, body: Supplier
     if body.operation_date is not None:
         await _apply_date(session, "supplier_outgoing_returns", record.id, _resolve_dt(body.operation_date))  # type: ignore[arg-type]
     await session.commit()
-    await session.refresh(record)
+    await session.refresh(
+        record, attribute_names=["created_at", "notes", "total_amount"]
+    )
     return SupplierOutgoingReturnOut(
         id=record.id, supplier_id=record.supplier_id, total_amount=record.total_amount,
         notes=record.notes, created_at=record.created_at,
