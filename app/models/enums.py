@@ -67,6 +67,11 @@ class FinancialTransactionType(CaseInsensitiveEnum):
     PAYMENT = "payment"
     COLLECTION = "collection"
 
+
+class ManualDebtTransactionType(CaseInsensitiveEnum):
+    CHARGE = "charge"
+    PAYMENT = "payment"
+
 class DebtLedgerReason(CaseInsensitiveEnum):
     SALE_COMPLETED = "sale_completed"
     CASH_COLLECTION = "cash_collection"

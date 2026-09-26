@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Truck,
+  NotebookTabs,
 } from "lucide-react";
 import { clearAuth, getStoredUser, onAuthExpired } from "@/lib/auth";
 import { api, UserMe } from "@/lib/api";
@@ -26,6 +27,7 @@ const ownerNav = [
   { href: "/inventory", icon: Warehouse, label: "sidebar.inventory" },
   { href: "/products", icon: Package, label: "sidebar.products" },
   { href: "/finance", icon: DollarSign, label: "sidebar.finance" },
+  { href: "/debts", icon: NotebookTabs, label: "sidebar.manual_debts" },
   { href: "/suppliers", icon: Truck, label: "sidebar.suppliers" },
   { href: "/management", icon: Users, label: "sidebar.management" },
   { href: "/settings", icon: Settings, label: "sidebar.settings" },

@@ -330,6 +330,28 @@ export const api = {
     });
   },
 
+  // Manual debts (independent from sales and cash collection)
+  getManualDebts: () => request<ManualDebtOverview>("/manual-debts"),
+  getManualDebtStore: (storeId: number) =>
+    request<ManualDebtStoreDetail>(`/manual-debts/stores/${storeId}`),
+  createManualDebtCharge: (data: ManualDebtMutation) =>
+    request<ManualDebtTransaction>("/manual-debts/charges", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  createManualDebtPayment: (data: ManualDebtMutation) =>
+    request<ManualDebtTransaction>("/manual-debts/payments", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateManualDebtTransaction: (id: number, data: Partial<Omit<ManualDebtMutation, "store_id">>) =>
+    request<ManualDebtTransaction>(`/manual-debts/transactions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  deleteManualDebtTransaction: (id: number) =>
+    request<void>(`/manual-debts/transactions/${id}`, { method: "DELETE" }),
+
   // Invites
   getInvites: (store_id: number) =>
     request<Invite[]>(`/invites/${store_id}`),
@@ -550,6 +572,49 @@ export interface CashCollectionSummary {
   store_id: number;
   store_name: string;
   current_debt: number;
+}
+
+export type ManualDebtTransactionType = "charge" | "payment";
+
+export interface ManualDebtTransaction {
+  id: number;
+  store_id: number;
+  store_name: string;
+  user_id: number;
+  user_name: string;
+  type: ManualDebtTransactionType;
+  amount: number;
+  operation_date: string;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface ManualDebtStoreSummary {
+  store_id: number;
+  store_name: string;
+  balance: number;
+  last_transaction: ManualDebtTransaction | null;
+}
+
+export interface ManualDebtOverview {
+  stores: ManualDebtStoreSummary[];
+  stores_with_debt: number;
+  total_debt: number;
+  charged_this_month: number;
+}
+
+export interface ManualDebtStoreDetail {
+  store_id: number;
+  store_name: string;
+  balance: number;
+  transactions: ManualDebtTransaction[];
+}
+
+export interface ManualDebtMutation {
+  store_id: number;
+  amount: number;
+  operation_date: string;
+  comment?: string | null;
 }
 
 export interface Invite {

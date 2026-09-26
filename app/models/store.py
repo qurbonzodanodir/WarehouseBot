@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.sale import Sale
     from app.models.financial_transaction import FinancialTransaction
     from app.models.debt_ledger import DebtLedger
+    from app.models.manual_debt_transaction import ManualDebtTransaction
 
 from sqlalchemy import Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -46,6 +47,9 @@ class Store(Base):
         back_populates="store"
     )
     debt_ledgers: Mapped[list[DebtLedger]] = relationship(
+        back_populates="store"
+    )
+    manual_debt_transactions: Mapped[list[ManualDebtTransaction]] = relationship(
         back_populates="store"
     )
 

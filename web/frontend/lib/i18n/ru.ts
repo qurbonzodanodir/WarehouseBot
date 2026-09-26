@@ -18,6 +18,7 @@ export const ru = {
     seller: "Продавец",
     admin: "Админ",
     suppliers: "Партнёры",
+    manual_debts: "Долги",
   },
   
   // Common

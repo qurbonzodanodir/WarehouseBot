@@ -19,6 +19,7 @@ from web.backend.routers import (
     stores,
     suppliers,
     notifications,
+    manual_debts,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,7 @@ app.include_router(finance.router, prefix=API_PREFIX)
 app.include_router(invites.router, prefix=API_PREFIX)
 app.include_router(suppliers.router, prefix=API_PREFIX)
 app.include_router(notifications.router, prefix=API_PREFIX)
+app.include_router(manual_debts.router, prefix=API_PREFIX)
 
 
 @app.post(settings.webhook_path)

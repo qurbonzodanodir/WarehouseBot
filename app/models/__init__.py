@@ -25,6 +25,7 @@ from app.models.supplier_outgoing_return import SupplierOutgoingReturn
 from app.models.supplier_outgoing_return_item import SupplierOutgoingReturnLineItem
 from app.models.system_setting import SystemSetting
 from app.models.push_subscription import PushSubscription
+from app.models.manual_debt_transaction import ManualDebtTransaction
 
 __all__ = [
     "User",
@@ -49,4 +50,5 @@ __all__ = [
     "SupplierReturnLineItem",
     "SystemSetting",
     "PushSubscription",
+    "ManualDebtTransaction",
 ]

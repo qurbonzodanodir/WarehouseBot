@@ -18,6 +18,7 @@ export const tj = {
     seller: "Фурӯшанда",
     admin: "Админ",
     suppliers: "Шарикон",
+    manual_debts: "Қарзҳо",
   },
   
   // Common
