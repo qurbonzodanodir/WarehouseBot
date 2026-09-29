@@ -966,7 +966,7 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(pay.created_at).getTime(),
         date: new Date(pay.created_at).toLocaleDateString("ru-RU"),
-        type: note.includes("закрыт") ? t("suppliers.debt_settled") : t("suppliers.payments_title"),
+        type: note.includes("закрыт") ? "Закрытие долга" : "Приняли оплату",
         amount: -amount,
         recvDelta: -amount,
         payDelta: 0,
@@ -979,7 +979,7 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(ret.created_at).getTime(),
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
-        type: "Возврат нам",
+        type: "Приняли возврат",
         amount: -amount,
         recvDelta: -amount,
         payDelta: 0,
@@ -1005,7 +1005,7 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(payout.created_at).getTime(),
         date: new Date(payout.created_at).toLocaleDateString("ru-RU"),
-        type: "Наша оплата",
+        type: "Оплатили",
         amount,
         recvDelta: 0,
         payDelta: -amount,
@@ -1018,7 +1018,7 @@ export default function SuppliersPage() {
       allOps.push({
         ts: new Date(ret.created_at).getTime(),
         date: new Date(ret.created_at).toLocaleDateString("ru-RU"),
-        type: "Вернули партнёру",
+        type: "Вернули товар",
         amount,
         recvDelta: 0,
         payDelta: -amount,
@@ -1050,9 +1050,6 @@ export default function SuppliersPage() {
     const netClose = recvClose - payClose;
 
     const fmtMoney = (n: number) => `${Math.round(Math.abs(n)).toLocaleString("ru-RU")} TJS`;
-    const fmtSigned = (n: number) =>
-      `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.round(Math.abs(n)).toLocaleString("ru-RU")}`;
-
     const debtResult =
       netClose > 0
         ? `Итог: вы должны нам ${fmtMoney(netClose)}`
@@ -1060,148 +1057,100 @@ export default function SuppliersPage() {
           ? `Итог: мы должны вам ${fmtMoney(netClose)}`
           : "Итог: долгов нет — всё закрыто";
 
-    const gaveGoods = ops.filter((o) => o.type === "Отдали товар").reduce((a, o) => a + Math.abs(o.amount), 0);
-    const partnerPaid = ops
-      .filter((o) => o.type === "Оплата от партнёра" || o.type === "Закрытие долга")
-      .reduce((a, o) => a + Math.abs(o.amount), 0);
-    const returnsToUs = ops.filter((o) => o.type === "Возврат нам").reduce((a, o) => a + Math.abs(o.amount), 0);
-    const receivedGoods = ops.filter((o) => o.type === "Приняли товар").reduce((a, o) => a + Math.abs(o.amount), 0);
-    const wePaid = ops.filter((o) => o.type === "Наша оплата").reduce((a, o) => a + Math.abs(o.amount), 0);
-    const returnedToPartner = ops.filter((o) => o.type === "Вернули партнёру").reduce((a, o) => a + Math.abs(o.amount), 0);
-
-    const partnerLabel = (type: string) => {
-      switch (type) {
-        case "Отдали товар":
-          return "Товар вам";
-        case "Оплата от партнёра":
-          return "Ваша оплата";
-        case "Закрытие долга":
-          return "Закрытие вашего долга";
-        case "Возврат нам":
-          return "Возврат товара от вас";
-        case "Приняли товар":
-          return "Товар от вас";
-        case "Наша оплата":
-          return "Наша оплата вам";
-        case "Вернули партнёру":
-          return "Вернули товар вам";
-        default:
-          return type;
-      }
-    };
-
     const detailRows: (string | number)[][] = [];
-    const detailSubtotalRows: number[] = [];
-    const detailDateRanges: { start: number; end: number }[] = [];
-    let operationIndex = 0;
 
-    while (operationIndex < ops.length) {
-      const date = ops[operationIndex].date;
-      const dateOps: ExportOp[] = [];
-      const dateStartRow = detailRows.length;
-      while (operationIndex < ops.length && ops[operationIndex].date === date) {
-        dateOps.push(ops[operationIndex]);
-        operationIndex += 1;
-      }
+    if (period.mode === "month") {
+      detailRows.push([
+        new Date(period.year, period.month, 1).toLocaleDateString("ru-RU"),
+        "Остаток на начало",
+        "Остаток на начало периода",
+        "—",
+        "—",
+        "—",
+        recvOpen || "—",
+        payOpen || "—",
+        "—",
+      ]);
+    }
 
-      for (const op of dateOps) {
-        if (op.items.length > 0) {
-          for (const item of op.items) {
-            detailRows.push([
-              op.date,
-              partnerLabel(op.type),
-              item.sku || "—",
-              item.sku || "—",
-              item.quantity,
-              Number(item.price_per_unit),
-              Number(item.line_total),
-              op.notes || "—",
-            ]);
-          }
-        } else {
+    for (const op of ops) {
+      const side = op.recvDelta !== 0 ? "Нам должны" : "Мы должны";
+      if (op.items.length > 0) {
+        const direction = op.recvDelta !== 0 ? Math.sign(op.recvDelta) : Math.sign(op.payDelta);
+        for (const item of op.items) {
+          const lineAmount = direction * Number(item.line_total);
           detailRows.push([
             op.date,
-            partnerLabel(op.type),
-            "—",
-            "—",
-            "—",
-            "—",
-            fmtSigned(op.amount),
+            side,
+            op.type,
+            item.sku || "—",
+            item.quantity,
+            Number(item.price_per_unit),
+            op.recvDelta !== 0 ? lineAmount : "—",
+            op.payDelta !== 0 ? lineAmount : "—",
             op.notes || "—",
           ]);
         }
+      } else {
+        detailRows.push([
+          op.date,
+          side,
+          op.type,
+          "—",
+          "—",
+          "—",
+          op.recvDelta !== 0 ? op.recvDelta : "—",
+          op.payDelta !== 0 ? op.payDelta : "—",
+          op.notes || "—",
+        ]);
       }
-
-      detailDateRanges.push({ start: dateStartRow, end: detailRows.length - 1 });
-      detailRows.push(["", "", "", "", "", "", "", ""]);
-      detailRows.push([
-        "",
-        `ИТОГ ЗА ${date}`,
-        "",
-        "",
-        "",
-        "",
-        fmtSigned(dateOps.reduce((sum, op) => sum + op.recvDelta - op.payDelta, 0)),
-        "",
-      ]);
-      detailSubtotalRows.push(detailRows.length - 1);
     }
 
-    const periodTotal = ops.reduce((sum, op) => sum + op.recvDelta - op.payDelta, 0);
+    if (ops.length === 0) {
+      detailRows.push(["—", "—", "Нет операций за выбранный период", "—", "—", "—", "—", "—", "—"]);
+    }
 
+    detailRows.push([
+      "",
+      "ИТОГ",
+      "Остаток долга на конец периода",
+      "",
+      "",
+      "",
+      recvClose,
+      payClose,
+      debtResult,
+    ]);
+
+    const tableHeaderRow = 5;
     const rows: (string | number)[][] = [
+      ["ВЗАИМОРАСЧЁТЫ С ПАРТНЁРОМ"],
       ["Партнёр", detail.name],
       ["Период", periodLabel],
       ["Дата выгрузки", dateStr],
-      [],
-      ["СКОЛЬКО КТО ДОЛЖЕН"],
-      ["Вы должны нам", fmtMoney(recvClose)],
-      ["Мы должны вам", fmtMoney(payClose)],
-      ["ИТОГ", debtResult],
-      [],
-      ["ИСТОРИЯ ОПЕРАЦИЙ"],
-      ["Дата", "Операция", "Товар", "SKU", "Кол-во", "Цена за шт. (TJS)", "Сумма (TJS)", "Комментарий"],
-      ...(detailRows.length
-        ? detailRows
-        : [["—", "Нет операций за выбранный период", "—", "—", "—", "—", "—", "—"]]),
-      [],
-      [],
-      ["", "ИТОГ ЗА ВЫБРАННЫЙ ПЕРИОД", "", "", "", "", fmtSigned(periodTotal), ""],
-      [],
-      ["ИТОГО ЗА ПЕРИОД", "", "", ""],
-      ["Товар вам", "", "", fmtMoney(gaveGoods)],
-      ["Ваши оплаты / закрытие долга", "", "", fmtMoney(partnerPaid)],
-      ["Возврат товара от вас", "", "", fmtMoney(returnsToUs)],
-      ["Товар от вас (приняли)", "", "", fmtMoney(receivedGoods)],
-      ["Наши оплаты вам", "", "", fmtMoney(wePaid)],
-      ["Вернули товар вам", "", "", fmtMoney(returnedToPartner)],
-      [],
-      ["ИТОГ ДОЛГА СЕЙЧАС", debtResult, "", ""],
+      ["Результат на конец периода", `${fmtMoney(recvClose)} нам должны · ${fmtMoney(payClose)} мы должны · ${debtResult}`],
+      ["Дата", "Сторона", "Операция", "Товар / SKU", "Кол-во", "Цена за шт. (TJS)", "Нам должны (TJS)", "Мы должны (TJS)", "Комментарий"],
+      ...detailRows,
     ];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    const detailHeaderRow = 10;
-    const detailFirstRow = detailHeaderRow + 1;
-    ws["!merges"] = [];
-    for (const { start, end } of detailDateRanges) {
-      if (end > start) {
-        ws["!merges"].push({
-          s: { r: detailFirstRow + start, c: 0 },
-          e: { r: detailFirstRow + end, c: 0 },
-        });
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+      { s: { r: 4, c: 1 }, e: { r: 4, c: 8 } },
+    ];
+    ws["!autofilter"] = {
+      ref: XLSX.utils.encode_range({ s: { r: tableHeaderRow, c: 0 }, e: { r: rows.length - 2, c: 8 } }),
+    };
+    for (let row = tableHeaderRow + 1; row < rows.length; row += 1) {
+      for (const column of [5, 6, 7]) {
+        const cell = ws[XLSX.utils.encode_cell({ r: row, c: column })];
+        if (cell?.t === "n") cell.z = '#,##0.00 "TJS"';
       }
     }
-    for (const subtotalRow of detailSubtotalRows) {
-      const rowNumber = detailFirstRow + subtotalRow;
-      ws["!merges"].push({
-        s: { r: rowNumber, c: 1 },
-        e: { r: rowNumber, c: 5 },
-      });
-    }
     ws["!cols"] = [
-      { wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 18 },
-      { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 32 },
+      { wch: 14 }, { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 10 },
+      { wch: 19 }, { wch: 20 }, { wch: 20 }, { wch: 36 },
     ];
     XLSX.utils.book_append_sheet(wb, ws, "Взаиморасчёты");
 
