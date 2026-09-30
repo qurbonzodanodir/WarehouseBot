@@ -1052,9 +1052,9 @@ export default function SuppliersPage() {
     const fmtMoney = (n: number) => `${Math.round(Math.abs(n)).toLocaleString("ru-RU")} TJS`;
     const debtResult =
       netClose > 0
-        ? `Итог: вы должны нам ${fmtMoney(netClose)}`
+        ? `Итог: вы должны ${fmtMoney(netClose)}`
         : netClose < 0
-          ? `Итог: мы должны вам ${fmtMoney(netClose)}`
+          ? `Итог: я должен ${fmtMoney(netClose)}`
           : "Итог: долгов нет — всё закрыто";
 
     const detailRows: (string | number)[][] = [];
@@ -1074,7 +1074,7 @@ export default function SuppliersPage() {
     }
 
     for (const op of ops) {
-      const side = op.recvDelta !== 0 ? "Нам должны" : "Мы должны";
+      const side = op.recvDelta !== 0 ? "Вы должны" : "Я должен";
       if (op.items.length > 0) {
         const direction = op.recvDelta !== 0 ? Math.sign(op.recvDelta) : Math.sign(op.payDelta);
         for (const item of op.items) {
@@ -1128,8 +1128,8 @@ export default function SuppliersPage() {
       ["Партнёр", detail.name],
       ["Период", periodLabel],
       ["Дата выгрузки", dateStr],
-      ["Результат на конец периода", `${fmtMoney(recvClose)} нам должны · ${fmtMoney(payClose)} мы должны · ${debtResult}`],
-      ["Дата", "Сторона", "Операция", "Товар / SKU", "Кол-во", "Цена за шт. (TJS)", "Нам должны (TJS)", "Мы должны (TJS)", "Комментарий"],
+      ["Результат на конец периода", `Вы должны: ${fmtMoney(recvClose)} · Я должен: ${fmtMoney(payClose)} · ${debtResult}`],
+      ["Дата", "Сторона", "Операция", "Товар / SKU", "Кол-во", "Цена за шт. (TJS)", "Вы должны (TJS)", "Я должен (TJS)", "Комментарий"],
       ...detailRows,
     ];
 
@@ -1181,8 +1181,8 @@ export default function SuppliersPage() {
 
     for (let row = tableHeaderRow + 1; row < rows.length; row += 1) {
       const side = String(rows[row]?.[1] ?? "");
-      const isReceivable = side === "Нам должны";
-      const isPayable = side === "Мы должны";
+      const isReceivable = side === "Вы должны";
+      const isPayable = side === "Я должен";
       const isTotal = side === "ИТОГ";
       const fillColor = isReceivable ? "EAF7EE" : isPayable ? "FDECEC" : isTotal ? "E5E7EB" : "FFFFFF";
       const textColor = isReceivable ? "166534" : isPayable ? "991B1B" : "1F2937";
