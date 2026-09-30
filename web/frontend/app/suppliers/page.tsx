@@ -8,7 +8,7 @@ import { api, ProductPicker, Supplier, SupplierDetail } from "@/lib/api";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useToast } from "@/lib/ToastContext";
 import { createPortal } from "react-dom";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
   Truck, Plus, AlertCircle, ChevronRight, ChevronDown,
   Wallet, X, History, ArrowDownCircle, ArrowUpCircle,
@@ -1135,6 +1135,89 @@ export default function SuppliersPage() {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
+    const border = {
+      top: { style: "thin", color: { rgb: "D7DEE8" } },
+      bottom: { style: "thin", color: { rgb: "D7DEE8" } },
+      left: { style: "thin", color: { rgb: "D7DEE8" } },
+      right: { style: "thin", color: { rgb: "D7DEE8" } },
+    } as const;
+    const applyStyle = (row: number, column: number, style: XLSX.CellStyle) => {
+      const address = XLSX.utils.encode_cell({ r: row, c: column });
+      if (!ws[address]) ws[address] = { t: "s", v: "" };
+      ws[address].s = style;
+    };
+
+    applyStyle(0, 0, {
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 16 },
+      fill: { patternType: "solid", fgColor: { rgb: "1F2937" } },
+      alignment: { horizontal: "center", vertical: "center" },
+    });
+    for (let row = 1; row <= 4; row += 1) {
+      applyStyle(row, 0, {
+        font: { bold: true, color: { rgb: "374151" } },
+        fill: { patternType: "solid", fgColor: { rgb: "F3F4F6" } },
+        alignment: { vertical: "center" },
+      });
+      applyStyle(row, 1, {
+        font: { color: { rgb: "111827" } },
+        fill: { patternType: "solid", fgColor: { rgb: "F9FAFB" } },
+        alignment: { vertical: "center", wrapText: true },
+      });
+    }
+
+    for (let column = 0; column <= 8; column += 1) {
+      const isReceivable = column === 6;
+      const isPayable = column === 7;
+      applyStyle(tableHeaderRow, column, {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: {
+          patternType: "solid",
+          fgColor: { rgb: isReceivable ? "15803D" : isPayable ? "B91C1C" : "374151" },
+        },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border,
+      });
+    }
+
+    for (let row = tableHeaderRow + 1; row < rows.length; row += 1) {
+      const side = String(rows[row]?.[1] ?? "");
+      const isReceivable = side === "Нам должны";
+      const isPayable = side === "Мы должны";
+      const isTotal = side === "ИТОГ";
+      const fillColor = isReceivable ? "EAF7EE" : isPayable ? "FDECEC" : isTotal ? "E5E7EB" : "FFFFFF";
+      const textColor = isReceivable ? "166534" : isPayable ? "991B1B" : "1F2937";
+
+      for (let column = 0; column <= 8; column += 1) {
+        applyStyle(row, column, {
+          font: { bold: isTotal || column === 1, color: { rgb: textColor } },
+          fill: { patternType: "solid", fgColor: { rgb: fillColor } },
+          alignment: {
+            vertical: "center",
+            horizontal: column >= 4 && column <= 7 ? "right" : "left",
+            wrapText: column === 2 || column === 3 || column === 8,
+          },
+          border,
+          numFmt: column >= 5 && column <= 7 ? '#,##0.00 "TJS"' : undefined,
+        });
+      }
+
+      if (isTotal) {
+        applyStyle(row, 6, {
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          fill: { patternType: "solid", fgColor: { rgb: "15803D" } },
+          alignment: { horizontal: "right", vertical: "center" },
+          border,
+          numFmt: '#,##0.00 "TJS"',
+        });
+        applyStyle(row, 7, {
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          fill: { patternType: "solid", fgColor: { rgb: "B91C1C" } },
+          alignment: { horizontal: "right", vertical: "center" },
+          border,
+          numFmt: '#,##0.00 "TJS"',
+        });
+      }
+    }
     ws["!merges"] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
       { s: { r: 4, c: 1 }, e: { r: 4, c: 8 } },
@@ -1142,16 +1225,11 @@ export default function SuppliersPage() {
     ws["!autofilter"] = {
       ref: XLSX.utils.encode_range({ s: { r: tableHeaderRow, c: 0 }, e: { r: rows.length - 2, c: 8 } }),
     };
-    for (let row = tableHeaderRow + 1; row < rows.length; row += 1) {
-      for (const column of [5, 6, 7]) {
-        const cell = ws[XLSX.utils.encode_cell({ r: row, c: column })];
-        if (cell?.t === "n") cell.z = '#,##0.00 "TJS"';
-      }
-    }
     ws["!cols"] = [
       { wch: 14 }, { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 10 },
       { wch: 19 }, { wch: 20 }, { wch: 20 }, { wch: 36 },
     ];
+    ws["!rows"] = rows.map((_, row) => ({ hpt: row === 0 ? 28 : row === tableHeaderRow ? 34 : 22 }));
     XLSX.utils.book_append_sheet(wb, ws, "Взаиморасчёты");
 
     const safeName = detail.name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "partner";
