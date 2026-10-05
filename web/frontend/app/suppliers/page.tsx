@@ -1298,7 +1298,7 @@ export default function SuppliersPage() {
     return Array.from(years).sort((a, b) => b - a);
   }, [selectedDetail]);
 
-  const openPartnerExport = (scope: "receivable" | "payable") => {
+  const openPartnerExport = (scope: "combined" | "receivable" | "payable") => {
     if (!selectedDetail) {
       showToast(t("suppliers.export_empty"), "error");
       return;
@@ -1429,34 +1429,15 @@ export default function SuppliersPage() {
                       {t("suppliers.col_contact")}: {selectedSupplier.contact_info || "—"}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      disabled={!selectedDetail}
-                      onClick={() => openPartnerExport("receivable")}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap",
-                        color: "var(--green)", border: "1px solid rgba(34, 197, 94, 0.35)",
-                        background: "rgba(34, 197, 94, 0.08)",
-                      }}
-                    >
-                      <FileSpreadsheet size={15} /> {t("suppliers.export_receivable")}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      disabled={!selectedDetail}
-                      onClick={() => openPartnerExport("payable")}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap",
-                        color: "var(--red)", border: "1px solid rgba(239, 68, 68, 0.35)",
-                        background: "rgba(239, 68, 68, 0.08)",
-                      }}
-                    >
-                      <FileSpreadsheet size={15} /> {t("suppliers.export_payable")}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={!selectedDetail}
+                    onClick={() => openPartnerExport("combined")}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", border: "1px solid var(--border)" }}
+                  >
+                    <FileSpreadsheet size={15} /> {t("suppliers.export_excel")}
+                  </button>
                 </div>
               )}
 
@@ -1470,8 +1451,24 @@ export default function SuppliersPage() {
                         <h3 className="partner-detail-title">{t("suppliers.goods_given")}</h3>
                         <div className="partner-detail-subtitle">{t("suppliers.current_debt")}</div>
                       </div>
-                      <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
-                        {fmt(Number(selectedDetail.receivable_debt || 0))} TJS
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <div className="partner-detail-amount" style={{ color: "var(--green)" }}>
+                          {fmt(Number(selectedDetail.receivable_debt || 0))} TJS
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => openPartnerExport("receivable")}
+                          title={t("suppliers.export_receivable")}
+                          style={{
+                            minHeight: 30, padding: "5px 9px", fontSize: 11,
+                            display: "inline-flex", alignItems: "center", gap: 5,
+                            color: "var(--green)", border: "1px solid rgba(34, 197, 94, 0.35)",
+                            background: "rgba(34, 197, 94, 0.08)",
+                          }}
+                        >
+                          <FileSpreadsheet size={13} /> Excel
+                        </button>
                       </div>
                     </div>
                     <div className="partner-detail-body">
@@ -1513,8 +1510,24 @@ export default function SuppliersPage() {
                         <h3 className="partner-detail-title">{t("suppliers.goods_received")}</h3>
                         <div className="partner-detail-subtitle">{t("suppliers.current_payable")}</div>
                       </div>
-                      <div className="partner-detail-amount" style={{ color: "var(--red)" }}>
-                        {fmt(Number(selectedDetail.payable_debt || 0))} TJS
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <div className="partner-detail-amount" style={{ color: "var(--red)" }}>
+                          {fmt(Number(selectedDetail.payable_debt || 0))} TJS
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => openPartnerExport("payable")}
+                          title={t("suppliers.export_payable")}
+                          style={{
+                            minHeight: 30, padding: "5px 9px", fontSize: 11,
+                            display: "inline-flex", alignItems: "center", gap: 5,
+                            color: "var(--red)", border: "1px solid rgba(239, 68, 68, 0.35)",
+                            background: "rgba(239, 68, 68, 0.08)",
+                          }}
+                        >
+                          <FileSpreadsheet size={13} /> Excel
+                        </button>
                       </div>
                     </div>
                     <div className="partner-detail-body">
@@ -1562,7 +1575,11 @@ export default function SuppliersPage() {
           <div className="modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
               <h3 style={{ margin: 0 }}>
-                {exportScope === "receivable" ? t("suppliers.export_receivable_title") : t("suppliers.export_payable_title")}
+                {exportScope === "combined"
+                  ? t("suppliers.export_period_title")
+                  : exportScope === "receivable"
+                    ? t("suppliers.export_receivable_title")
+                    : t("suppliers.export_payable_title")}
               </h3>
               <button onClick={() => setExportModalOpen(false)} style={{ background: "transparent", border: "none", color: "var(--text-primary)" }}>
                 <X size={22} />
