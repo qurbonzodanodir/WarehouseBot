@@ -85,6 +85,7 @@ export default function SuppliersPage() {
   const [savingOutgoingReturn, setSavingOutgoingReturn] = useState(false);
 
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<"combined" | "receivable" | "payable">("combined");
   const [exportPeriodMode, setExportPeriodMode] = useState<"all" | "month">("month");
   const [exportMonth, setExportMonth] = useState(() => new Date().getMonth());
   const [exportYear, setExportYear] = useState(() => new Date().getFullYear());
@@ -914,6 +915,7 @@ export default function SuppliersPage() {
   const exportPartnerExcel = (
     detail: SupplierDetail,
     period: { mode: "all" } | { mode: "month"; year: number; month: number },
+    scope: "combined" | "receivable" | "payable",
   ) => {
     const exportedAt = new Date();
     const dateStr = exportedAt.toLocaleDateString("ru-RU");
@@ -1038,13 +1040,25 @@ export default function SuppliersPage() {
       }
     }
 
-    const ops = allOps.filter((op) => inSelectedPeriod(op.ts));
+    if (scope === "receivable") payOpen = 0;
+    if (scope === "payable") recvOpen = 0;
+
+    const ops = allOps.filter((op) => {
+      if (!inSelectedPeriod(op.ts)) return false;
+      if (scope === "receivable") return op.recvDelta !== 0;
+      if (scope === "payable") return op.payDelta !== 0;
+      return true;
+    });
     const recvClose =
-      period.mode === "all"
+      scope === "payable"
+        ? 0
+        : period.mode === "all"
         ? Number(detail.receivable_debt || 0)
         : recvOpen + ops.reduce((acc, op) => acc + op.recvDelta, 0);
     const payClose =
-      period.mode === "all"
+      scope === "receivable"
+        ? 0
+        : period.mode === "all"
         ? Number(detail.payable_debt || 0)
         : payOpen + ops.reduce((acc, op) => acc + op.payDelta, 0);
     const netClose = recvClose - payClose;
@@ -1057,84 +1071,97 @@ export default function SuppliersPage() {
           ? `Итог: я должен ${fmtMoney(netClose)}`
           : "Итог: долгов нет — всё закрыто";
 
+    const isCombined = scope === "combined";
+    const singleAmount = scope === "receivable" ? recvClose : payClose;
+    const title = isCombined
+      ? "ВЗАИМОРАСЧЁТЫ С ПАРТНЁРОМ"
+      : scope === "receivable"
+        ? "ДОЛГ ПАРТНЁРА"
+        : "МОЙ ДОЛГ ПЕРЕД ПАРТНЁРОМ";
+    const resultLabel = isCombined
+      ? `Вы должны: ${fmtMoney(recvClose)} · Я должен: ${fmtMoney(payClose)} · ${debtResult}`
+      : `${scope === "receivable" ? "Вы должны" : "Я должен"}: ${fmtMoney(singleAmount)} · ${debtResult}`;
     const detailRows: (string | number)[][] = [];
 
     if (period.mode === "month") {
-      detailRows.push([
-        new Date(period.year, period.month, 1).toLocaleDateString("ru-RU"),
-        "Остаток на начало",
-        "Остаток на начало периода",
-        "—",
-        "—",
-        "—",
-        recvOpen || "—",
-        payOpen || "—",
-        "—",
-      ]);
+      detailRows.push(isCombined
+        ? [
+            new Date(period.year, period.month, 1).toLocaleDateString("ru-RU"),
+            "Остаток на начало",
+            "Остаток на начало периода",
+            "—", "—", "—", recvOpen || "—", payOpen || "—", "—",
+          ]
+        : [
+            new Date(period.year, period.month, 1).toLocaleDateString("ru-RU"),
+            "Остаток на начало периода",
+            "—", "—", "—",
+            (scope === "receivable" ? recvOpen : payOpen) || "—",
+            "—",
+          ]);
     }
 
     for (const op of ops) {
       const side = op.recvDelta !== 0 ? "Вы должны" : "Я должен";
+      const opAmount = op.recvDelta !== 0 ? op.recvDelta : op.payDelta;
       if (op.items.length > 0) {
-        const direction = op.recvDelta !== 0 ? Math.sign(op.recvDelta) : Math.sign(op.payDelta);
+        const direction = Math.sign(opAmount);
         for (const item of op.items) {
           const lineAmount = direction * Number(item.line_total);
-          detailRows.push([
-            op.date,
-            side,
-            op.type,
-            item.sku || "—",
-            item.quantity,
-            Number(item.price_per_unit),
-            op.recvDelta !== 0 ? lineAmount : "—",
-            op.payDelta !== 0 ? lineAmount : "—",
-            op.notes || "—",
-          ]);
+          detailRows.push(isCombined
+            ? [
+                op.date, side, op.type, item.sku || "—", item.quantity,
+                Number(item.price_per_unit),
+                op.recvDelta !== 0 ? lineAmount : "—",
+                op.payDelta !== 0 ? lineAmount : "—",
+                op.notes || "—",
+              ]
+            : [
+                op.date, op.type, item.sku || "—", item.quantity,
+                Number(item.price_per_unit), lineAmount, op.notes || "—",
+              ]);
         }
       } else {
-        detailRows.push([
-          op.date,
-          side,
-          op.type,
-          "—",
-          "—",
-          "—",
-          op.recvDelta !== 0 ? op.recvDelta : "—",
-          op.payDelta !== 0 ? op.payDelta : "—",
-          op.notes || "—",
-        ]);
+        detailRows.push(isCombined
+          ? [
+              op.date, side, op.type, "—", "—", "—",
+              op.recvDelta !== 0 ? op.recvDelta : "—",
+              op.payDelta !== 0 ? op.payDelta : "—",
+              op.notes || "—",
+            ]
+          : [op.date, op.type, "—", "—", "—", opAmount, op.notes || "—"]);
       }
     }
 
     if (ops.length === 0) {
-      detailRows.push(["—", "—", "Нет операций за выбранный период", "—", "—", "—", "—", "—", "—"]);
+      detailRows.push(isCombined
+        ? ["—", "—", "Нет операций за выбранный период", "—", "—", "—", "—", "—", "—"]
+        : ["—", "Нет операций за выбранный период", "—", "—", "—", "—", "—"]);
     }
 
-    detailRows.push([
-      "",
-      "ИТОГ",
-      "Остаток долга на конец периода",
-      "",
-      "",
-      "",
-      recvClose,
-      payClose,
-      debtResult,
-    ]);
+    detailRows.push(isCombined
+      ? ["", "ИТОГ", "Остаток долга на конец периода", "", "", "", recvClose, payClose, debtResult]
+      : ["", "ИТОГ", "Остаток долга на конец периода", "", "", singleAmount, debtResult]);
 
     const tableHeaderRow = 5;
+    const tableHeader = isCombined
+      ? ["Дата", "Сторона", "Операция", "Товар / SKU", "Кол-во", "Цена за шт. (TJS)", "Вы должны (TJS)", "Я должен (TJS)", "Комментарий"]
+      : ["Дата", "Операция", "Товар / SKU", "Кол-во", "Цена за шт. (TJS)", `${scope === "receivable" ? "Вы должны" : "Я должен"} (TJS)`, "Комментарий"];
     const rows: (string | number)[][] = [
-      ["ВЗАИМОРАСЧЁТЫ С ПАРТНЁРОМ"],
+      [title],
       ["Партнёр", detail.name],
       ["Период", periodLabel],
       ["Дата выгрузки", dateStr],
-      ["Результат на конец периода", `Вы должны: ${fmtMoney(recvClose)} · Я должен: ${fmtMoney(payClose)} · ${debtResult}`],
-      ["Дата", "Сторона", "Операция", "Товар / SKU", "Кол-во", "Цена за шт. (TJS)", "Вы должны (TJS)", "Я должен (TJS)", "Комментарий"],
+      ["Результат на конец периода", resultLabel],
+      tableHeader,
       ...detailRows,
     ];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
+    const lastColumn = isCombined ? 8 : 6;
+    const receivableAmountColumn = isCombined ? 6 : scope === "receivable" ? 5 : -1;
+    const payableAmountColumn = isCombined ? 7 : scope === "payable" ? 5 : -1;
+    const currencyColumns = new Set(isCombined ? [5, 6, 7] : [4, 5]);
     const border = {
       top: { style: "thin", color: { rgb: "D7DEE8" } },
       bottom: { style: "thin", color: { rgb: "D7DEE8" } },
@@ -1165,9 +1192,9 @@ export default function SuppliersPage() {
       });
     }
 
-    for (let column = 0; column <= 8; column += 1) {
-      const isReceivable = column === 6;
-      const isPayable = column === 7;
+    for (let column = 0; column <= lastColumn; column += 1) {
+      const isReceivable = column === receivableAmountColumn;
+      const isPayable = column === payableAmountColumn;
       applyStyle(tableHeaderRow, column, {
         font: { bold: true, color: { rgb: "FFFFFF" } },
         fill: {
@@ -1180,36 +1207,40 @@ export default function SuppliersPage() {
     }
 
     for (let row = tableHeaderRow + 1; row < rows.length; row += 1) {
-      const side = String(rows[row]?.[1] ?? "");
-      const isReceivable = side === "Вы должны";
-      const isPayable = side === "Я должен";
-      const isTotal = side === "ИТОГ";
+      const rowLabel = String(rows[row]?.[1] ?? "");
+      const isReceivable = isCombined ? rowLabel === "Вы должны" : scope === "receivable";
+      const isPayable = isCombined ? rowLabel === "Я должен" : scope === "payable";
+      const isTotal = rowLabel === "ИТОГ";
       const fillColor = isReceivable ? "EAF7EE" : isPayable ? "FDECEC" : isTotal ? "E5E7EB" : "FFFFFF";
       const textColor = isReceivable ? "166534" : isPayable ? "991B1B" : "1F2937";
 
-      for (let column = 0; column <= 8; column += 1) {
+      for (let column = 0; column <= lastColumn; column += 1) {
         applyStyle(row, column, {
           font: { bold: isTotal || column === 1, color: { rgb: textColor } },
           fill: { patternType: "solid", fgColor: { rgb: fillColor } },
           alignment: {
             vertical: "center",
-            horizontal: column >= 4 && column <= 7 ? "right" : "left",
-            wrapText: column === 2 || column === 3 || column === 8,
+            horizontal: isCombined
+              ? column >= 4 && column <= 7 ? "right" : "left"
+              : column >= 3 && column <= 5 ? "right" : "left",
+            wrapText: isCombined
+              ? column === 2 || column === 3 || column === 8
+              : column === 1 || column === 2 || column === 6,
           },
           border,
-          numFmt: column >= 5 && column <= 7 ? '#,##0.00 "TJS"' : undefined,
+          numFmt: currencyColumns.has(column) ? '#,##0.00 "TJS"' : undefined,
         });
       }
 
       if (isTotal) {
-        applyStyle(row, 6, {
+        if (receivableAmountColumn >= 0) applyStyle(row, receivableAmountColumn, {
           font: { bold: true, color: { rgb: "FFFFFF" } },
           fill: { patternType: "solid", fgColor: { rgb: "15803D" } },
           alignment: { horizontal: "right", vertical: "center" },
           border,
           numFmt: '#,##0.00 "TJS"',
         });
-        applyStyle(row, 7, {
+        if (payableAmountColumn >= 0) applyStyle(row, payableAmountColumn, {
           font: { bold: true, color: { rgb: "FFFFFF" } },
           fill: { patternType: "solid", fgColor: { rgb: "B91C1C" } },
           alignment: { horizontal: "right", vertical: "center" },
@@ -1219,25 +1250,32 @@ export default function SuppliersPage() {
       }
     }
     ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
-      { s: { r: 4, c: 1 }, e: { r: 4, c: 8 } },
+      { s: { r: 0, c: 0 }, e: { r: 0, c: lastColumn } },
+      { s: { r: 4, c: 1 }, e: { r: 4, c: lastColumn } },
     ];
     ws["!autofilter"] = {
-      ref: XLSX.utils.encode_range({ s: { r: tableHeaderRow, c: 0 }, e: { r: rows.length - 2, c: 8 } }),
+      ref: XLSX.utils.encode_range({ s: { r: tableHeaderRow, c: 0 }, e: { r: rows.length - 2, c: lastColumn } }),
     };
-    ws["!cols"] = [
-      { wch: 14 }, { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 10 },
-      { wch: 19 }, { wch: 20 }, { wch: 20 }, { wch: 36 },
-    ];
+    ws["!cols"] = isCombined
+      ? [
+          { wch: 14 }, { wch: 18 }, { wch: 24 }, { wch: 24 }, { wch: 10 },
+          { wch: 19 }, { wch: 20 }, { wch: 20 }, { wch: 36 },
+        ]
+      : [
+          { wch: 14 }, { wch: 26 }, { wch: 25 }, { wch: 10 },
+          { wch: 19 }, { wch: 20 }, { wch: 36 },
+        ];
     ws["!rows"] = rows.map((_, row) => ({ hpt: row === 0 ? 28 : row === tableHeaderRow ? 34 : 22 }));
-    XLSX.utils.book_append_sheet(wb, ws, "Взаиморасчёты");
+    const sheetName = isCombined ? "Взаиморасчёты" : scope === "receivable" ? "Вы должны" : "Я должен";
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
     const safeName = detail.name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "partner";
     const periodFile =
       period.mode === "all"
         ? "all"
         : `${period.year}-${String(period.month + 1).padStart(2, "0")}`;
-    XLSX.writeFile(wb, `partner_${safeName}_${periodFile}.xlsx`);
+    const scopeFile = scope === "combined" ? "all_debts" : scope === "receivable" ? "partner_debt" : "my_debt";
+    XLSX.writeFile(wb, `partner_${safeName}_${scopeFile}_${periodFile}.xlsx`);
     showToast(t("suppliers.export_success"), "success");
     setExportModalOpen(false);
   };
@@ -1388,6 +1426,7 @@ export default function SuppliersPage() {
                         return;
                       }
                       const d = new Date();
+                      setExportScope("combined");
                       setExportPeriodMode("month");
                       setExportMonth(d.getMonth());
                       setExportYear(d.getFullYear());
@@ -1509,6 +1548,35 @@ export default function SuppliersPage() {
             <div style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
               {selectedDetail.name}
             </div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>{t("suppliers.export_scope")}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {([
+                  ["combined", t("suppliers.export_scope_combined")],
+                  ["receivable", t("suppliers.export_scope_receivable")],
+                  ["payable", t("suppliers.export_scope_payable")],
+                ] as const).map(([value, label]) => (
+                  <label
+                    key={value}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
+                      padding: "10px 12px", borderRadius: 10,
+                      border: exportScope === value ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      background: exportScope === value ? "var(--accent-soft)" : "transparent",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="export-scope"
+                      checked={exportScope === value}
+                      onChange={() => setExportScope(value)}
+                    />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>{t("suppliers.export_period")}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                 <input
@@ -1578,6 +1646,7 @@ export default function SuppliersPage() {
                     exportPeriodMode === "all"
                       ? { mode: "all" }
                       : { mode: "month", year: exportYear, month: exportMonth },
+                    exportScope,
                   );
                 }}
               >
