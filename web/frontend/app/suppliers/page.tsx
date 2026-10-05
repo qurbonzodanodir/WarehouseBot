@@ -1298,6 +1298,19 @@ export default function SuppliersPage() {
     return Array.from(years).sort((a, b) => b - a);
   }, [selectedDetail]);
 
+  const openPartnerExport = (scope: "receivable" | "payable") => {
+    if (!selectedDetail) {
+      showToast(t("suppliers.export_empty"), "error");
+      return;
+    }
+    const today = new Date();
+    setExportScope(scope);
+    setExportPeriodMode("month");
+    setExportMonth(today.getMonth());
+    setExportYear(today.getFullYear());
+    setExportModalOpen(true);
+  };
+
   return (
     <div style={{ display: "flex" }}>
       <Sidebar />
@@ -1416,26 +1429,34 @@ export default function SuppliersPage() {
                       {t("suppliers.col_contact")}: {selectedSupplier.contact_info || "—"}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    disabled={!selectedDetail}
-                    onClick={() => {
-                      if (!selectedDetail) {
-                        showToast(t("suppliers.export_empty"), "error");
-                        return;
-                      }
-                      const d = new Date();
-                      setExportScope("combined");
-                      setExportPeriodMode("month");
-                      setExportMonth(d.getMonth());
-                      setExportYear(d.getFullYear());
-                      setExportModalOpen(true);
-                    }}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", border: "1px solid var(--border)" }}
-                  >
-                    <FileSpreadsheet size={15} /> {t("suppliers.export_excel")}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={!selectedDetail}
+                      onClick={() => openPartnerExport("receivable")}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap",
+                        color: "var(--green)", border: "1px solid rgba(34, 197, 94, 0.35)",
+                        background: "rgba(34, 197, 94, 0.08)",
+                      }}
+                    >
+                      <FileSpreadsheet size={15} /> {t("suppliers.export_receivable")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={!selectedDetail}
+                      onClick={() => openPartnerExport("payable")}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap",
+                        color: "var(--red)", border: "1px solid rgba(239, 68, 68, 0.35)",
+                        background: "rgba(239, 68, 68, 0.08)",
+                      }}
+                    >
+                      <FileSpreadsheet size={15} /> {t("suppliers.export_payable")}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1540,41 +1561,15 @@ export default function SuppliersPage() {
         <div className="modal-overlay" onClick={() => setExportModalOpen(false)}>
           <div className="modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
-              <h3 style={{ margin: 0 }}>{t("suppliers.export_period_title")}</h3>
+              <h3 style={{ margin: 0 }}>
+                {exportScope === "receivable" ? t("suppliers.export_receivable_title") : t("suppliers.export_payable_title")}
+              </h3>
               <button onClick={() => setExportModalOpen(false)} style={{ background: "transparent", border: "none", color: "var(--text-primary)" }}>
                 <X size={22} />
               </button>
             </div>
             <div style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
               {selectedDetail.name}
-            </div>
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>{t("suppliers.export_scope")}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {([
-                  ["combined", t("suppliers.export_scope_combined")],
-                  ["receivable", t("suppliers.export_scope_receivable")],
-                  ["payable", t("suppliers.export_scope_payable")],
-                ] as const).map(([value, label]) => (
-                  <label
-                    key={value}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
-                      padding: "10px 12px", borderRadius: 10,
-                      border: exportScope === value ? "1px solid var(--accent)" : "1px solid var(--border)",
-                      background: exportScope === value ? "var(--accent-soft)" : "transparent",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="export-scope"
-                      checked={exportScope === value}
-                      onChange={() => setExportScope(value)}
-                    />
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
-                  </label>
-                ))}
-              </div>
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>{t("suppliers.export_period")}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
