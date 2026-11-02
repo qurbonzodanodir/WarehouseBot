@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
 async def _start_polling():
     """Run Aiogram polling (used when no webhook is configured)."""
     try:
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, polling_timeout=10)
     except Exception as e:
         logger.error("Polling error: %s", e)
 
