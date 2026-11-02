@@ -40,12 +40,9 @@ async def cmd_start(
     """Greet registered user or prompt for invite code."""
     if user is not None:
         if user.role == UserRole.OWNER:
-            # Owner can use warehouse/seller menu while web is unavailable
-            menu_func = reply.get_seller_menu
-            greeting_key = GREETING_KEYS.get(user.role, "👋")
+            # Owner → redirect to web dashboard
             await message.answer(
-                _("welcome", name=user.name, greeting=_(greeting_key)) + "\n\n" + _("owner_use_web"),
-                reply_markup=menu_func(_),
+                _("owner_use_web"),
                 parse_mode="HTML",
             )
             return
