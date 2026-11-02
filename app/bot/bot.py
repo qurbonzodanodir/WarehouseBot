@@ -1,3 +1,5 @@
+import socket
+import aiohttp
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
@@ -11,9 +13,21 @@ from app.bot.routers.seller import seller_router
 from app.bot.routers.warehouse import router as warehouse_router
 from app.core.config import settings
 
+
+class IPv4Session(AiohttpSession):
+    async def create_session(self) -> aiohttp.ClientSession:
+        connector = aiohttp.TCPConnector(family=socket.AF_INET)
+        return aiohttp.ClientSession(
+            connector=connector,
+            json_serialize=self.json_dumps,
+        )
+
+
 bot_session = None
 if settings.telegram_proxy_url:
     bot_session = AiohttpSession(proxy=settings.telegram_proxy_url)
+else:
+    bot_session = IPv4Session()
 
 bot = Bot(
     token=settings.bot_token,
