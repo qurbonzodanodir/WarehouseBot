@@ -31,7 +31,7 @@ async def _set_webhook():
 
     try:
         await asyncio.wait_for(
-            bot.set_webhook(settings.webhook_url, drop_pending_updates=True),
+            bot.set_webhook(settings.webhook_url, drop_pending_updates=False),
             timeout=10,
         )
         logger.info("Webhook set: %s", settings.webhook_url)
