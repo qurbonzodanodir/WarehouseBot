@@ -1,13 +1,19 @@
+import logging
 from dataclasses import dataclass
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.quantity import validate_transaction_quantity
 from app.models.display_inventory import DisplayInventory
 from app.models.enums import OrderStatus
 from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.product import Product
+from app.services import catalog_cache
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -23,6 +29,11 @@ class OrderService:
         self.session = session
 
     async def get_available_products(self, store_id: int) -> list[Product]:
+        cache_key = f"store:{store_id}:available"
+        cached = catalog_cache.get_cached(cache_key)
+        if cached is not None:
+            return list(cached)
+
         from sqlalchemy import exists, or_
 
         from sqlalchemy.orm import aliased
@@ -53,7 +64,13 @@ class OrderService:
             .order_by(Product.sku)
         )
         result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        products = list(result.scalars().all())
+
+        # Detach from session for safe cross-request caching
+        for p in products:
+            self.session.expunge(p)
+        catalog_cache.set_cached(cache_key, products)
+        return list(products)
 
     async def get_store_inventory(
         self, store_id: int, include_empty: bool = False
@@ -77,6 +94,11 @@ class OrderService:
         store_id: int,
         include_empty: bool = False,
     ) -> list[VitrineItem]:
+        cache_key = f"store:{store_id}:vitrine:{include_empty}"
+        cached = catalog_cache.get_cached(cache_key)
+        if cached is not None:
+            return list(cached)
+
         from sqlalchemy.orm import joinedload
 
         regular_result = await self.session.execute(
@@ -111,7 +133,15 @@ class OrderService:
         items = sorted(merged.values(), key=lambda item: item.product.id)
         if not include_empty:
             items = [item for item in items if item.quantity > 0]
-        return items
+
+        # Detach Product objects from session for safe cross-request caching
+        expunged: set[int] = set()
+        for vi in items:
+            if vi.product.id not in expunged:
+                self.session.expunge(vi.product)
+                expunged.add(vi.product.id)
+        catalog_cache.set_cached(cache_key, items)
+        return list(items)
 
     async def get_store_vitrine_product_stock(
         self,
