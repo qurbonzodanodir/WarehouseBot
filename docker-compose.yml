@@ -31,7 +31,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-warehouse}
     extra_hosts:
-      - "api.telegram.org:149.154.167.220"
+      - "api.telegram.org:149.154.166.110"
     ports:
       - "127.0.0.1:8000:8000"
 

@@ -38,6 +38,8 @@ class NotificationService:
 
         chat_message_ids = []
         for user in users:
+            if not user.telegram_id:
+                continue
             try:
                 user_lang = user.language_code if user.language_code else "ru"
                 user_translator = Translator(user_lang)
