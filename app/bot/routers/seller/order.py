@@ -110,6 +110,7 @@ async def search_product(
 async def order_page_nav(
     callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
+    await callback.answer()
     page = int(callback.data.split(":")[-1])
     order_svc = OrderService(session)
     items = await order_svc.get_available_products(store_id=user.store_id)
@@ -123,13 +124,13 @@ async def order_page_nav(
         item_callback_prefix="order:select",
         _=_,
     )
-    await callback.answer()
 
 
 @router.callback_query(OrderFlow.select_product, F.data.startswith("order:select:"))
 async def select_product(
     callback: CallbackQuery, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
+    await callback.answer()
     product_id = int(callback.data.split(":")[-1])
     product = await session.get(Product, product_id)
     await state.update_data(product_id=product_id)
@@ -138,7 +139,6 @@ async def select_product(
         parse_mode="HTML",
     )
     await state.set_state(OrderFlow.enter_quantity)
-    await callback.answer()
 
 
 @router.message(OrderFlow.enter_quantity)
@@ -207,6 +207,7 @@ async def enter_order_quantity(
 
 @router.callback_query(OrderFlow.cart_action, F.data == "cart:add_more")
 async def cart_add_more(callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any) -> None:
+    await callback.answer()
     order_svc = OrderService(session)
     items = await order_svc.get_available_products(store_id=user.store_id)
     if not items:
@@ -223,19 +224,19 @@ async def cart_add_more(callback: CallbackQuery, user: User, state: FSMContext, 
         _=_,
     )
     await state.set_state(OrderFlow.select_product)
-    await callback.answer()
 
 
 @router.callback_query(OrderFlow.cart_action, F.data == "cart:clear")
 async def cart_clear(callback: CallbackQuery, state: FSMContext, _: Any) -> None:
+    await callback.answer()
     await state.update_data(cart=[])
     await callback.message.edit_text(_("cart_cleared"))
     await state.clear()
-    await callback.answer()
 
 
 @router.callback_query(OrderFlow.cart_action, F.data == "cart:send")
 async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any) -> None:
+    await callback.answer()
     data = await state.get_data()
     cart = data.get("cart", [])
     if not cart:
@@ -296,13 +297,13 @@ async def cart_send(callback: CallbackQuery, user: User, state: FSMContext, sess
         logger.error(f"Error in cart_send: {e}", exc_info=True)
 
     await state.clear()
-    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("order:accept:"))
 async def accept_delivery(
     callback: CallbackQuery, user: User, session: AsyncSession, _: Any
 ) -> None:
+    await callback.answer()
     order_id = int(callback.data.split(":")[-1])
     try:
         order_check = await _ensure_seller_order_access(session, user, order_id)
@@ -324,21 +325,19 @@ async def accept_delivery(
     except Exception as e:
         await callback.message.edit_text(_("sale_system_error"))
         logger.error(f"Error in accept_delivery: {order_id=}, {e}", exc_info=True)
-    finally:
-        await callback.answer()
 
 
 @router.callback_query(F.data.startswith("order:batch_accept:"))
 async def batch_accept_delivery(
     callback: CallbackQuery, user: User, session: AsyncSession, _: Any
 ) -> None:
+    await callback.answer()
     batch_id = callback.data.split(":")[-1]
     try:
         order_svc = OrderService(session)
         orders = await order_svc.get_batch_orders(batch_id)
         if not orders or any(o.store_id != user.store_id for o in orders):
             await callback.message.edit_text(_("batch_empty_or_processed"))
-            await callback.answer()
             return
         
         from app.models.enums import OrderStatus
@@ -352,7 +351,6 @@ async def batch_accept_delivery(
                 
         if not delivered_info:
             await callback.message.edit_text(_("batch_empty_or_processed"))
-            await callback.answer()
             return
             
         await session.commit()

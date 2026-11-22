@@ -116,23 +116,24 @@ async def process_customer_return_quantity(
 
 @router.callback_query(CustomerReturnFlow.cart_action, F.data == "customer_return_cart:add_more")
 async def customer_return_cart_add_more(callback: CallbackQuery, state: FSMContext, _: Any) -> None:
+    await callback.answer()
     await callback.message.edit_text(_("customer_return_prompt"), parse_mode="HTML")
     await state.set_state(CustomerReturnFlow.enter_sku)
-    await callback.answer()
 
 
 @router.callback_query(CustomerReturnFlow.cart_action, F.data == "customer_return_cart:clear")
 async def customer_return_cart_clear(callback: CallbackQuery, state: FSMContext, _: Any) -> None:
+    await callback.answer()
     await state.update_data(cart=[])
     await callback.message.edit_text(_("cart_cleared"))
     await state.clear()
-    await callback.answer()
 
 
 @router.callback_query(CustomerReturnFlow.cart_action, F.data == "customer_return_cart:send")
 async def customer_return_cart_send(
     callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
+    await callback.answer()
     from app.bot.keyboards.inline import warehouse_return_kb
     from app.services.notification_service import NotificationService
     

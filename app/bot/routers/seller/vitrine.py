@@ -63,6 +63,7 @@ async def vitrine_search(
 async def vitrine_page_nav(
     callback: CallbackQuery, user: User, session: AsyncSession, state: FSMContext, _: Any
 ) -> None:
+    await callback.answer()
     page = int(callback.data.split(":")[-1])
     data = await state.get_data()
     query = data.get("vitrine_query", "")
@@ -72,4 +73,3 @@ async def vitrine_page_nav(
     if query:
         items = [item for item in items if product_matches(getattr(item, "product", item), query)]
     await _send_vitrine_page(callback, items, page, _=_)
-    await callback.answer()

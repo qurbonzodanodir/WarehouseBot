@@ -124,6 +124,7 @@ async def return_search_product(
 async def return_page_nav(
     callback: CallbackQuery, user: User, state: FSMContext, session: AsyncSession, _: Any
 ) -> None:
+    await callback.answer()
     page = int(callback.data.split(":")[-1])
     order_svc = OrderService(session)
     items = await order_svc.get_store_vitrine_inventory(user.store_id, include_empty=False)
@@ -136,13 +137,13 @@ async def return_page_nav(
         item_callback_prefix="return:select",
         _=_,
     )
-    await callback.answer()
 
 
 @router.callback_query(ReturnFlow.select_product, F.data.startswith("return:select:"))
 async def return_select_product(
     callback: CallbackQuery, state: FSMContext, session: AsyncSession, user: User, _: Any
 ) -> None:
+    await callback.answer()
     product_id = int(callback.data.split(":")[-1])
     order_svc = OrderService(session)
     regular_qty, display_qty = await order_svc.get_store_vitrine_product_stock(user.store_id, product_id)
@@ -155,7 +156,6 @@ async def return_select_product(
         parse_mode="HTML",
     )
     await state.set_state(ReturnFlow.enter_quantity)
-    await callback.answer()
 
 
 @router.message(ReturnFlow.enter_quantity)
